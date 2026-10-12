@@ -62,7 +62,7 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.11 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.12 — F8 / Escape to close");
         string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors" };
         float tabWidth = 556f / pages.Length;
         for (int i = 0; i < pages.Length; i++)
@@ -303,7 +303,7 @@ public sealed partial class Core
             long visualTiming = timings.Begin();
             visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value,
                 tintScore.Value, Read(starColor), Read(progressColor), Read(scoreColor), Read(songProgressColor), lockSpeed.Value,
-                clock.Elapsed.TotalSeconds);
+                clock.Elapsed.TotalSeconds, timings);
             timings.End(2, visualTiming);
         }
         catch (Exception ex)
