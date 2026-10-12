@@ -21,12 +21,10 @@ internal sealed class VisualOverrides
     private readonly Dictionary<IntPtr, (double Window, float Speed)> visibility = new();
     private bool oldSides, oldStrings, oldBeats, oldScore, oldPractice;
     private readonly HashSet<IntPtr> hiddenPlayers = new();
-    private readonly HashSet<IntPtr> speedLog = new();
-    private readonly HashSet<IntPtr> speedTransitionLog = new();
     private bool fullSongSpeedSyncPending = true;
     public bool HasOverrides => hidden.Count != 0 || colors.Count != 0 || speeds.Count != 0 || texts.Count != 0;
     public bool NeedsUpdate => fullSongSpeedSyncPending || HasOverrides;
-    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); starFaceSprites.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); speedTransitionLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
+    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); starFaceSprites.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
     private SpriteRenderer[] Sprites(GameObject go)
     {
         if (!spriteChildren.TryGetValue(go.Pointer, out var result))
@@ -140,8 +138,6 @@ internal sealed class VisualOverrides
             // so the new practice session starts from its live native state.
             speeds.Clear();
             visibility.Clear();
-            speedLog.Clear();
-            speedTransitionLog.Clear();
         }
         if (!practiceNow && fullSongSpeedSyncPending)
             fullSongSpeedSyncPending = !SyncFullSongSpeed(game);
@@ -176,9 +172,6 @@ internal sealed class VisualOverrides
                 notes = p.gameObject.GetComponentInChildren<GuitarNoteRenderer>(true);
                 if (notes != null) noteRenderers.Add(p.Pointer, notes);
             }
-            float noteSpeedBefore = notes == null ? float.NaN : notes.noteSpeed;
-            float beatSpeedBefore = b == null ? float.NaN : b.field_Private_Single_0;
-            float highwaySpeedBefore = p.highwayScroll == null ? float.NaN : p.highwayScroll.field_Private_Single_1;
             if (notes != null)
             {
                 if (!visibility.TryGetValue(notes.Pointer, out var native) || !double.IsFinite(native.Window) || native.Window <= 0 || native.Speed <= 0)
@@ -199,14 +192,10 @@ internal sealed class VisualOverrides
                     if (native.Speed > 0 && float.IsFinite(native.Speed)) notes.noteSpeed = native.Speed;
                     if (native.Window > 0 && double.IsFinite(native.Window)) notes.field_Protected_Double_0 = native.Window;
                 }
-                if (compensate && speedLog.Add(notes.Pointer))
-                    MelonLoader.MelonLogger.Msg($"Practice rendering: profile={configured}, chartTempo={game.practiceSpeed}, clockRate={ratio}, nativeSpeed={native.Speed}, targetSpeed={speed}, nativeWindow={native.Window}, targetWindow={window}.");
             }
             if (b != null) b.field_Private_Single_0 = Speed(b.Pointer, b.field_Private_Single_0, ratio, compensate, configured);
             if (p.highwayScroll != null)
                 p.highwayScroll.field_Private_Single_1 = Speed(p.highwayScroll.Pointer, p.highwayScroll.field_Private_Single_1, ratio, compensate, configured);
-            if (practiceChanged && speedTransitionLog.Add(p.Pointer))
-                MelonLoader.MelonLogger.Msg($"Practice speed transition: practice={practiceNow}, chartTempo={game.practiceSpeed:0.###}, clockRate={ratio:0.###}, profile={configured:0.###}, note={noteSpeedBefore:0.###}->{(notes == null ? float.NaN : notes.noteSpeed):0.###}, beat={beatSpeedBefore:0.###}->{(b == null ? float.NaN : b.field_Private_Single_0):0.###}, highway={highwaySpeedBefore:0.###}->{(p.highwayScroll == null ? float.NaN : p.highwayScroll.field_Private_Single_1):0.###}.");
         }
         oldSides = sides; oldStrings = strings; oldBeats = beats;
         oldPractice = practiceNow;
@@ -262,13 +251,9 @@ internal sealed class VisualOverrides
             if (double.IsFinite(windowTarget) && windowTarget > 0 && Math.Abs(windowTarget - windowBefore) > .0001)
                 notes.field_Protected_Double_0 = windowTarget;
             var beat = player.beatRenderer;
-            float beatBefore = beat == null ? float.NaN : beat.field_Private_Single_0;
-            if (beat != null && Math.Abs(beatBefore - configured) > .001f) beat.field_Private_Single_0 = configured;
+            if (beat != null && Math.Abs(beat.field_Private_Single_0 - configured) > .001f) beat.field_Private_Single_0 = configured;
             var scroll = player.highwayScroll;
-            float scrollBefore = scroll == null ? float.NaN : scroll.field_Private_Single_1;
-            if (scroll != null && Math.Abs(scrollBefore - configured) > .001f) scroll.field_Private_Single_1 = configured;
-            if (changed || (beat != null && Math.Abs(beatBefore - configured) > .001f) || (scroll != null && Math.Abs(scrollBefore - configured) > .001f))
-                MelonLoader.MelonLogger.Msg($"Full-song speed reset after scene change: profile={configured:0.###}, note={noteBefore:0.###}->{notes.noteSpeed:0.###}, window={windowBefore:0.######}->{notes.field_Protected_Double_0:0.######}, beat={beatBefore:0.###}->{(beat == null ? float.NaN : beat.field_Private_Single_0):0.###}, highway={scrollBefore:0.###}->{(scroll == null ? float.NaN : scroll.field_Private_Single_1):0.###}.");
+            if (scroll != null && Math.Abs(scroll.field_Private_Single_1 - configured) > .001f) scroll.field_Private_Single_1 = configured;
         }
         return foundPlayer;
     }

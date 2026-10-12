@@ -1,15 +1,16 @@
-# SlopHero 0.4.10 alpha
+# SlopHero 0.4.11 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.10 reduces repeated work in custom star coloring. Version 0.4.9
+**Version 0.4.11 removes resolved test diagnostics. Version 0.4.10 reduces
+repeated work in custom star coloring. Version 0.4.9
 reduces idle frame work in the mod. Version 0.4.8 compensates
 from the measured gameplay clock rate rather than assuming the practice
 percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.10 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.10-alpha.zip?raw=true)
+[Download v0.4.11 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.11-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -142,6 +143,12 @@ The timing capture showed visual overrides as the largest SlopHero callback.
 Custom star coloring now caches which child sprites are star graphics instead
 of walking their transform ancestry every frame. The cache resets with each
 gameplay scene so replacement UI objects are discovered normally.
+
+## 0.4.11 log cleanup
+
+Removed resolved practice-speed and FC-shader diagnostic traces, along with
+scene readiness chatter. Action notices, failure details, and the opt-in timing
+capture remain available for support and performance checks.
 
 ## 0.3.9 profiling and renderer update
 

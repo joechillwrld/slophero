@@ -17,7 +17,6 @@ internal sealed class RingColors
         public float Hue, Saturation;
         public Color Applied;
         public bool HasApplied;
-        public bool DiagnosticWritten;
     }
     private readonly Dictionary<IntPtr, Ring> rings = new();
     private MaterialPropertyBlock? block;
@@ -119,13 +118,6 @@ internal sealed class RingColors
         ring.Renderer.GetPropertyBlock(block);
         block!.SetFloat(hueId, h); block.SetFloat(saturationId, s);
         ring.Renderer.SetPropertyBlock(block);
-        if (!ring.DiagnosticWritten)
-        {
-            ring.DiagnosticWritten = true;
-            var material = ring.Renderer.sharedMaterial;
-            string shader = material == null || material.shader == null ? "unknown" : material.shader.name;
-            MelonLoader.MelonLogger.Msg($"FC color diagnostics: shader={shader}, colorSpace={QualitySettings.activeColorSpace}, requestedRGB=({c.r:0.###},{c.g:0.###},{c.b:0.###}), shaderHSV=({h:0.###},{s:0.###},{v:0.###}), originalVertexRGB=({ring.Original.r:0.###},{ring.Original.g:0.###},{ring.Original.b:0.###}). Texture shading remains active; these are shader inputs, not measured pixel colors.");
-        }
         // Hue/saturation live in the shader; grayscale vertex tint controls brightness.
         ring.Renderer.color = new Color(v, v, v, ring.Renderer.color.a);
     }

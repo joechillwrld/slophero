@@ -5,7 +5,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.10", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.11", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -93,7 +93,6 @@ public sealed partial class Core : MelonMod
         if (string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase))
         {
             gameplayInitialized = true;
-            LoggerInstance.Msg("Gameplay scene initialized; checking player and renderer readiness.");
         }
     }
 
@@ -327,7 +326,7 @@ public sealed partial class Core : MelonMod
             transition = false;
             nextStats = 0;
             Notice("Practice: starting the section you left.");
-            LoggerInstance.Msg($"Selected practice section {section}; ticks {game.practiceDisplayStartTick}–{game.practiceDisplayEndTick}; guitar input enabled={game.practicePlayer.inputEnabled}.");
+            LoggerInstance.Msg($"Selected practice section {section}.");
         }
         catch (Exception ex)
         {
