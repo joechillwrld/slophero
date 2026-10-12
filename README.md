@@ -1,14 +1,14 @@
-# SlopHero 0.3.1 alpha
+# SlopHero 0.3.2 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.3.1 repairs the practice-speed baseline and overrides the FC ring's
-shader colors as well as its tint. All color editors now offer RGB sliders,
-hex entry, and previews. These repairs still need a Windows gameplay test.**
+**Version 0.3.2 changes practice note visibility handling and reduces mod overhead.
+Color controls were confirmed working in the user's 0.3.1 test. The new visibility
+repair and performance changes need Windows testing; no FPS gain is measured yet.**
 
 ## Install
 
-[Download v0.3.1 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.1-alpha.zip?raw=true)
+[Download v0.3.2 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.2-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -90,6 +90,43 @@ renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
 
+## 0.3.2 note visibility and mod overhead
+
+The speed fix previously recomputed the note spawn/lookahead window from live
+clip-plane values. This release uses the renderer's initialized native window
+instead, preserves at least that much lookahead, and rejects zero, negative, or
+nonfinite windows/speeds. A slower visual speed can expand the window. Disabling
+the toggle restores the saved window. Runtime speed/window values are written
+once per renderer to `Latest.log` to diagnose the disappearing-note report.
+This is a guarded repair, not a claim of an in-game fix verified on Windows.
+
+Automatic overhead reductions:
+
+- FC shader overrides react to native color changes and selected-color changes
+  rather than rewriting unchanged shader colors every frame. Component discovery
+  runs at most twice per second.
+- Hidden sides, strings, and beatlines are configured when toggles/player resources
+  change, avoiding repeated per-frame arrays/scans and redundant renderer writes.
+- Disabled score colors skip their renderer scans. Parsed colors and HUD background
+  style are cached. Passive HUDs draw only for repaint events; editor controls
+  still receive their normal input events.
+- Practice counters binary-search the sorted chart to the start tick after resets,
+  rather than scanning every earlier head again. Boundary chord heads are included.
+
+**F8 → Controls → Low overhead HUD** optionally reduces counter refresh from
+five to two updates per second. The restart/practice holds still update each
+frame. This reduces mod work; it does not disable game systems or existing
+vanilla effects.
+
+**F8 → Controls → Capture mod timings for 30 seconds** writes callback averages,
+maximums, call counts, and observed update rate to `Latest.log`. Start during a
+song, close F8, and play the same passage. For comparison, capture once with low
+overhead HUD off and once with it on. Keep chart, tempo, visual settings, and
+other mods constant. Timing capture ends automatically or with **Finish timing
+report**. It is off normally and does not log every frame. Callback timings
+exclude most of the game's CPU/GPU workload; a broader performance mode still
+needs profiling to choose niche removable work beyond existing settings.
+
 ## 0.3.1 speed and ring repairs
 
 Constant practice speed now derives its baseline from the player's configured
@@ -105,7 +142,7 @@ ring-color setters to reapply it immediately. Normal visibility, alpha, and FC
 eligibility stay under game control. Disabling the override restores the latest
 observed vanilla shader state. Custom shaders from other mods need testing.
 
-A performance mode is **not included**. The requested scope is unnecessary
+A game-wide performance mode is **not included**. The requested scope is unnecessary
 background work or niche resources beyond existing in-game effects toggles.
 Static inspection has not established a removable bottleneck or measured FPS
 gain. A future mode needs Windows profiling and comparisons with matching
@@ -150,7 +187,7 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 
 ## First in-game check
 
-Version 0.3.1 compiles without warnings, and **42 portable logic checks pass**,
+Version 0.3.2 compiles without warnings, and **54 portable logic checks pass**,
 including enable-after-slowdown/speedup, native renderer rewrites, live profile
 changes, restoration, and protection against repeated speed compensation. The new GUI calls were checked against the supplied wrappers.
 `GUI.TextField` is an unstripping-failed stub, so numeric/color entry uses string
@@ -174,7 +211,9 @@ Linux environment; the new features need the checks below.
    Toggle off and confirm vanilla behavior returns.
 8. Compare FC/PFC colors before and after ghost inputs, misses, and practice
    restarts; toggle colors off and check the vanilla appearance is restored.
-9. Move the HUD to another corner and adjust opacity/text color. Restart the game
+9. Capture the two timing reports above while playing a repeatable passage, then
+   attach Latest.log with the FPS change observed on the game's FPS display.
+10. Move the HUD to another corner and adjust opacity/text color. Restart the game
    and confirm those settings were retained.
 
 If the HUD is wrong, an action fails, or the mod disables itself, attach

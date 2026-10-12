@@ -5,7 +5,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.1", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.2", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -114,6 +114,7 @@ public sealed partial class Core : MelonMod
 
     public override void OnUpdate()
     {
+        long timingStart = timings.Begin();
         try
         {
             double now = clock.Elapsed.TotalSeconds;
@@ -224,7 +225,7 @@ public sealed partial class Core : MelonMod
                     if (showCharter.Value) lines.Add("Charter: " + (song.Charter_StrippedTags ?? "Unknown"));
                 }
                 songText = string.Join("\n", lines);
-                nextStats = now + .2;
+                nextStats = now + (lowOverhead.Value ? .5 : .2);
             }
         }
         catch (Exception ex)
@@ -236,6 +237,7 @@ public sealed partial class Core : MelonMod
             Notice("SlopHero disabled after an error. Send MelonLoader/Latest.log.");
             LoggerInstance.Error(ex.ToString());
         }
+        finally { timings.End(0, timingStart); }
     }
 
     private double Duration => float.IsFinite(holdSeconds.Value) ? Math.Clamp(holdSeconds.Value, .25f, 3f) : .75;
@@ -344,6 +346,10 @@ public sealed partial class Core : MelonMod
 
     public override void OnGUI()
     {
+        // Passive HUDs need only the repaint event. Keep full event processing
+        // while editing so sliders, typing, and dragging remain responsive.
+        if (!settingsOpen && !moveHud && Event.current.type != EventType.Repaint) return;
+        long timingStart = timings.Begin();
         Color previousColor = GUI.color;
         GUI.color = Color.white;
         try
@@ -400,7 +406,7 @@ public sealed partial class Core : MelonMod
                 LoggerInstance.Error($"Overlay rendering failed; editor closed. Send Latest.log: {ex}");
             }
         }
-        finally { GUI.color = previousColor; }
+        finally { GUI.color = previousColor; timings.End(2, timingStart); }
     }
 
     private void DrawHud(string text)
@@ -411,20 +417,12 @@ public sealed partial class Core : MelonMod
         hudStyle.normal.textColor = new Color(HudLayout.Unit(textRed.Value),
             HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1);
         int width = Math.Max(240, hudStyle.fontSize * 12 + 24);
-        int height = (int)(hudStyle.fontSize * 1.25f) * text.Split('\n').Length + 20;
+        int height = (int)(hudStyle.fontSize * 1.25f) * (1 + text.Count(c => c == '\n')) + 20;
         var position = HudLayout.ClampPosition(hudX.Value, hudY.Value, width, height, Screen.width, Screen.height);
         Rect rect = new(position.X, position.Y, width, height);
         // DrawTexture's final overload is an unstripping-failed stub in the
         // supplied game assemblies. GUI.Box invokes the available native API.
-        if (hudBackgroundStyle == null)
-        {
-            hudBackgroundStyle = new GUIStyle(GUI.skin.label);
-            var texture = Texture2D.whiteTexture;
-            hudBackgroundStyle.normal.background = texture;
-            hudBackgroundStyle.hover.background = texture;
-            hudBackgroundStyle.active.background = texture;
-            hudBackgroundStyle.focused.background = texture;
-        }
+        EnsureHudBackground();
         Color previousBackground = GUI.backgroundColor;
         try
         {
@@ -456,6 +454,17 @@ public sealed partial class Core : MelonMod
             hudDragging = false;
             SavePreferences();
         }
+    }
+
+    private void EnsureHudBackground()
+    {
+        if (hudBackgroundStyle != null) return;
+        hudBackgroundStyle = new GUIStyle(GUI.skin.label);
+        var texture = Texture2D.whiteTexture;
+        hudBackgroundStyle.normal.background = texture;
+        hudBackgroundStyle.hover.background = texture;
+        hudBackgroundStyle.active.background = texture;
+        hudBackgroundStyle.focused.background = texture;
     }
 
     private void DrawBasicHud(string text)
@@ -507,6 +516,7 @@ public sealed partial class Core : MelonMod
 
     public override void OnDeinitializeMelon()
     {
+        timings.Finish();
         settingsOpen = moveHud = hudDragging = false;
         SavePreferences();
         UpdateCursor();

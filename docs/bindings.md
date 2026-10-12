@@ -217,3 +217,33 @@ New shader/property-block/HSV APIs and existing string IMGUI/slider APIs were
 checked for reachable unstripping-failed wrappers. 42 portable checks pass.
 Windows validation of the new hooks, shader result, and color picker is pending.
 No game-wide performance mode or FPS improvement is claimed in this release.
+
+
+## 0.3.2 visibility and overhead investigation
+
+The new user log contains no managed SlopHero exception. Color behavior is
+reported working; notes disappear when compensation is enabled. The preceding
+code recalculated native lookahead at `BaseNoteRenderer` offset `0xF0` from live
+clip limits. Native guitar rendering compares future note time against this
+window at `0x115A5B5` and stops enumerating when outside it. This makes an invalid
+window sufficient to hide notes without throwing. The new version preserves
+and scales the initialized native window and rejects invalid inputs. It logs
+initial/target speed/window values for the next Windows reproduction; static
+inspection does not establish the runtime cause conclusively.
+
+FC updates now skip identical selected colors; native hue/saturation postfixes
+continue forcing the custom color immediately. Renderer discovery is throttled
+and references clear on scene changes. Hide toggles configure renderer state
+when settings/player resources change. Disabled score coloring skips its scans.
+Passive IMGUI draw work occurs only for repaint events, with full event handling
+retained for settings and dragging. Parsed colors and background GUIStyle are
+cached. Counter resets use a lower-bound search on the ordered chart ticks,
+including duplicate ticks at practice boundaries. A 100,000-head synthetic seek
+needs fewer than 20 reads; this measures algorithmic work, not Windows FPS.
+
+54 portable checks pass: existing hold/accuracy/readiness checks, configured
+speed regressions, lookahead validity/scaling, and boundary-safe practice search.
+The optional two-Hz HUD mode trades display refresh rate for less counter work.
+Thirty-second optional callback captures use managed Stopwatch timestamps and
+write summaries only; no additional Unity APIs or removal of gameplay objects.
+There is no measured game-wide FPS improvement or game-system performance mode.

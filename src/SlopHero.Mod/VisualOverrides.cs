@@ -15,7 +15,11 @@ internal sealed class VisualOverrides
     private readonly Dictionary<IntPtr, Renderer[]> stringRenderers = new();
     private readonly Dictionary<IntPtr, GuitarNoteRenderer> noteRenderers = new();
     private SongProgress[]? songProgress;
-    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); songProgress = null; }
+    private readonly Dictionary<IntPtr, (double Window, float Speed)> visibility = new();
+    private bool oldSides, oldStrings, oldBeats, oldScore;
+    private readonly HashSet<IntPtr> hiddenPlayers = new();
+    private readonly HashSet<IntPtr> speedLog = new();
+    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = false; songProgress = null; }
     private SpriteRenderer[] Sprites(GameObject go)
     {
         if (!spriteChildren.TryGetValue(go.Pointer, out var result))
@@ -34,7 +38,8 @@ internal sealed class VisualOverrides
         if (r == null) return;
         if (enabled)
         {
-            if (!hidden.ContainsKey(r.Pointer)) hidden.Add(r.Pointer, (r, r.enabled));
+            if (hidden.ContainsKey(r.Pointer)) return;
+            hidden.Add(r.Pointer, (r, r.enabled));
             r.enabled = false;
         }
         else if (hidden.Remove(r.Pointer, out var old)) r.enabled = old.Original;
@@ -90,15 +95,23 @@ internal sealed class VisualOverrides
         foreach (var p in game.playerObjects)
         {
             if (p == null || !p.enabled || p.TryCast<GuitarPlayer>() == null || p.engine == null) continue;
-            Hide(p.trackSidebarLeft?.field_Private_SpriteRenderer_0, sides);
-            Hide(p.trackSidebarRight?.field_Private_SpriteRenderer_0, sides);
-            if (p.neckController?.fretStrings != null)
-                foreach (var go in p.neckController.fretStrings)
-                    if (go != null) foreach (var r in Strings(go)) Hide(r, strings);
             var b = p.beatRenderer;
-            if (b?.field_Protected_Il2CppReferenceArray_1_SpriteRenderer_0 != null)
-                foreach (var r in b.field_Protected_Il2CppReferenceArray_1_SpriteRenderer_0) Hide(r, beats);
-            TintText(p.AccuracyText, score, scoreText);
+            bool newPlayer = !hiddenPlayers.Contains(p.Pointer);
+            if (newPlayer || sides != oldSides || strings != oldStrings || beats != oldBeats)
+            {
+                Hide(p.trackSidebarLeft?.field_Private_SpriteRenderer_0, sides);
+                Hide(p.trackSidebarRight?.field_Private_SpriteRenderer_0, sides);
+                var neck = p.neckController;
+                var fretStrings = neck?.fretStrings;
+                if (fretStrings != null && (strings || oldStrings))
+                    foreach (var go in fretStrings)
+                        if (go != null) foreach (var r in Strings(go)) Hide(r, strings);
+                var beatSprites = b?.field_Protected_Il2CppReferenceArray_1_SpriteRenderer_0;
+                if (beatSprites != null && (beats || oldBeats))
+                    foreach (var r in beatSprites) Hide(r, beats);
+                if (b != null && beatSprites != null && neck != null && fretStrings != null) hiddenPlayers.Add(p.Pointer);
+            }
+            if (score || oldScore) TintText(p.AccuracyText, score, scoreText);
             bool compensate = constantSpeed && game.globalVariables.isPracticeEnabled;
             float ratio = game.practiceSpeed;
             if (!constantSpeed && speeds.Count == 0) continue;
@@ -111,18 +124,35 @@ internal sealed class VisualOverrides
             }
             if (notes != null)
             {
-                float speed = Speed(notes.Pointer, notes.noteSpeed, ratio, compensate, configured);
-                if (Math.Abs(speed - notes.noteSpeed) > .0001f)
+                if (!visibility.TryGetValue(notes.Pointer, out var native) || !double.IsFinite(native.Window) || native.Window <= 0 || native.Speed <= 0)
                 {
-                    notes.noteSpeed = speed;
-                    // Same horizon expression as native BaseNoteRenderer.Start.
-                    notes.field_Protected_Double_0 = (notes.noteZPosFarLimit - notes.strikeLine) / speed;
+                    native = (notes.field_Protected_Double_0, notes.noteSpeed);
+                    visibility[notes.Pointer] = native;
                 }
+                float speed = Speed(notes.Pointer, notes.noteSpeed, ratio, compensate, configured);
+                double window = compensate ? NoteVisibilityWindow.Calculate(native.Window, native.Speed, speed) : native.Window;
+                if (double.IsFinite(window) && window > 0 && float.IsFinite(speed) && speed > 0)
+                {
+                    if (Math.Abs(speed - notes.noteSpeed) > .0001f) notes.noteSpeed = speed;
+                    // Never derive the spawn window from live camera clipping limits.
+                    if (Math.Abs(window - notes.field_Protected_Double_0) > .0001) notes.field_Protected_Double_0 = window;
+                }
+                else if (compensate)
+                {
+                    if (native.Speed > 0 && float.IsFinite(native.Speed)) notes.noteSpeed = native.Speed;
+                    if (native.Window > 0 && double.IsFinite(native.Window)) notes.field_Protected_Double_0 = native.Window;
+                }
+                if (compensate && speedLog.Add(notes.Pointer))
+                    MelonLoader.MelonLogger.Msg($"Practice rendering: profile={configured}, tempo={ratio}, nativeSpeed={native.Speed}, targetSpeed={speed}, nativeWindow={native.Window}, targetWindow={window}.");
             }
             if (b != null) b.field_Private_Single_0 = Speed(b.Pointer, b.field_Private_Single_0, ratio, compensate, configured);
             if (p.highwayScroll != null)
                 p.highwayScroll.field_Private_Single_1 = Speed(p.highwayScroll.Pointer, p.highwayScroll.field_Private_Single_1, ratio, compensate, configured);
         }
+        oldSides = sides; oldStrings = strings; oldBeats = beats;
+        bool restoreScore = oldScore;
+        oldScore = score;
+        if (!score && !restoreScore) return;
         if (score || colors.Count > 0)
         {
             songProgress ??= UnityEngine.Object.FindObjectsOfType<SongProgress>().ToArray();

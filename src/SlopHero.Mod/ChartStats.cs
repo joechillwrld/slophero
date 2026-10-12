@@ -17,14 +17,18 @@ internal sealed class ChartStats
         // Read only. Inspect the same flattened chart used by the results snapshot.
         // Do not cache native note pointers across frames or scene changes.
         var notes = engine.prop_List_1_ObjectPublicObInObDoSiDoUIInBoInUnique_0;
+        int count = notes.Count;
         bool practice = game.globalVariables.isPracticeEnabled;
         long start = practice ? game.practiceDisplayStartTick : long.MinValue;
         long end = practice ? game.practiceDisplayEndTick : long.MaxValue;
         int hits = engine.field_Public_Int32_6;
-        if (engine.Pointer != enginePointer || notes.Pointer != notesPointer || cursor > notes.Count
+        if (engine.Pointer != enginePointer || notes.Pointer != notesPointer || cursor > count
             || game.songTime < lastSongTime - .05 || hits < lastHits || start != rangeStart || end != rangeEnd)
         {
-            cursor = 0;
+            // Ordered chart ticks let practice jump directly to its first head
+            // instead of marshalling thousands of previous notes after a seek.
+            cursor = practice ? OrderedNoteSearch.LowerBound(count, start,
+                i => notes[i]?.field_Public_Int64_0 ?? long.MinValue) : 0;
             misses = 0;
             enginePointer = engine.Pointer;
             notesPointer = notes.Pointer;
@@ -35,7 +39,7 @@ internal sealed class ChartStats
         lastHits = hits;
         // Chart is in time order. Process each resolved head once; unresolved
         // future notes wait for the next refresh. Bound catch-up after a seek.
-        for (int budget = 4096; cursor < notes.Count && budget > 0; budget--)
+        for (int budget = 4096; cursor < count && budget > 0; budget--)
         {
             var note = notes[cursor];
             if (note == null) { cursor++; continue; }

@@ -14,12 +14,15 @@ internal sealed class RingColors
         public BasePlayer Player = null!;
         public Color Original;
         public float Hue, Saturation;
+        public Color Applied;
+        public bool HasApplied;
     }
     private readonly Dictionary<IntPtr, Ring> rings = new();
     private MaterialPropertyBlock? block;
     private int hueId, saturationId;
     private Color fc, perfect;
     private bool enabled, callbackFailed;
+    private long nextDiscovery;
     internal static RingColors? Active;
 
     public void Install(HarmonyLib.Harmony harmony)
@@ -31,7 +34,7 @@ internal sealed class RingColors
         harmony.Patch(typeof(DesaturateSprite).GetMethod("Method_Public_Void_Single_0"),
             postfix: new HarmonyMethod(typeof(RingColors).GetMethod(nameof(SaturationWritten), BindingFlags.NonPublic | BindingFlags.Static)));
     }
-    public void Clear() { rings.Clear(); enabled = false; callbackFailed = false; }
+    public void Clear() { rings.Clear(); enabled = false; callbackFailed = false; nextDiscovery = 0; }
     private static void HueWritten(DesaturateSprite __instance) => Active?.Written(__instance, true);
     private static void SaturationWritten(DesaturateSprite __instance) => Active?.Written(__instance, false);
     private void Written(DesaturateSprite component, bool hue)
@@ -41,7 +44,7 @@ internal sealed class RingColors
         {
             ring.Renderer.GetPropertyBlock(block);
             if (hue) ring.Hue = block!.GetFloat(hueId); else ring.Saturation = block!.GetFloat(saturationId);
-            Apply(ring);
+            Apply(ring, true);
         }
         catch (Exception ex)
         {
@@ -72,7 +75,10 @@ internal sealed class RingColors
             }
             rings.Clear(); return;
         }
-        if (game.playerObjects == null) return;
+        foreach (var ring in rings.Values) Apply(ring);
+        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (now < nextDiscovery || game.playerObjects == null) return;
+        nextDiscovery = now + System.Diagnostics.Stopwatch.Frequency / 2;
         foreach (var p in game.playerObjects)
         {
             if (p == null || !p.enabled || p.TryCast<GuitarPlayer>() == null || p.FCIndicator == null || p.engine == null) continue;
@@ -92,10 +98,12 @@ internal sealed class RingColors
             }
         }
     }
-    private void Apply(Ring ring)
+    private void Apply(Ring ring, bool force = false)
     {
         if (ring.Renderer == null || ring.Player == null || ring.Player.engine == null) return;
         Color c = ring.Player.engine.field_Public_Int32_17 == 0 ? perfect : fc;
+        if (!force && ring.HasApplied && ring.Applied == c) return;
+        ring.Applied = c; ring.HasApplied = true;
         Color.RGBToHSV(c, out float h, out float s, out float v);
         ring.Renderer.GetPropertyBlock(block);
         block!.SetFloat(hueId, h); block.SetFloat(saturationId, s);

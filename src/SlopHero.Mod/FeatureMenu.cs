@@ -15,16 +15,20 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
     private readonly VisualOverrides visuals = new();
     private readonly RingColors rings = new();
+    private readonly RuntimeTimings timings = new();
+    private MelonPreferences_Entry<bool> lowOverhead = null!;
     private string songText = "", editText = "", editLabel = "", editError = "";
     private Action<string>? editApply;
     private bool replaceEdit, moveSong, editColor;
     private Color editPreview = Color.white;
     private GUIStyle? colorPreviewStyle;
     private int settingsPage;
+    private readonly Dictionary<string, Color> parsedColors = new();
     private GUIStyle? songStyle;
 
     private void InitializeFeatures()
     {
+        lowOverhead = preferences.CreateEntry("LowOverheadHud", false);
         showMisses = preferences.CreateEntry("ShowMisses", true);
         showHit = preferences.CreateEntry("ShowHitPercentage", true);
         showGhosts = preferences.CreateEntry("ShowGhosts", true);
@@ -56,7 +60,7 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.1 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.2 — F8 / Escape to close");
         string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors" };
         for (int i = 0; i < pages.Length; i++)
             if (GUI.Button(new Rect(x + 12 + i * 112, y + 32, 108, 30), pages[i])) settingsPage = i;
@@ -70,6 +74,18 @@ public sealed partial class Core
                 if (GUI.Button(new Rect(x, y + 44, 540, 34), $"Practice: {practiceButton.Value} — bind")) capture = "practice";
                 Number("Hold duration (seconds)", (float)Duration, x, y + 94, .25f, 3, v => holdSeconds.Value = v);
                 GUI.Label(new Rect(x, y + 150, 540, 70), capture == null ? "Song actions apply to solo Quickplay.\nPractice begins at the start of your current named section." : $"Press a key or controller button for {capture}.");
+                Toggle(lowOverhead, "Low overhead HUD (2 updates/sec)", x, y + 245);
+                if (GUI.Button(new Rect(x, y + 290, 540, 32), timings.Active ? "Finish timing report" : "Capture mod timings for 30 seconds"))
+                {
+                    if (timings.Active) timings.Finish();
+                    else if (gameplayInitialized)
+                    {
+                        LoggerInstance.Msg($"Timing settings: lowOverheadHud={lowOverhead.Value}, FC colors={tintFc.Value}, score colors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}.");
+                        timings.Start();
+                    }
+                    else Notice("Start a song before capturing mod timings.");
+                }
+                GUI.Label(new Rect(x, y + 338, 540, 70), "Timings are written to Latest.log. Close this menu and play.\nLow overhead HUD reduces counter refresh rate; input timing is unchanged.");
                 break;
             case 1:
                 Toggle(showHud, "Counter HUD", x, y); Toggle(showMisses, "Misses", x, y + 40);
@@ -229,8 +245,7 @@ public sealed partial class Core
         int height = (int)(songStyle.fontSize * 1.35f) * lineCount + 20;
         var p = HudLayout.ClampPosition(songX.Value, songY.Value, width, height, Screen.width, Screen.height);
         var rect = new Rect(p.X, p.Y, width, height);
-        hudBackgroundStyle ??= new GUIStyle(GUI.skin.label);
-        hudBackgroundStyle.normal.background = Texture2D.whiteTexture;
+        EnsureHudBackground();
         var old = GUI.backgroundColor;
         try { GUI.backgroundColor = new Color(0, 0, 0, HudLayout.Unit(songOpacity.Value, .65f)); GUI.Box(rect, "", hudBackgroundStyle); }
         finally { GUI.backgroundColor = old; }
@@ -259,9 +274,16 @@ public sealed partial class Core
         if (!compatible || !gameplay || !gameplayInitialized || transition || visualError) return;
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
         if (game == null || !game.songLoaded || !game.playersInit || game.globalVariables == null) return;
+        long timingStart = timings.Begin();
         try
         {
-            Color Read(MelonPreferences_Entry<string> e) { try { return ParseColor(e.Value); } catch (FormatException) { return Color.white; } }
+            Color Read(MelonPreferences_Entry<string> e)
+            {
+                if (parsedColors.TryGetValue(e.Value, out var cached)) return cached;
+                Color color; try { color = ParseColor(e.Value); } catch (FormatException) { color = Color.white; }
+                if (parsedColors.Count > 64) parsedColors.Clear();
+                parsedColors[e.Value] = color; return color;
+            }
             rings.Update(game, tintFc.Value, Read(fcColor), Read(pfcColor));
             visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value,
                 tintScore.Value, Read(starColor), Read(progressColor), Read(scoreColor), Read(songProgressColor), lockSpeed.Value);
@@ -272,6 +294,7 @@ public sealed partial class Core
             LoggerInstance.Error($"Visual overrides paused after an error; counters and controls remain available: {ex}");
             Notice("Visual overrides stopped after an error. Send Latest.log.");
         }
+        finally { timings.End(1, timingStart); }
     }
 
 }

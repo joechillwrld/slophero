@@ -66,4 +66,19 @@ Check(profileSpeed.Update(15, 1.5f, true, 10) == 10 / 1.5f, "Vanilla rewrite can
 Check(profileSpeed.Update(10 / 1.5f, .5f, true, 12) == 24, "Profile note speed changes while compensation is enabled");
 Check(profileSpeed.Update(24, .5f, false, 12) == 12, "Disabling restores latest configured speed");
 Check(profileSpeed.Update(18, 1.5f, true, 12) == 8, "Enable after speedup uses configured baseline");
+Check(NoteVisibilityWindow.Calculate(3, 10, 20) == 3, "Faster visual speed retains initialized lookahead");
+Check(NoteVisibilityWindow.Calculate(3, 10, 5) == 6, "Slower visual speed expands lookahead");
+Check(NoteVisibilityWindow.Calculate(3, 10, 10) == 3, "Normal speed preserves native window");
+Check(double.IsNaN(NoteVisibilityWindow.Calculate(0, 10, 20)), "Zero initialized window cannot hide notes");
+Check(double.IsNaN(NoteVisibilityWindow.Calculate(-3, 10, 20)), "Negative lookahead rejected");
+Check(double.IsNaN(NoteVisibilityWindow.Calculate(3, 10, 0)), "Zero speed rejected");
+Check(double.IsNaN(NoteVisibilityWindow.Calculate(3, 10, float.NaN)), "Nonfinite speed rejected");
+long[] ticks = { 0, 10, 10, 20, 30 };
+Check(OrderedNoteSearch.LowerBound(ticks.Length, 10, i => ticks[i]) == 1, "Practice includes all heads at the section boundary");
+Check(OrderedNoteSearch.LowerBound(ticks.Length, 11, i => ticks[i]) == 3, "Practice skips earlier heads");
+Check(OrderedNoteSearch.LowerBound(ticks.Length, 31, i => ticks[i]) == ticks.Length, "Range after chart returns end");
+Check(OrderedNoteSearch.LowerBound(0, 10, _ => throw new Exception()) == 0, "Empty chart needs no native reads");
+int reads = 0;
+Check(OrderedNoteSearch.LowerBound(100000, 99000, i => { reads++; return i; }) == 99000 && reads < 20,
+    "Large practice seek needs logarithmic native reads");
 Console.WriteLine($"Passed {checks} checks.");
