@@ -20,11 +20,11 @@ public sealed class ScrollSpeedCompensation
         }
         if (!float.IsFinite(current) || current <= 0) return current;
         if (!authoritative && (!active || Math.Abs(current - applied) >= .001f)) original = current;
-        // Clone Hero's practice path reduces the raw renderer speed as tempo
-        // rises. Scale the raw value with tempo to keep visible highway motion
-        // at the configured profile speed. `original` is refreshed from the
-        // live profile setting above, so this supports every profile speed.
-        float target = original * tempo;
+        // Keep the raw renderer fields at the live profile setting. Practice
+        // tempo changes chart timing; multiplying or dividing this field causes
+        // the highway to run too fast or too slowly. The profile is read live,
+        // so this works at any configured note speed.
+        float target = original;
         if (!float.IsFinite(target) || target < .01f || target > 10000)
         {
             bool owned = active;
