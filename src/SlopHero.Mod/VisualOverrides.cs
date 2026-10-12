@@ -128,8 +128,8 @@ internal sealed class VisualOverrides
             }
             if (score || oldScore) TintText(p.AccuracyText, score, scoreText);
             bool compensate = constantSpeed && practiceNow;
+            if (!compensate && speeds.Count == 0) continue;
             float ratio = game.practiceSpeed;
-            if (!constantSpeed && speeds.Count == 0) continue;
             float configured = ConfiguredNoteSpeed.Read(p.player?.Pointer ?? IntPtr.Zero);
             compensate &= ConfiguredNoteSpeed.IsPlausible(configured);
             if (!noteRenderers.TryGetValue(p.Pointer, out var notes))

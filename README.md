@@ -1,13 +1,13 @@
-# SlopHero 0.3.9 alpha
+# SlopHero 0.4.0 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.3.9 removes redundant game-effect controls and adds separate timings
-for SlopHero's ring and visual overrides.**
+**Version 0.4.0 removes the irrelevant counter limiter and avoids note-speed
+work outside practice. Ring color checks are throttled and measured separately.**
 
 ## Install
 
-[Download v0.3.9 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.9-alpha.zip?raw=true)
+[Download v0.4.0 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.0-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -30,7 +30,7 @@ are needed. Remove `Mods/SlopHero.dll` to uninstall. Preferences can remain.
 
 Pause the game before editing settings. Press **F8** for the settings panel.
 
-F8 has six pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colors**, and **Performance**.
+F8 has five pages: **Controls**, **Counters**, **Song HUD**, **Highway**, and **Colors**.
 
 - Click a numeric or color value and type a replacement. Enter or **Apply** saves;
   Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.
@@ -89,14 +89,23 @@ renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
 
+## 0.4.0 performance hot-path changes
+
+Removed the low-overhead HUD refresh option. It was unrelated to Clone Hero's
+frame performance and is not part of Performance mode. Constant practice note
+speed now exits before reading the player's speed setting during full-song play;
+that data and renderer work is only needed in practice or while restoring a
+previous override. FC ring checks run at 10 Hz rather than every frame. The
+game's Harmony callbacks still update a changed ring immediately, and ring
+discovery remains at 2 Hz. Timing reports separate FC rings and other visual
+overrides to guide further profiling.
+
 ## 0.3.9 profiling and renderer update
 
-Performance no longer duplicates Clone Hero's fret, flame, or particle controls.
-The Performance page keeps only SlopHero's own low-overhead counter refresh
-setting. The timing capture now reports FC rings and other visual overrides
-separately, to identify which mod feature accounts for callback cost. Custom
-color overrides skip redundant renderer writes when the target RGB is already
-applied. This optimization preserves native alpha/fades.
+Performance no longer duplicated Clone Hero's fret, flame, or particle controls.
+The timing capture reports FC rings and other visual overrides separately.
+Custom color overrides skip redundant renderer writes when the target RGB is
+already applied. This optimization preserves native alpha/fades.
 
 ## 0.3.8 performance update
 
@@ -222,7 +231,7 @@ Automatic overhead reductions:
 - Practice counters binary-search the sorted chart to the start tick after resets,
   rather than scanning every earlier head again. Boundary chord heads are included.
 
-**F8 → Performance → Low overhead HUD** optionally reduces counter refresh from
+**F8 → Performance → Low overhead HUD** (removed in v0.4.0) reduced counter refresh from
 five to two updates per second. The restart/practice holds still update each
 frame. This reduces mod work; it does not disable game systems or existing
 vanilla effects.

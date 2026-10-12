@@ -24,7 +24,7 @@ internal sealed class RingColors
     private int hueId, saturationId;
     private Color fc, perfect;
     private bool enabled, callbackFailed;
-    private long nextDiscovery;
+    private long nextDiscovery, nextRefresh;
     internal static RingColors? Active;
 
     public void Install(HarmonyLib.Harmony harmony)
@@ -36,7 +36,7 @@ internal sealed class RingColors
         harmony.Patch(typeof(DesaturateSprite).GetMethod("Method_Public_Void_Single_0"),
             postfix: new HarmonyMethod(typeof(RingColors).GetMethod(nameof(SaturationWritten), BindingFlags.NonPublic | BindingFlags.Static)));
     }
-    public void Clear() { rings.Clear(); enabled = false; callbackFailed = false; nextDiscovery = 0; }
+    public void Clear() { rings.Clear(); enabled = false; callbackFailed = false; nextDiscovery = nextRefresh = 0; }
     private static void HueWritten(DesaturateSprite __instance) => Active?.Written(__instance, true);
     private static void SaturationWritten(DesaturateSprite __instance) => Active?.Written(__instance, false);
     private void Written(DesaturateSprite component, bool hue)
@@ -77,8 +77,12 @@ internal sealed class RingColors
             }
             rings.Clear(); return;
         }
-        foreach (var ring in rings.Values) Apply(ring);
         long now = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (now >= nextRefresh)
+        {
+            nextRefresh = now + System.Diagnostics.Stopwatch.Frequency / 10;
+            foreach (var ring in rings.Values) Apply(ring);
+        }
         if (now < nextDiscovery || game.playerObjects == null) return;
         nextDiscovery = now + System.Diagnostics.Stopwatch.Frequency / 2;
         foreach (var p in game.playerObjects)

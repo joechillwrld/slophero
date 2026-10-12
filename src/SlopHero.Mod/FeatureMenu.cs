@@ -16,7 +16,6 @@ public sealed partial class Core
     private readonly VisualOverrides visuals = new();
     private readonly RingColors rings = new();
     private readonly RuntimeTimings timings = new();
-    private MelonPreferences_Entry<bool> lowOverhead = null!;
     private string songText = "", editText = "", editLabel = "", editError = "";
     private Action<string>? editApply;
     private bool replaceEdit, moveSong, editColor;
@@ -31,7 +30,6 @@ public sealed partial class Core
 
     private void InitializeFeatures()
     {
-        lowOverhead = preferences.CreateEntry("LowOverheadHud", false);
         showMisses = preferences.CreateEntry("ShowMisses", true);
         showHit = preferences.CreateEntry("ShowHitPercentage", true);
         showGhosts = preferences.CreateEntry("ShowGhosts", true);
@@ -64,8 +62,8 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.9 — F8 / Escape to close");
-        string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Performance" };
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.0 — F8 / Escape to close");
+        string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors" };
         float tabWidth = 556f / pages.Length;
         for (int i = 0; i < pages.Length; i++)
             if (GUI.Button(new Rect(x + 12 + i * tabWidth, y + 32, tabWidth - 4, 30), pages[i])) settingsPage = i;
@@ -84,7 +82,7 @@ public sealed partial class Core
                     if (timings.Active) timings.Finish();
                     else if (gameplayInitialized)
                     {
-                        LoggerInstance.Msg($"Timing settings: lowOverheadHud={lowOverhead.Value}, FC colors={tintFc.Value}, score colors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}.");
+                        LoggerInstance.Msg($"Timing settings: FC colors={tintFc.Value}, score colors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}.");
                         timings.Start();
                     }
                     else Notice("Start a song before capturing mod timings.");
@@ -116,10 +114,6 @@ public sealed partial class Core
                 Hex(starColor, "Stars", x, y + 176); Hex(progressColor, "Star progress bar", x, y + 218);
                 Hex(scoreColor, "Score / accuracy text", x, y + 260);
                 Hex(songProgressColor, "Song progress bar", x, y + 302);
-                break;
-            case 5:
-                Toggle(lowOverhead, "Low overhead HUD (2 updates/sec)", x, y);
-                GUI.Label(new Rect(x, y + 48, 540, 150), "This reduces SlopHero counter polling from 5 to 2 updates per second. It does not change Clone Hero effects or gameplay settings. The timing capture below separates the mod's update, ring, and other visual work.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
