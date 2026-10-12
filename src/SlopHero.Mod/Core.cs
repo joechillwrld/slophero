@@ -5,7 +5,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.2.0", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.2.1", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -35,6 +35,8 @@ public sealed class Core : MelonMod
     private IntPtr sourceManager;
     private IntPtr statsEngine;
     private GUIStyle? hudStyle;
+    private GUIStyle? hudBackgroundStyle;
+    private bool hudRenderFailed, hudRenderErrorLogged, settingsRenderErrorLogged, guiErrorLogged;
 
     public override void OnInitializeMelon()
     {
@@ -314,15 +316,54 @@ public sealed class Core : MelonMod
         try
         {
             if ((showHud.Value && gameplay && !string.IsNullOrEmpty(statsText)) || settingsOpen || moveHud)
-                DrawHud(string.IsNullOrEmpty(statsText) ? "Misses: 0\nHit: 100.00%\nGhosts: 0" : statsText);
+            {
+                string text = string.IsNullOrEmpty(statsText) ? "Misses: 0\nHit: 100.00%\nGhosts: 0" : statsText;
+                if (hudRenderFailed) DrawBasicHud(text);
+                else
+                {
+                    try { DrawHud(text); }
+                    catch (Exception ex)
+                    {
+                        hudRenderFailed = true;
+                        hudDragging = false;
+                        if (!hudRenderErrorLogged)
+                        {
+                            hudRenderErrorLogged = true;
+                            LoggerInstance.Error($"HUD appearance renderer failed; using basic counters: {ex}");
+                        }
+                        DrawBasicHud(text);
+                    }
+                }
+            }
             if (!compatible || clock.Elapsed.TotalSeconds < noticeUntil)
                 GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44), status);
             if (moveHud)
                 GUI.Box(new Rect(20, Screen.height - 110, Math.Max(300, Screen.width - 40), 44),
                     "Drag the HUD anywhere. F8 returns to settings; Escape finishes. Position saves when released.");
-            if (settingsOpen) DrawSettings();
+            if (settingsOpen)
+            {
+                try { DrawSettings(); }
+                catch (Exception ex)
+                {
+                    CloseEditor();
+                    if (!settingsRenderErrorLogged)
+                    {
+                        settingsRenderErrorLogged = true;
+                        LoggerInstance.Error($"Settings renderer failed; editor closed so song controls stay available: {ex}");
+                    }
+                }
+            }
             // Sliders and drag events may be consumed; rawType retains the release.
             if (Event.current.rawType == EventType.MouseUp) SavePreferences();
+        }
+        catch (Exception ex)
+        {
+            CloseEditor();
+            if (!guiErrorLogged)
+            {
+                guiErrorLogged = true;
+                LoggerInstance.Error($"Overlay rendering failed; editor closed. Send Latest.log: {ex}");
+            }
         }
         finally { GUI.color = previousColor; }
     }
@@ -337,10 +378,24 @@ public sealed class Core : MelonMod
         int height = hudStyle.fontSize * 4 + 16;
         var position = HudLayout.ClampPosition(hudX.Value, hudY.Value, width, height, Screen.width, Screen.height);
         Rect rect = new(position.X, position.Y, width, height);
-        Color original = GUI.color;
-        GUI.color = new Color(0, 0, 0, HudLayout.Unit(backgroundOpacity.Value, .65f));
-        GUI.DrawTexture(rect, Texture2D.whiteTexture);
-        GUI.color = original;
+        // DrawTexture's final overload is an unstripping-failed stub in the
+        // supplied game assemblies. GUI.Box invokes the available native API.
+        if (hudBackgroundStyle == null)
+        {
+            hudBackgroundStyle = new GUIStyle(GUI.skin.label);
+            var texture = Texture2D.whiteTexture;
+            hudBackgroundStyle.normal.background = texture;
+            hudBackgroundStyle.hover.background = texture;
+            hudBackgroundStyle.active.background = texture;
+            hudBackgroundStyle.focused.background = texture;
+        }
+        Color previousBackground = GUI.backgroundColor;
+        try
+        {
+            GUI.backgroundColor = new Color(0, 0, 0, HudLayout.Unit(backgroundOpacity.Value, .65f));
+            GUI.Box(rect, "", hudBackgroundStyle);
+        }
+        finally { GUI.backgroundColor = previousBackground; }
         GUI.Label(new Rect(rect.x + 12, rect.y + 8, width - 24, height - 8), text, hudStyle);
         if (!moveHud) return;
         var evt = Event.current;
@@ -367,11 +422,29 @@ public sealed class Core : MelonMod
         }
     }
 
+    private void DrawBasicHud(string text)
+    {
+        // The original native-backed label path remains usable independently of
+        // background rendering, drag controls, and the settings panel.
+        var position = HudLayout.ClampPosition(hudX.Value, hudY.Value, 320, 150, Screen.width, Screen.height);
+        GUI.Label(new Rect(position.X + 12, position.Y + 8, 300, 140), text);
+    }
+
+    private void CloseEditor()
+    {
+        settingsOpen = moveHud = hudDragging = false;
+        capture = null;
+        SavePreferences();
+        UpdateCursor();
+        restartHold.RequireRelease();
+        practiceHold.RequireRelease();
+    }
+
     private void DrawSettings()
     {
         float left = Math.Max(10, (Screen.width - 540) / 2f);
         float top = Math.Max(10, (Screen.height - 590) / 2f);
-        GUI.Box(new Rect(left, top, 540, 590), "SlopHero 0.2.0 — F8 / Escape to close");
+        GUI.Box(new Rect(left, top, 540, 590), "SlopHero 0.2.1 — F8 / Escape to close");
         GUI.Label(new Rect(left + 20, top + 35, 500, 40), "Pause the game before editing. Song controls apply to solo Quickplay.");
         if (GUI.Button(new Rect(left + 20, top + 78, 500, 32), $"Restart: {restartButton.Value} — click to bind")) capture = "restart";
         if (GUI.Button(new Rect(left + 20, top + 118, 500, 32), $"Practice: {practiceButton.Value} — click to bind")) capture = "practice";

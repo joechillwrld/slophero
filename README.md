@@ -1,13 +1,14 @@
-# SlopHero 0.2.0 alpha
+# SlopHero 0.2.1 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**The HUD and restart ran in the user's 0.1.0 test. The new HUD editor and
-practice timing fix in 0.2.0 still need an in-game test.**
+**Practice switching is confirmed working in the user's 0.2.0 test. Version
+0.2.1 fixes the rendering regression that hid the HUD and F8 menu. The repaired
+HUD editor still needs an in-game test.**
 
 ## Install
 
-[Download v0.2.0 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.2.0-alpha.zip?raw=true)
+[Download v0.2.1 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.2.1-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -65,6 +66,20 @@ renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
 
+## 0.2.1 rendering repair
+
+The supplied Unity assemblies route `GUI.DrawTexture` to a stub that throws
+`Method unstripping failed`. That background call in 0.2.0 stopped drawing
+before the counters and menu, while F8 still toggled the invisible editor state.
+Version 0.2.1 uses the available native-backed `GUI.Box` renderer instead.
+Background opacity and text color controls are retained.
+
+HUD appearance rendering, settings rendering, and song controls have separate
+error handling. If appearance rendering fails, basic counters remain available.
+If menu rendering fails, the editor closes so it cannot silently block song
+controls. Each rendering-error category logs once per session instead of flooding
+`Latest.log` every frame. The working practice transition was not changed.
+
 ## HUD
 
 - **Misses:** resolved chart heads marked missed, using the game's results-screen
@@ -82,8 +97,9 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 ## First in-game check
 
 Compilation passed with no warnings, and all **29 portable logic checks passed**.
-Native hooks were traced in the supplied binary. The 0.2.0 changes still need
-Windows testing; the prior test log confirms the original HUD and restart ran.
+Native hooks were traced in the supplied binary. The latest Windows log confirms
+practice selected sections 0 and 2 successfully. Version 0.2.1 replaces the
+unsupported background-drawing call; the repaired overlay needs Windows testing.
 
 1. Hit some notes, intentionally miss a few, and press extra frets. Compare the
    final HUD counters against the guitar results screen.

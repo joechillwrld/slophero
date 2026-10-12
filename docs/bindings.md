@@ -97,3 +97,30 @@ practice shortcuts are disabled for that session, and the HUD remains enabled.
 Seven regression checks cover premature-scene, stale-manager, missing-renderer,
 missing-menu, missing-player, active-coroutine, and fully-ready conditions.
 The repaired transition has not yet been tested in the Windows game.
+
+
+## 0.2.1 rendering regression fix
+
+The user's zipped 0.2.0 log confirms successful practice selection at section
+indices 0 and 2. Its only error category is the repeatedly thrown
+System.NotSupportedException: Method unstripping failed from GUI.DrawTexture,
+which reached the HUD before the settings menu could render.
+
+Managed IL inspection of the supplied UnityEngine.IMGUIModule.dll shows that the
+two-argument DrawTexture overload forwards through several overloads to an
+12-argument colors/borders overload whose implementation is a hard-coded throw.
+This is not a counter or practice-engine failure.
+
+The repair draws the background with the native-backed GUI.Box overload accepting
+a GUIContent and GUIStyle, reached by the string/style wrapper. A white texture
+is assigned to the background style and tinted with GUI.backgroundColor for
+opacity. The relevant string-based Label, Box, Button, and HorizontalSlider call
+paths were inspected for reachable unstripping-failed stubs; none were found.
+Texture-only Label/Box/Button overloads were found to reach another stub in
+GUIContent.Temp and are deliberately not used. This static inspection does not
+establish Windows GUI behavior; the updated UI still needs a user test.
+
+HUD rendering failures fall back to the original native-backed string Label
+path. Settings failures close the editor instead of leaving invisible input
+gating enabled. Errors are logged once per rendering category to prevent the
+previous repeated-exception log growth. Practice selection logic remains unchanged.
