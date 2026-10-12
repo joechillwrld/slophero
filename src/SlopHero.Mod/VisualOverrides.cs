@@ -21,7 +21,8 @@ internal sealed class VisualOverrides
     private readonly HashSet<IntPtr> hiddenPlayers = new();
     private readonly HashSet<IntPtr> speedLog = new();
     private readonly HashSet<IntPtr> speedTransitionLog = new();
-    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); speedTransitionLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; songProgress = null; starProgresses = null; }
+    private bool fullSongSpeedSyncPending = true;
+    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); speedTransitionLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
     private SpriteRenderer[] Sprites(GameObject go)
     {
         if (!spriteChildren.TryGetValue(go.Pointer, out var result))
@@ -109,6 +110,8 @@ internal sealed class VisualOverrides
             speedLog.Clear();
             speedTransitionLog.Clear();
         }
+        if (!practiceNow && fullSongSpeedSyncPending)
+            fullSongSpeedSyncPending = !SyncFullSongSpeed(game);
         if (!sides && !strings && !beats && !score && !constantSpeed && hidden.Count == 0 && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
         foreach (var p in game.playerObjects)
         {
@@ -206,6 +209,40 @@ internal sealed class VisualOverrides
             TintChildren(star.progressBar, score, progress);
             TintChildren(star.progressBarEnd, score, progress);
         }
+    }
+
+    // A scene reload can reuse renderer objects after their practice speed cache
+    // has been cleared. Reconcile those fields once against the profile setting
+    // before full-song play so a prior practice tempo cannot leak into the song.
+    private bool SyncFullSongSpeed(GameManager game)
+    {
+        if (game.playerObjects == null) return false;
+        bool foundPlayer = false;
+        foreach (var player in game.playerObjects)
+        {
+            if (player == null || !player.enabled || player.TryCast<GuitarPlayer>() == null || player.engine == null) continue;
+            float configured = ConfiguredNoteSpeed.Read(player.player?.Pointer ?? IntPtr.Zero);
+            if (!ConfiguredNoteSpeed.IsPlausible(configured)) continue;
+            foundPlayer = true;
+            var notes = player.gameObject.GetComponentInChildren<GuitarNoteRenderer>(true);
+            if (notes == null) continue;
+            float noteBefore = notes.noteSpeed;
+            double windowBefore = notes.field_Protected_Double_0;
+            double windowTarget = NoteVisibilityWindow.Calculate(windowBefore, noteBefore, configured);
+            bool changed = Math.Abs(noteBefore - configured) > .001f;
+            if (changed) notes.noteSpeed = configured;
+            if (double.IsFinite(windowTarget) && windowTarget > 0 && Math.Abs(windowTarget - windowBefore) > .0001)
+                notes.field_Protected_Double_0 = windowTarget;
+            var beat = player.beatRenderer;
+            float beatBefore = beat == null ? float.NaN : beat.field_Private_Single_0;
+            if (beat != null && Math.Abs(beatBefore - configured) > .001f) beat.field_Private_Single_0 = configured;
+            var scroll = player.highwayScroll;
+            float scrollBefore = scroll == null ? float.NaN : scroll.field_Private_Single_1;
+            if (scroll != null && Math.Abs(scrollBefore - configured) > .001f) scroll.field_Private_Single_1 = configured;
+            if (changed || (beat != null && Math.Abs(beatBefore - configured) > .001f) || (scroll != null && Math.Abs(scrollBefore - configured) > .001f))
+                MelonLoader.MelonLogger.Msg($"Full-song speed reset after scene change: profile={configured:0.###}, note={noteBefore:0.###}->{notes.noteSpeed:0.###}, window={windowBefore:0.######}->{notes.field_Protected_Double_0:0.######}, beat={beatBefore:0.###}->{(beat == null ? float.NaN : beat.field_Private_Single_0):0.###}, highway={scrollBefore:0.###}->{(scroll == null ? float.NaN : scroll.field_Private_Single_1):0.###}.");
+        }
+        return foundPlayer;
     }
 
     private static bool Under(Transform? child, Transform? parent)
