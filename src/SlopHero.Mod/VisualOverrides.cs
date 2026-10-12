@@ -15,11 +15,12 @@ internal sealed class VisualOverrides
     private readonly Dictionary<IntPtr, Renderer[]> stringRenderers = new();
     private readonly Dictionary<IntPtr, GuitarNoteRenderer> noteRenderers = new();
     private SongProgress[]? songProgress;
+    private StarProgress[]? starProgresses;
     private readonly Dictionary<IntPtr, (double Window, float Speed)> visibility = new();
     private bool oldSides, oldStrings, oldBeats, oldScore, oldPractice;
     private readonly HashSet<IntPtr> hiddenPlayers = new();
     private readonly HashSet<IntPtr> speedLog = new();
-    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; songProgress = null; }
+    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; songProgress = null; starProgresses = null; }
     private SpriteRenderer[] Sprites(GameObject go)
     {
         if (!spriteChildren.TryGetValue(go.Pointer, out var result))
@@ -175,15 +176,31 @@ internal sealed class VisualOverrides
             }
         }
         var manager = game.scoreManager;
-        if (manager == null) return;
-        TintChildren(manager.scoreFont, score, scoreText);
-        TintChildren(manager.comboFont, score, scoreText);
-        var star = manager.starProgress;
-        if (star != null)
+        if (manager != null)
         {
-            Tint(star.starCountBG, score, stars);
+            TintChildren(manager.scoreFont, score, scoreText);
+            TintChildren(manager.comboFont, score, scoreText);
+        }
+        starProgresses ??= UnityEngine.Object.FindObjectsOfType<StarProgress>().ToArray();
+        foreach (var star in starProgresses)
+        {
+            if (star == null) continue;
+            foreach (var renderer in Sprites(star.gameObject))
+            {
+                if (renderer == null || renderer.Pointer == star.starCount?.Pointer) continue;
+                if (Under(renderer.transform, star.progressBar) || Under(renderer.transform, star.progressBarEnd)) continue;
+                Tint(renderer, score, stars);
+            }
             TintChildren(star.progressBar, score, progress);
             TintChildren(star.progressBarEnd, score, progress);
         }
+    }
+
+    private static bool Under(Transform? child, Transform? parent)
+    {
+        if (child == null || parent == null) return false;
+        for (var current = child; current != null; current = current.parent)
+            if (current.Pointer == parent.Pointer) return true;
+        return false;
     }
 }

@@ -13,7 +13,9 @@ public sealed partial class Core
     private MelonPreferences_Entry<float> songOpacity = null!;
     private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!;
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
+    private MelonPreferences_Entry<bool> performanceMode = null!, performanceFretEffects = null!, performanceNeckParticles = null!, performanceStarParticles = null!, performanceSlowHud = null!;
     private readonly VisualOverrides visuals = new();
+    private readonly PerformanceOverrides performance = new();
     private readonly RingColors rings = new();
     private readonly RuntimeTimings timings = new();
     private MelonPreferences_Entry<bool> lowOverhead = null!;
@@ -52,6 +54,11 @@ public sealed partial class Core
         tintFc = preferences.CreateEntry("CustomizeFcRings", false);
         tintScore = preferences.CreateEntry("CustomizeScoreColors", false);
         lockSpeed = preferences.CreateEntry("ConstantPracticeNoteSpeed", false);
+        performanceMode = preferences.CreateEntry("PerformanceMode", false);
+        performanceFretEffects = preferences.CreateEntry("PerformanceDisableFretEffects", true);
+        performanceNeckParticles = preferences.CreateEntry("PerformanceDisableNeckParticles", true);
+        performanceStarParticles = preferences.CreateEntry("PerformanceDisableStarParticles", true);
+        performanceSlowHud = preferences.CreateEntry("PerformanceSlowHud", true);
         fcColor = preferences.CreateEntry("FcColor", "FFD700");
         pfcColor = preferences.CreateEntry("PerfectFcColor", "00FFFF");
         songProgressColor = preferences.CreateEntry("SongProgressColor", "00FFFF");
@@ -64,10 +71,11 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.6 — F8 / Escape to close");
-        string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors" };
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.7 — F8 / Escape to close");
+        string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Performance" };
+        float tabWidth = 556f / pages.Length;
         for (int i = 0; i < pages.Length; i++)
-            if (GUI.Button(new Rect(x + 12 + i * 112, y + 32, 108, 30), pages[i])) settingsPage = i;
+            if (GUI.Button(new Rect(x + 12 + i * tabWidth, y + 32, tabWidth - 4, 30), pages[i])) settingsPage = i;
         x += 20; y += 80;
         GUI.Label(new Rect(x, y, 540, 25), "Pause before editing. Click a value to type; Enter applies, Escape cancels.");
         y += 34;
@@ -84,7 +92,7 @@ public sealed partial class Core
                     if (timings.Active) timings.Finish();
                     else if (gameplayInitialized)
                     {
-                        LoggerInstance.Msg($"Timing settings: lowOverheadHud={lowOverhead.Value}, FC colors={tintFc.Value}, score colors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}.");
+                        LoggerInstance.Msg($"Timing settings: lowOverheadHud={lowOverhead.Value}, performanceMode={performanceMode.Value}, FC colors={tintFc.Value}, score colors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}.");
                         timings.Start();
                     }
                     else Notice("Start a song before capturing mod timings.");
@@ -116,6 +124,14 @@ public sealed partial class Core
                 Hex(starColor, "Stars", x, y + 176); Hex(progressColor, "Star progress bar", x, y + 218);
                 Hex(scoreColor, "Score / accuracy text", x, y + 260);
                 Hex(songProgressColor, "Song progress bar", x, y + 302);
+                break;
+            case 5:
+                Toggle(performanceMode, "Performance mode", x, y);
+                Toggle(performanceFretEffects, "Disable fret sparks and flame animators", x, y + 44);
+                Toggle(performanceNeckParticles, "Disable note and sustain particles", x, y + 88);
+                Toggle(performanceStarParticles, "Disable score star particles", x, y + 132);
+                Toggle(performanceSlowHud, "Reduce HUD refresh to 2/sec", x, y + 176);
+                GUI.Label(new Rect(x, y + 220, 540, 120), "Choose which optional effects to suppress. The particle option also disables inactive particle systems attached to the guitar neck. Player input, notes, scoring, and gameplay objects stay active. Effect overrides restore when Performance mode is off.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -295,6 +311,8 @@ public sealed partial class Core
                 parsedColors[e.Value] = color; return color;
             }
             rings.Update(game, tintFc.Value, Read(fcColor), Read(pfcColor));
+            performance.Apply(game, performanceMode.Value, performanceFretEffects.Value,
+                performanceNeckParticles.Value, performanceStarParticles.Value);
             visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value,
                 tintScore.Value, Read(starColor), Read(progressColor), Read(scoreColor), Read(songProgressColor), lockSpeed.Value);
         }

@@ -1,13 +1,13 @@
-# SlopHero 0.3.6 alpha
+# SlopHero 0.3.7 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.3.6 resets practice speed compensation between practice sessions
-and applies the star color to the star graphic instead of its number.**
+**Version 0.3.7 adds customizable performance controls for optional gameplay
+effects, and broadens star HUD tinting while logging its renderer inventory.**
 
 ## Install
 
-[Download v0.3.6 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.6-alpha.zip?raw=true)
+[Download v0.3.7 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.7-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -89,7 +89,21 @@ renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
 
-## 0.3.6 practice speed reset and star graphic color
+## 0.3.7 performance controls and star HUD targeting
+
+**F8 → Performance** lets you enable the mode and choose which effects to
+suppress: fret sparks/flame animators, note and sustain particles, score star
+particles, and a 2 Hz counter refresh. Particle systems on the guitar neck are
+disabled even when idle. The mode restores each affected object when turned
+off; notes, input, scoring, and gameplay objects stay active. These are
+experimental removal options, and no FPS gain has been measured yet.
+
+The star tint now covers graphic renderers on all active StarProgress HUDs,
+excluding the numeric count and progress-bar renderers. The latest log also
+records each star HUD renderer and its sprite name once, so an incorrect target
+can be identified without guessing from field names.
+
+## 0.3.6 practice speed transition handling
 
 On entering practice again, cached speed and note-visibility state is cleared
 so compensation starts from that session's live renderer values. The supplied
@@ -97,9 +111,10 @@ log showed the feature targeting 18.4 from a configured speed of 23 at 125%
 tempo, with no logged exception. The repeated-practice speed drop was not
 reproduced from the log, so the reset needs a Windows check after this update.
 
-The star color now tints the star-count background graphic. The star number
-remains controlled by the score/accuracy text color. The star-color preference
-name stays the same, so existing settings are retained.
+The previous star tint change did not resolve the visible star in the user's
+install. This release broadens the target and includes renderer diagnostics.
+The practice transition issue was not reproduced in the attached log; the speed
+cache reset remains in place.
 
 ## Earlier 0.3.5 changes
 
@@ -259,7 +274,7 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 
 ## First in-game check
 
-Version 0.3.6 compiles without warnings. Earlier portable logic checks covered
+Version 0.3.7 compiles without warnings. Earlier portable logic checks covered
 title-speed formatting, native ring-state classification, chart-speed
 percentage formatting, native floating-point noise, the observed corrupt speed,
 concrete native-memory reads, and earlier gameplay logic. The new GUI calls were checked against the supplied wrappers.
@@ -295,6 +310,9 @@ Linux environment; the new features need the checks below.
 12. Enter practice, exit to the song, then enter practice again at both 100% and
     a changed tempo. Confirm note speed does not compound. Change the star color
     and verify the star graphic changes while its number follows the score text color.
+13. In F8 → Performance, test each removal by itself and in combination. Check
+    that turning the mode off restores all effects. Compare FPS and attach the
+    before/after Latest.log because removal does not guarantee an FPS increase.
 
 If the HUD is wrong, an action fails, or the mod disables itself, attach
 `MelonLoader/Latest.log` and describe the action. Include whether other mods were
