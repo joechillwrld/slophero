@@ -13,6 +13,7 @@ internal sealed class VisualOverrides
     private readonly PracticeClockRate practiceClockRate = new();
     private readonly Dictionary<IntPtr, (Il2CppTMPro.TextMeshProUGUI Text, Color Original)> texts = new();
     private readonly Dictionary<IntPtr, SpriteRenderer[]> spriteChildren = new();
+    private readonly Dictionary<IntPtr, SpriteRenderer[]> starFaceSprites = new();
     private readonly Dictionary<IntPtr, Renderer[]> stringRenderers = new();
     private readonly Dictionary<IntPtr, GuitarNoteRenderer> noteRenderers = new();
     private SongProgress[]? songProgress;
@@ -25,7 +26,7 @@ internal sealed class VisualOverrides
     private bool fullSongSpeedSyncPending = true;
     public bool HasOverrides => hidden.Count != 0 || colors.Count != 0 || speeds.Count != 0 || texts.Count != 0;
     public bool NeedsUpdate => fullSongSpeedSyncPending || HasOverrides;
-    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); speedTransitionLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
+    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); starFaceSprites.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); speedTransitionLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
     private SpriteRenderer[] Sprites(GameObject go)
     {
         if (!spriteChildren.TryGetValue(go.Pointer, out var result))
@@ -36,6 +37,28 @@ internal sealed class VisualOverrides
     {
         if (!stringRenderers.TryGetValue(go.Pointer, out var result))
             stringRenderers.Add(go.Pointer, result = go.GetComponentsInChildren<Renderer>(true).ToArray());
+        return result;
+    }
+
+    // Star fills can sit beneath the star graphic in the same hierarchy. Cache
+    // the ancestry test once per scene instead of walking every transform each
+    // frame while custom score colors are enabled.
+    private SpriteRenderer[] StarFaces(StarProgress star)
+    {
+        var gameObject = star.gameObject;
+        if (starFaceSprites.TryGetValue(gameObject.Pointer, out var result)) return result;
+        var starCount = star.starCount?.Pointer ?? IntPtr.Zero;
+        var progressBar = star.progressBar;
+        var progressEnd = star.progressBarEnd;
+        var faces = new List<SpriteRenderer>();
+        foreach (var renderer in Sprites(gameObject))
+        {
+            if (renderer == null || renderer.Pointer == starCount) continue;
+            if (Under(renderer.transform, progressBar) || Under(renderer.transform, progressEnd)) continue;
+            faces.Add(renderer);
+        }
+        result = faces.ToArray();
+        starFaceSprites.Add(gameObject.Pointer, result);
         return result;
     }
 
@@ -210,12 +233,7 @@ internal sealed class VisualOverrides
         foreach (var star in starProgresses)
         {
             if (star == null) continue;
-            foreach (var renderer in Sprites(star.gameObject))
-            {
-                if (renderer == null || renderer.Pointer == star.starCount?.Pointer) continue;
-                if (Under(renderer.transform, star.progressBar) || Under(renderer.transform, star.progressBarEnd)) continue;
-                Tint(renderer, score, stars);
-            }
+            foreach (var renderer in StarFaces(star)) Tint(renderer, score, stars);
             TintChildren(star.progressBar, score, progress);
             TintChildren(star.progressBarEnd, score, progress);
         }
