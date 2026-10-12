@@ -1,6 +1,7 @@
 using System.Reflection;
 using HarmonyLib;
 using Il2Cpp;
+using SlopHero.Core;
 using UnityEngine;
 
 namespace SlopHero.Mod;
@@ -102,7 +103,10 @@ internal sealed class RingColors
     private void Apply(Ring ring, bool force = false)
     {
         if (ring.Renderer == null || ring.Player == null || ring.Player.engine == null) return;
-        Color c = ring.Player.engine.field_Public_Int32_17 == 0 ? perfect : fc;
+        // Clone Hero's guitar rings use native hue 0 for perfect FC and
+        // 1/6 for ordinary FC. Keep the vanilla hue captured by the Harmony
+        // postfix; the ghost counter is not the ring's FC state.
+        Color c = NativeRingState.IsPerfectFc(ring.Hue) ? perfect : fc;
         if (!force && ring.HasApplied && ring.Applied == c) return;
         ring.Applied = c; ring.HasApplied = true;
         Color.RGBToHSV(c, out float h, out float s, out float v);

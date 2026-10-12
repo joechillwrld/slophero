@@ -1,14 +1,13 @@
-# SlopHero 0.3.4 alpha
+# SlopHero 0.3.5 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.3.4 adds live chart speed to the song HUD and FC shader diagnostics.
-The corrected note-speed reader worked in the user's 0.3.3 test. Chart-speed
-HUD display still needs a Windows check; no FPS improvement is established.**
+**Version 0.3.5 places chart speed beside the song title and selects custom
+perfect-FC colors from Clone Hero's native ring state.**
 
 ## Install
 
-[Download v0.3.4 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.4-alpha.zip?raw=true)
+[Download v0.3.5 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.5-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -90,13 +89,19 @@ renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
 
-## 0.3.4 song speed and FC brightness investigation
+## 0.3.5 title speed and perfect-FC ring state
 
-The song HUD now includes **Chart speed: 100% / 75% / 150% / ...**, using the
-current native tempo in both full-song and practice gameplay. It updates at the
-selected HUD refresh rate and follows practice tempo changes. Toggle it with
-**F8 → Song HUD → Chart speed**, or `ShowChartSpeed` in preferences. Native
-floating-point noise is rounded away; fractional percentages remain supported.
+The song HUD appends the live chart speed to the title, for example
+**Song Title (150%)**. It follows practice tempo changes. Toggle the suffix with
+**F8 → Song HUD → Speed beside title**, or `ShowChartSpeed` in preferences.
+Native floating-point noise is rounded away; fractional percentages remain
+supported. The suffix is hidden when the title itself is disabled.
+
+Custom perfect-FC and regular-FC ring colors now follow the hue state Clone Hero
+writes to the guitar ring. The ghost-input count no longer determines which
+color is used, since it is independent from the ring state. This native-state
+mapping needs confirmation in Windows gameplay, including runs with ghost fret
+presses and an actual broken perfect FC.
 
 The latest log confirms the repaired speed reader: configured/native speed 23,
 with a target of approximately 15.333 at 150% tempo. That implementation is
@@ -242,9 +247,10 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 
 ## First in-game check
 
-Version 0.3.4 compiles without warnings, and **69 portable logic checks pass**,
-including chart-speed percentage formatting, native floating-point noise, the
-observed corrupt speed, concrete native-memory reads, and earlier gameplay logic. The new GUI calls were checked against the supplied wrappers.
+Version 0.3.5 compiles without warnings, and **78 portable logic checks pass**,
+including title-speed formatting, native ring-state classification, chart-speed
+percentage formatting, native floating-point noise, the observed corrupt speed,
+concrete native-memory reads, and earlier gameplay logic. The new GUI calls were checked against the supplied wrappers.
 `GUI.TextField` is an unstripping-failed stub, so numeric/color entry uses string
 controls with IMGUI keyboard events. Windows gameplay cannot be run in this
 Linux environment; the new features need the checks below.
@@ -266,10 +272,11 @@ Linux environment; the new features need the checks below.
    Toggle off and confirm vanilla behavior returns.
 8. Compare FC/PFC colors before and after ghost inputs, misses, and practice
    restarts; toggle colors off and check the vanilla appearance is restored.
+   Ghost inputs alone should no longer switch the selected FC ring color.
 9. Capture the two timing reports above while playing a repeatable passage, then
    attach Latest.log with the FPS change observed on the game's FPS display.
-10. Verify the Chart speed line at 100%, 75%, and 150% in full-song/practice
-    play, then toggle that individual line off. Enable custom FC colors so the
+10. Verify the title suffix at 100%, 75%, and 150% in full-song/practice
+    play, then toggle it off. Enable custom FC colors so the
     next log includes the shader/color-space diagnostics.
 11. Move the HUD to another corner and adjust opacity/text color. Restart the game
    and confirm those settings were retained.
