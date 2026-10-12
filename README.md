@@ -1,8 +1,10 @@
-# SlopHero 0.4.14 alpha
+# SlopHero 0.4.15 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.14 adds movable practice stats and FPS HUDs, optional FPS text coloring,
+**Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
+when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
+practice stats and FPS HUDs, optional FPS text coloring,
 and skips inactive native HUD polling. It also skips counter sampling when both
 SlopHero HUDs are hidden. Version 0.4.13 caps custom score-color checks at 60 Hz. Version 0.4.12 adds
 opt-in timing detail for visual overrides. Version 0.4.11
@@ -14,7 +16,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.14 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.14-alpha.zip?raw=true)
+[Download v0.4.15 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.15-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -175,6 +177,13 @@ Added position controls for the native practice stats bar and FPS display, plus
 optional FPS text coloring. Native HUD objects are only polled when customization
 is configured or being edited. Counter and song metadata sampling stops when both
 SlopHero HUDs are hidden.
+
+## 0.4.15 settings cleanup and FPS row
+
+Fixed a missed score-color restore that could keep visual overrides active after
+turning custom colors off. Static player and score graphics are refreshed at 10 Hz;
+practice speed compensation remains on the live gameplay path. FPS text color and
+position now target its shared row, including the two numeric FPS readouts.
 
 ## 0.3.9 profiling and renderer update
 

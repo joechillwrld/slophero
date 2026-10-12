@@ -19,13 +19,14 @@ internal sealed class VisualOverrides
     private SongProgress[]? songProgress;
     private StarProgress[]? starProgresses;
     private double nextScoreColorRefresh;
+    private double nextPlayerPass;
     private readonly Dictionary<IntPtr, (double Window, float Speed)> visibility = new();
     private bool oldSides, oldStrings, oldBeats, oldScore, oldPractice;
     private readonly HashSet<IntPtr> hiddenPlayers = new();
     private bool fullSongSpeedSyncPending = true;
     public bool HasOverrides => hidden.Count != 0 || colors.Count != 0 || speeds.Count != 0 || texts.Count != 0;
     public bool NeedsUpdate => fullSongSpeedSyncPending || HasOverrides;
-    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); starFaceSprites.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; nextScoreColorRefresh = 0; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
+    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); starFaceSprites.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; nextScoreColorRefresh = nextPlayerPass = 0; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
     private SpriteRenderer[] Sprites(GameObject go)
     {
         if (!spriteChildren.TryGetValue(go.Pointer, out var result))
@@ -124,11 +125,17 @@ internal sealed class VisualOverrides
         double realtime, RuntimeTimings timings)
     {
         if (game.playerObjects == null) return;
-        bool restoreScore = oldScore;
+        // Keep the restore pass alive until every renderer has its captured
+        // color back. A one-frame oldScore edge can be missed by the throttled
+        // refresh interval, leaving stale colors cached and waking this hook
+        // on every frame until the scene reloads.
+        bool restoreScore = oldScore || (!score && (colors.Count != 0 || texts.Count != 0));
         oldScore = score;
         bool scorePassNeeded = score || restoreScore;
         bool refreshScoreColors = scorePassNeeded && realtime >= nextScoreColorRefresh;
-        if (refreshScoreColors) nextScoreColorRefresh = realtime + 1d / 60d;
+        // These colors are static; 10 Hz is more than enough for live edits and
+        // avoids repeatedly walking score/star graphics at unlocked FPS rates.
+        if (refreshScoreColors) nextScoreColorRefresh = realtime + .1;
         bool practiceNow = game.globalVariables != null && game.globalVariables.isPracticeEnabled;
         // The playback-clock sample is only needed by the optional compensation
         // feature. Avoid a clock read and stopwatch bookkeeping on the default path.
@@ -149,66 +156,73 @@ internal sealed class VisualOverrides
         if (!practiceNow && fullSongSpeedSyncPending)
             fullSongSpeedSyncPending = !SyncFullSongSpeed(game);
         if (!sides && !strings && !beats && !score && !constantSpeed && hidden.Count == 0 && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
-        long playerTiming = timings.Begin();
-        try
+        bool speedCompensationActive = constantSpeed && practiceNow;
+        bool playerPassNeeded = sides != oldSides || strings != oldStrings || beats != oldBeats
+            || practiceChanged || refreshScoreColors || speeds.Count > 0 || speedCompensationActive;
+        if (playerPassNeeded || realtime >= nextPlayerPass)
         {
-            foreach (var p in game.playerObjects)
+            nextPlayerPass = realtime + .1;
+            long playerTiming = timings.Begin();
+            try
             {
-                if (p == null || !p.enabled || p.TryCast<GuitarPlayer>() == null || p.engine == null) continue;
-                var b = p.beatRenderer;
-                bool newPlayer = !hiddenPlayers.Contains(p.Pointer);
-                if (newPlayer || sides != oldSides || strings != oldStrings || beats != oldBeats)
+                foreach (var p in game.playerObjects)
                 {
-                    Hide(p.trackSidebarLeft?.field_Private_SpriteRenderer_0, sides);
-                    Hide(p.trackSidebarRight?.field_Private_SpriteRenderer_0, sides);
-                    var neck = p.neckController;
-                    var fretStrings = neck?.fretStrings;
-                    if (fretStrings != null && (strings || oldStrings))
-                        foreach (var go in fretStrings)
-                            if (go != null) foreach (var r in Strings(go)) Hide(r, strings);
-                    var beatSprites = b?.field_Protected_Il2CppReferenceArray_1_SpriteRenderer_0;
-                    if (beatSprites != null && (beats || oldBeats))
-                        foreach (var r in beatSprites) Hide(r, beats);
-                    if (b != null && beatSprites != null && neck != null && fretStrings != null) hiddenPlayers.Add(p.Pointer);
-                }
-                if (refreshScoreColors) TintText(p.AccuracyText, score, scoreText);
-                bool compensate = constantSpeed && practiceNow;
-                if (!compensate && speeds.Count == 0 && !practiceChanged) continue;
-                float ratio = clockRate;
-                float configured = ConfiguredNoteSpeed.Read(p.player?.Pointer ?? IntPtr.Zero);
-                compensate &= ConfiguredNoteSpeed.IsPlausible(configured);
-                if (!noteRenderers.TryGetValue(p.Pointer, out var notes))
-                {
-                    notes = p.gameObject.GetComponentInChildren<GuitarNoteRenderer>(true);
-                    if (notes != null) noteRenderers.Add(p.Pointer, notes);
-                }
-                if (notes != null)
-                {
-                    if (!visibility.TryGetValue(notes.Pointer, out var native) || !double.IsFinite(native.Window) || native.Window <= 0 || native.Speed <= 0)
+                    if (p == null || !p.enabled || p.TryCast<GuitarPlayer>() == null || p.engine == null) continue;
+                    var b = p.beatRenderer;
+                    bool newPlayer = !hiddenPlayers.Contains(p.Pointer);
+                    if (newPlayer || sides != oldSides || strings != oldStrings || beats != oldBeats)
                     {
-                        native = (notes.field_Protected_Double_0, notes.noteSpeed);
-                        visibility[notes.Pointer] = native;
+                        Hide(p.trackSidebarLeft?.field_Private_SpriteRenderer_0, sides);
+                        Hide(p.trackSidebarRight?.field_Private_SpriteRenderer_0, sides);
+                        var neck = p.neckController;
+                        var fretStrings = neck?.fretStrings;
+                        if (fretStrings != null && (strings || oldStrings))
+                            foreach (var go in fretStrings)
+                                if (go != null) foreach (var r in Strings(go)) Hide(r, strings);
+                        var beatSprites = b?.field_Protected_Il2CppReferenceArray_1_SpriteRenderer_0;
+                        if (beatSprites != null && (beats || oldBeats))
+                            foreach (var r in beatSprites) Hide(r, beats);
+                        if (b != null && beatSprites != null && neck != null && fretStrings != null) hiddenPlayers.Add(p.Pointer);
                     }
-                    float speed = Speed(notes.Pointer, notes.noteSpeed, ratio, compensate, configured);
-                    double window = compensate ? NoteVisibilityWindow.Calculate(native.Window, native.Speed, speed) : native.Window;
-                    if (double.IsFinite(window) && window > 0 && float.IsFinite(speed) && speed > 0 && speed <= 10000)
+                    if (refreshScoreColors) TintText(p.AccuracyText, score, scoreText);
+                    bool compensate = speedCompensationActive;
+                    if (!compensate && speeds.Count == 0 && !practiceChanged) continue;
+                    float ratio = clockRate;
+                    float configured = ConfiguredNoteSpeed.Read(p.player?.Pointer ?? IntPtr.Zero);
+                    compensate &= ConfiguredNoteSpeed.IsPlausible(configured);
+                    if (!noteRenderers.TryGetValue(p.Pointer, out var notes))
                     {
-                        if (Math.Abs(speed - notes.noteSpeed) > .0001f) notes.noteSpeed = speed;
-                        // Never derive the spawn window from live camera clipping limits.
-                        if (Math.Abs(window - notes.field_Protected_Double_0) > .0001) notes.field_Protected_Double_0 = window;
+                        notes = p.gameObject.GetComponentInChildren<GuitarNoteRenderer>(true);
+                        if (notes != null) noteRenderers.Add(p.Pointer, notes);
                     }
-                    else if (compensate)
+                    if (notes != null)
                     {
-                        if (native.Speed > 0 && float.IsFinite(native.Speed)) notes.noteSpeed = native.Speed;
-                        if (native.Window > 0 && double.IsFinite(native.Window)) notes.field_Protected_Double_0 = native.Window;
+                        if (!visibility.TryGetValue(notes.Pointer, out var native) || !double.IsFinite(native.Window) || native.Window <= 0 || native.Speed <= 0)
+                        {
+                            native = (notes.field_Protected_Double_0, notes.noteSpeed);
+                            visibility[notes.Pointer] = native;
+                        }
+                        float speed = Speed(notes.Pointer, notes.noteSpeed, ratio, compensate, configured);
+                        double window = compensate ? NoteVisibilityWindow.Calculate(native.Window, native.Speed, speed) : native.Window;
+                        if (double.IsFinite(window) && window > 0 && float.IsFinite(speed) && speed > 0 && speed <= 10000)
+                        {
+                            if (Math.Abs(speed - notes.noteSpeed) > .0001f) notes.noteSpeed = speed;
+                            // Never derive the spawn window from live camera clipping limits.
+                            if (Math.Abs(window - notes.field_Protected_Double_0) > .0001) notes.field_Protected_Double_0 = window;
+                        }
+                        else if (compensate)
+                        {
+                            if (native.Speed > 0 && float.IsFinite(native.Speed)) notes.noteSpeed = native.Speed;
+                            if (native.Window > 0 && double.IsFinite(native.Window)) notes.field_Protected_Double_0 = native.Window;
+                        }
                     }
+                    if (b != null) b.field_Private_Single_0 = Speed(b.Pointer, b.field_Private_Single_0, ratio, compensate, configured);
+                    if (p.highwayScroll != null)
+                        p.highwayScroll.field_Private_Single_1 = Speed(p.highwayScroll.Pointer, p.highwayScroll.field_Private_Single_1, ratio, compensate, configured);
                 }
-                if (b != null) b.field_Private_Single_0 = Speed(b.Pointer, b.field_Private_Single_0, ratio, compensate, configured);
-                if (p.highwayScroll != null)
-                    p.highwayScroll.field_Private_Single_1 = Speed(p.highwayScroll.Pointer, p.highwayScroll.field_Private_Single_1, ratio, compensate, configured);
             }
+            finally { timings.End(4, playerTiming); }
         }
-        finally { timings.End(4, playerTiming); }
         oldSides = sides; oldStrings = strings; oldBeats = beats;
         oldPractice = practiceNow;
         if (!score && !restoreScore) return;

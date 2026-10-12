@@ -1,4 +1,5 @@
 using Il2Cpp;
+using Il2CppTMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -43,15 +44,14 @@ internal sealed class NativeHudLayout
         nextProbe = realtime + .25;
 
         var fpsObject = game.FPSText;
-        var nextFps = fpsObject == null ? null : fpsObject.GetComponent<RectTransform>();
-        if (nextFps == null && fpsObject != null) nextFps = fpsObject.GetComponentInChildren<RectTransform>(true);
+        var (nextFps, nextFpsGraphics) = FindFpsHud(fpsObject);
         if (nextFps?.Pointer != fpsPointer)
         {
             RestoreFps();
             fpsRect = nextFps;
             fpsPointer = fpsRect?.Pointer ?? IntPtr.Zero;
             fpsOriginal = fpsRect == null ? Vector2.zero : fpsRect.anchoredPosition;
-            fpsGraphics = fpsObject == null ? Array.Empty<Graphic>() : fpsObject.GetComponentsInChildren<Graphic>(true).ToArray();
+            fpsGraphics = nextFpsGraphics;
             fpsOriginalColors = fpsGraphics.Select(g => g == null ? Color.white : g.color).ToArray();
             lastFpsX = lastFpsY = float.NaN;
             lastFpsTint = false;
@@ -124,6 +124,30 @@ internal sealed class NativeHudLayout
         lastX = x;
         lastY = y;
     }
+
+    private static (RectTransform? Transform, Graphic[] Texts) FindFpsHud(GameObject? fpsObject)
+    {
+        if (fpsObject == null) return (null, Array.Empty<Graphic>());
+        var parent = fpsObject.transform.parent;
+        var parentRect = parent == null ? null : parent.GetComponent<RectTransform>();
+        if (parentRect != null)
+        {
+            var siblings = parent!.gameObject.GetComponentsInChildren<Graphic>(true)
+                .Where(IsTextGraphic).ToArray();
+            // FPSText is the slash separator on this game build; the numeric
+            // values are sibling text objects, so move/tint their shared row.
+            if (siblings.Length > 1) return (parentRect, siblings);
+        }
+
+        var ownRect = fpsObject.GetComponent<RectTransform>()
+            ?? fpsObject.GetComponentInChildren<RectTransform>(true);
+        var ownTexts = fpsObject.GetComponentsInChildren<Graphic>(true)
+            .Where(IsTextGraphic).ToArray();
+        return (ownRect, ownTexts);
+    }
+
+    private static bool IsTextGraphic(Graphic graphic) =>
+        graphic != null && (graphic.TryCast<TextMeshProUGUI>() != null || graphic.TryCast<Text>() != null);
 
     private static float LocalToScreenScale(RectTransform transform)
     {
