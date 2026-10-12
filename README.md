@@ -1,8 +1,9 @@
-# SlopHero 0.4.12 alpha
+# SlopHero 0.4.13 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.12 adds opt-in timing detail for visual overrides. Version 0.4.11
+**Version 0.4.13 caps custom score-color checks at 60 Hz. Version 0.4.12 adds
+opt-in timing detail for visual overrides. Version 0.4.11
 removes resolved test diagnostics. Version 0.4.10 reduces
 repeated work in custom star coloring. Version 0.4.9
 reduces idle frame work in the mod. Version 0.4.8 compensates
@@ -11,7 +12,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.12 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.12-alpha.zip?raw=true)
+[Download v0.4.13 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.13-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -156,6 +157,12 @@ capture remain available for support and performance checks.
 The opt-in 30-second timing report now separates the player/speed override work
 from score graphics work inside the visual callback. These measurements are
 reported only when timing capture is started from the settings menu.
+
+## 0.4.13 score-color refresh
+
+Custom score, star, and progress colors are checked at up to 60 Hz. This keeps
+color changes responsive while avoiding repeated renderer scans at unlocked
+frame rates. Practice speed and FC ring updates keep their existing cadence.
 
 ## 0.3.9 profiling and renderer update
 
