@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>SlopHero</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <Version>0.1.0</Version>
+    <GameReferences Condition="'$(GameReferences)' == ''">../../references</GameReferences>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="$(GameReferences)/net6/*.dll"><Private>false</Private></Reference>
+    <Reference Include="$(GameReferences)/Il2CppAssemblies/*.dll"><Private>false</Private></Reference>
+    <Compile Include="../SlopHero.Core/*.cs" Link="Core/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <Target Name="CheckReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GameReferences)/net6/MelonLoader.dll')" Text="Set GameReferences to the directory containing net6 and Il2CppAssemblies from your MelonLoader installation." />
+  </Target>
+</Project>
