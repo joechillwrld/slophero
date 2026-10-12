@@ -20,11 +20,11 @@ public sealed class ScrollSpeedCompensation
         }
         if (!float.IsFinite(current) || current <= 0) return current;
         if (!authoritative && (!active || Math.Abs(current - applied) >= .001f)) original = current;
-        // Native speed inspection shows practice tempo only weakly affects the
-        // rendered highway. A small logarithmic correction addresses the slight
-        // slowdown observed at 135% without the large swings from using tempo
-        // directly. The profile is read live, so every configured speed works.
-        float target = original * MathF.Pow(tempo, .1f);
+        // `tempo` is the measured rate of GameManager.songTimeVideoTime against
+        // real time, not the practice menu percentage. Native note, beat, and
+        // highway update paths multiply chart-time deltas by these renderer
+        // speeds, so inverse measured clock rate holds world motion constant.
+        float target = original / tempo;
         if (!float.IsFinite(target) || target < .01f || target > 10000)
         {
             bool owned = active;

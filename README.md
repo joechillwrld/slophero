@@ -1,13 +1,13 @@
-# SlopHero 0.4.7 alpha
+# SlopHero 0.4.8 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.7 adds a restrained practice tempo correction based on the latest
-135% comparison.**
+**Version 0.4.8 compensates from the measured gameplay clock rate rather than
+assuming the practice percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.7 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.7-alpha.zip?raw=true)
+[Download v0.4.8 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.8-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -90,13 +90,13 @@ renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
 
-## 0.4.7 practice tempo correction
+## 0.4.8 practice tempo correction
 
-The constant practice speed option applies a small logarithmic tempo correction
-to each live configured profile speed. At 135% tempo this raises raw renderer
-speed by about 3%, addressing the slight slowdown reported with a fixed raw
-value. This supports any configured note speed and avoids large direct tempo
-multipliers.
+The constant practice speed option measures how quickly the gameplay song clock
+advances against real time, then applies the inverse rate to note, beatline, and
+highway renderer speeds. The game’s displayed practice percentage is logged for
+comparison but is no longer assumed to equal that measured rate. This supports
+any configured note speed and avoids guessing a multiplier from one percentage.
 
 ## 0.4.2 full-song speed reset
 

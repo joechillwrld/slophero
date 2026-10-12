@@ -10,6 +10,7 @@ internal sealed class VisualOverrides
     private readonly Dictionary<IntPtr, (SpriteRenderer Renderer, Color Original)> colors = new();
     private readonly Dictionary<IntPtr, (Renderer Renderer, bool Original)> hidden = new();
     private readonly Dictionary<IntPtr, ScrollSpeedCompensation> speeds = new();
+    private readonly PracticeClockRate practiceClockRate = new();
     private readonly Dictionary<IntPtr, (Il2CppTMPro.TextMeshProUGUI Text, Color Original)> texts = new();
     private readonly Dictionary<IntPtr, SpriteRenderer[]> spriteChildren = new();
     private readonly Dictionary<IntPtr, Renderer[]> stringRenderers = new();
@@ -22,7 +23,7 @@ internal sealed class VisualOverrides
     private readonly HashSet<IntPtr> speedLog = new();
     private readonly HashSet<IntPtr> speedTransitionLog = new();
     private bool fullSongSpeedSyncPending = true;
-    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); speedTransitionLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
+    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); speedTransitionLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
     private SpriteRenderer[] Sprites(GameObject go)
     {
         if (!spriteChildren.TryGetValue(go.Pointer, out var result))
@@ -95,10 +96,12 @@ internal sealed class VisualOverrides
     }
 
     public void Apply(GameManager game, bool sides, bool strings, bool beats,
-        bool score, Color stars, Color progress, Color scoreText, Color songProgressColor, bool constantSpeed)
+        bool score, Color stars, Color progress, Color scoreText, Color songProgressColor, bool constantSpeed, double realtime)
     {
         if (game.playerObjects == null) return;
         bool practiceNow = game.globalVariables != null && game.globalVariables.isPracticeEnabled;
+        float clockRate = practiceClockRate.Update(game.songTimeVideoTime, realtime,
+            practiceNow && game.isSongPlaying && !game.isPaused);
         bool practiceChanged = practiceNow != oldPractice;
         if (practiceNow && !oldPractice)
         {
@@ -135,7 +138,7 @@ internal sealed class VisualOverrides
             if (score || oldScore) TintText(p.AccuracyText, score, scoreText);
             bool compensate = constantSpeed && practiceNow;
             if (!compensate && speeds.Count == 0 && !practiceChanged) continue;
-            float ratio = game.practiceSpeed;
+            float ratio = clockRate;
             float configured = ConfiguredNoteSpeed.Read(p.player?.Pointer ?? IntPtr.Zero);
             compensate &= ConfiguredNoteSpeed.IsPlausible(configured);
             if (!noteRenderers.TryGetValue(p.Pointer, out var notes))
@@ -166,14 +169,14 @@ internal sealed class VisualOverrides
                     if (native.Speed > 0 && float.IsFinite(native.Speed)) notes.noteSpeed = native.Speed;
                     if (native.Window > 0 && double.IsFinite(native.Window)) notes.field_Protected_Double_0 = native.Window;
                 }
-                if (constantSpeed && practiceNow && speedLog.Add(notes.Pointer))
-                    MelonLoader.MelonLogger.Msg($"Practice rendering: profile={configured}, tempo={ratio}, nativeSpeed={native.Speed}, targetSpeed={speed}, nativeWindow={native.Window}, targetWindow={window}.");
+                if (compensate && speedLog.Add(notes.Pointer))
+                    MelonLoader.MelonLogger.Msg($"Practice rendering: profile={configured}, chartTempo={game.practiceSpeed}, clockRate={ratio}, nativeSpeed={native.Speed}, targetSpeed={speed}, nativeWindow={native.Window}, targetWindow={window}.");
             }
             if (b != null) b.field_Private_Single_0 = Speed(b.Pointer, b.field_Private_Single_0, ratio, compensate, configured);
             if (p.highwayScroll != null)
                 p.highwayScroll.field_Private_Single_1 = Speed(p.highwayScroll.Pointer, p.highwayScroll.field_Private_Single_1, ratio, compensate, configured);
             if (practiceChanged && speedTransitionLog.Add(p.Pointer))
-                MelonLoader.MelonLogger.Msg($"Practice speed transition: practice={practiceNow}, tempo={ratio:0.###}, profile={configured:0.###}, note={noteSpeedBefore:0.###}->{(notes == null ? float.NaN : notes.noteSpeed):0.###}, beat={beatSpeedBefore:0.###}->{(b == null ? float.NaN : b.field_Private_Single_0):0.###}, highway={highwaySpeedBefore:0.###}->{(p.highwayScroll == null ? float.NaN : p.highwayScroll.field_Private_Single_1):0.###}.");
+                MelonLoader.MelonLogger.Msg($"Practice speed transition: practice={practiceNow}, chartTempo={game.practiceSpeed:0.###}, clockRate={ratio:0.###}, profile={configured:0.###}, note={noteSpeedBefore:0.###}->{(notes == null ? float.NaN : notes.noteSpeed):0.###}, beat={beatSpeedBefore:0.###}->{(b == null ? float.NaN : b.field_Private_Single_0):0.###}, highway={highwaySpeedBefore:0.###}->{(p.highwayScroll == null ? float.NaN : p.highwayScroll.field_Private_Single_1):0.###}.");
         }
         oldSides = sides; oldStrings = strings; oldBeats = beats;
         oldPractice = practiceNow;

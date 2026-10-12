@@ -166,16 +166,21 @@ verified; automatic guitar input restoration needs the user's Windows test.
 - Score text: `ScoreManager.scoreFont/comboFont` sprite renderers and
   `BasePlayer.AccuracyText`. Stars: `StarProgress.starCount`. Star progress:
   `progressBar/progressBarEnd`. Song progress: `SongProgress.barTransform/endTransform`.
-- Practice compensation uses `GameManager.practiceSpeed`, a tempo ratio (native
-  restart telemetry multiplies it by 100 for `songSpeed`, RVA `0xBFDB9`).
+- Practice compensation samples `GameManager.songTimeVideoTime` against real
+  time instead of assuming `GameManager.practiceSpeed` is the actual renderer
+  clock rate (native restart telemetry multiplies it by 100 for `songSpeed`, RVA
+  `0xBFDB9`).
   `GuitarNoteRenderer.noteSpeed` is initialized from the profile at `0x1162A0A`.
   Its cached horizon uses `(noteZPosFarLimit - strikeLine) / noteSpeed`
   (`BaseNoteRenderer.Start`, RVA `0x1162980`). Beat positions multiply chart-time
   difference by speed at offset `0x68` (`0x26E8BD`); highway texture scrolling
-  uses offset `0x50` (`0x38194D`). Keep these rendering speeds at the configured
-  profile value through tempo changes; practice already applies tempo scaling.
-  Maintain separate baselines and restore them when disabled. Audio and
-  engine timing are unchanged. No Windows runtime validation yet.
+  integrates `songTimeVideoTime` delta times its speed at offset `0x50`
+  (`0x38194D`). Guitar note positions likewise use chart-time delta times
+  `noteSpeed` (`0x115A661–0x115A686`). The effective multiplier is therefore the
+  measured rate of `songTimeVideoTime` against real time. Each renderer's speed
+  is scaled inversely to that measured rate, with independent baselines and
+  restoration. Audio and engine timing remain unchanged. The measured-clock
+  correction still needs Windows runtime validation.
 - All supplied `GUI.TextField` overloads reach an unstripping-failed
   `GUI.DoTextField` stub. The editor uses native string `GUI.Box/Button/Label`
   and `Event` character/key input. Audited character/key/control/rawType getters,
