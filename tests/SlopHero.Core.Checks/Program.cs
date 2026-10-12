@@ -37,4 +37,18 @@ Check(!ChartNote.IsResolved(0) && !ChartNote.IsMissed(0), "Future note omitted")
 Check(ChartNote.IsResolved(1) && !ChartNote.IsMissed(1), "Hit head resolved");
 Check(ChartNote.IsResolved(2) && ChartNote.IsMissed(2), "Missed head resolved");
 Check(!ChartNote.IsResolved(4 | 8 | 16), "Dynamics and sustain flags are not head outcomes");
+Check(!PracticeReadiness.CanSelect(false, true, true, true, true, 0),
+    "Regression: practice cannot select before scene initialization even when game flags are ready");
+Check(!PracticeReadiness.CanSelect(true, false, true, true, true, 0),
+    "Practice cannot select using the outgoing game manager");
+Check(!PracticeReadiness.CanSelect(true, true, true, true, false, 0),
+    "Regression: missing beat renderer resources block the native practice call");
+Check(!PracticeReadiness.CanSelect(true, true, true, false, true, 0),
+    "Section menu must finish initialization");
+Check(!PracticeReadiness.CanSelect(true, true, false, true, true, 0),
+    "Practice player and chart must finish loading");
+Check(!PracticeReadiness.CanSelect(true, true, true, true, true, 1),
+    "Initialization coroutines block selection");
+Check(PracticeReadiness.CanSelect(true, true, true, true, true, 0),
+    "Fully initialized practice scene allows selection");
 Console.WriteLine($"Passed {checks} checks.");

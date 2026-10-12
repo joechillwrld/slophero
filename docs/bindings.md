@@ -72,3 +72,28 @@ Portable tests exercise percentage math, hold latching, pause/scene gating,
 clock reversal, and chart-head classification. Unity, Rewired, native scene
 transitions, counter agreement, long-chart performance, and coexistence with
 ClonZones need Windows testing. None are claimed runtime-verified.
+
+
+## 0.2.0 practice regression fix
+
+The user's 0.1.0 log shows automatic selection throwing in BeatRenderer's
+reset helper (RVA 0x26ECC0), called by BasePlayer's range reset and then
+GameManager's section-selection routine. The exception precedes the Gameplay
+scene-initialized callback. Scene-loaded plus game-ready flags were insufficient.
+
+BeatRenderer.Start (RVA 0x26DC40) initializes its beat data at native offset 0x28.
+The reset helper requires that data. The 0.2.0 transition waits for:
+
+- the Gameplay scene-initialized callback;
+- a game manager distinct from the outgoing song's manager;
+- a ready practice player, chart, audio sync, and practice UI;
+- the visible section menu with its initialized section list;
+- initialized BeatRenderer beat data and renderer arrays;
+- no outstanding initialization coroutines.
+
+Native selection is attempted once after these checks. A selection exception
+is handled within the practice feature: pending selection is cancelled, further
+practice shortcuts are disabled for that session, and the HUD remains enabled.
+Seven regression checks cover premature-scene, stale-manager, missing-renderer,
+missing-menu, missing-player, active-coroutine, and fully-ready conditions.
+The repaired transition has not yet been tested in the Windows game.
