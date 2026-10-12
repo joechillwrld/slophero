@@ -1,13 +1,13 @@
-# SlopHero 0.3.5 alpha
+# SlopHero 0.3.6 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.3.5 places chart speed beside the song title and selects custom
-perfect-FC colors from Clone Hero's native ring state.**
+**Version 0.3.6 resets practice speed compensation between practice sessions
+and applies the star color to the star graphic instead of its number.**
 
 ## Install
 
-[Download v0.3.5 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.5-alpha.zip?raw=true)
+[Download v0.3.6 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.6-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -89,7 +89,19 @@ renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
 
-## 0.3.5 title speed and perfect-FC ring state
+## 0.3.6 practice speed reset and star graphic color
+
+On entering practice again, cached speed and note-visibility state is cleared
+so compensation starts from that session's live renderer values. The supplied
+log showed the feature targeting 18.4 from a configured speed of 23 at 125%
+tempo, with no logged exception. The repeated-practice speed drop was not
+reproduced from the log, so the reset needs a Windows check after this update.
+
+The star color now tints the star-count background graphic. The star number
+remains controlled by the score/accuracy text color. The star-color preference
+name stays the same, so existing settings are retained.
+
+## Earlier 0.3.5 changes
 
 The song HUD appends the live chart speed to the title, for example
 **Song Title (150%)**. It follows practice tempo changes. Toggle the suffix with
@@ -247,8 +259,8 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 
 ## First in-game check
 
-Version 0.3.5 compiles without warnings, and **78 portable logic checks pass**,
-including title-speed formatting, native ring-state classification, chart-speed
+Version 0.3.6 compiles without warnings. Earlier portable logic checks covered
+title-speed formatting, native ring-state classification, chart-speed
 percentage formatting, native floating-point noise, the observed corrupt speed,
 concrete native-memory reads, and earlier gameplay logic. The new GUI calls were checked against the supplied wrappers.
 `GUI.TextField` is an unstripping-failed stub, so numeric/color entry uses string
@@ -279,7 +291,10 @@ Linux environment; the new features need the checks below.
     play, then toggle it off. Enable custom FC colors so the
     next log includes the shader/color-space diagnostics.
 11. Move the HUD to another corner and adjust opacity/text color. Restart the game
-   and confirm those settings were retained.
+    and confirm those settings were retained.
+12. Enter practice, exit to the song, then enter practice again at both 100% and
+    a changed tempo. Confirm note speed does not compound. Change the star color
+    and verify the star graphic changes while its number follows the score text color.
 
 If the HUD is wrong, an action fails, or the mod disables itself, attach
 `MelonLoader/Latest.log` and describe the action. Include whether other mods were

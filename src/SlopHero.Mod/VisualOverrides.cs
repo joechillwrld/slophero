@@ -16,10 +16,10 @@ internal sealed class VisualOverrides
     private readonly Dictionary<IntPtr, GuitarNoteRenderer> noteRenderers = new();
     private SongProgress[]? songProgress;
     private readonly Dictionary<IntPtr, (double Window, float Speed)> visibility = new();
-    private bool oldSides, oldStrings, oldBeats, oldScore;
+    private bool oldSides, oldStrings, oldBeats, oldScore, oldPractice;
     private readonly HashSet<IntPtr> hiddenPlayers = new();
     private readonly HashSet<IntPtr> speedLog = new();
-    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = false; songProgress = null; }
+    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; songProgress = null; }
     private SpriteRenderer[] Sprites(GameObject go)
     {
         if (!spriteChildren.TryGetValue(go.Pointer, out var result))
@@ -91,6 +91,16 @@ internal sealed class VisualOverrides
         bool score, Color stars, Color progress, Color scoreText, Color songProgressColor, bool constantSpeed)
     {
         if (game.playerObjects == null) return;
+        bool practiceNow = game.globalVariables != null && game.globalVariables.isPracticeEnabled;
+        if (practiceNow && !oldPractice)
+        {
+            // Practice may reuse gameplay renderers after the player returns to
+            // the song. Drop per-session compensation and visibility baselines
+            // so the new practice session starts from its live native state.
+            speeds.Clear();
+            visibility.Clear();
+            speedLog.Clear();
+        }
         if (!sides && !strings && !beats && !score && !constantSpeed && hidden.Count == 0 && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
         foreach (var p in game.playerObjects)
         {
@@ -112,7 +122,7 @@ internal sealed class VisualOverrides
                 if (b != null && beatSprites != null && neck != null && fretStrings != null) hiddenPlayers.Add(p.Pointer);
             }
             if (score || oldScore) TintText(p.AccuracyText, score, scoreText);
-            bool compensate = constantSpeed && game.globalVariables.isPracticeEnabled;
+            bool compensate = constantSpeed && practiceNow;
             float ratio = game.practiceSpeed;
             if (!constantSpeed && speeds.Count == 0) continue;
             float configured = ConfiguredNoteSpeed.Read(p.player?.Pointer ?? IntPtr.Zero);
@@ -142,7 +152,7 @@ internal sealed class VisualOverrides
                     if (native.Speed > 0 && float.IsFinite(native.Speed)) notes.noteSpeed = native.Speed;
                     if (native.Window > 0 && double.IsFinite(native.Window)) notes.field_Protected_Double_0 = native.Window;
                 }
-                if (constantSpeed && game.globalVariables.isPracticeEnabled && speedLog.Add(notes.Pointer))
+                if (constantSpeed && practiceNow && speedLog.Add(notes.Pointer))
                     MelonLoader.MelonLogger.Msg($"Practice rendering: profile={configured}, tempo={ratio}, nativeSpeed={native.Speed}, targetSpeed={speed}, nativeWindow={native.Window}, targetWindow={window}.");
             }
             if (b != null) b.field_Private_Single_0 = Speed(b.Pointer, b.field_Private_Single_0, ratio, compensate, configured);
@@ -150,6 +160,7 @@ internal sealed class VisualOverrides
                 p.highwayScroll.field_Private_Single_1 = Speed(p.highwayScroll.Pointer, p.highwayScroll.field_Private_Single_1, ratio, compensate, configured);
         }
         oldSides = sides; oldStrings = strings; oldBeats = beats;
+        oldPractice = practiceNow;
         bool restoreScore = oldScore;
         oldScore = score;
         if (!score && !restoreScore) return;
@@ -170,7 +181,7 @@ internal sealed class VisualOverrides
         var star = manager.starProgress;
         if (star != null)
         {
-            Tint(star.starCount, score, stars);
+            Tint(star.starCountBG, score, stars);
             TintChildren(star.progressBar, score, progress);
             TintChildren(star.progressBarEnd, score, progress);
         }

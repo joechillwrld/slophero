@@ -64,7 +64,7 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.5 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.6 — F8 / Escape to close");
         string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors" };
         for (int i = 0; i < pages.Length; i++)
             if (GUI.Button(new Rect(x + 12 + i * 112, y + 32, 108, 30), pages[i])) settingsPage = i;
