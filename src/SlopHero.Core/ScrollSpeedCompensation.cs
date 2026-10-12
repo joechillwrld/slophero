@@ -11,7 +11,7 @@ public sealed class ScrollSpeedCompensation
         if (!float.IsNaN(configuredSpeed) && !ConfiguredNoteSpeed.IsPlausible(configuredSpeed)) enabled = false;
         bool authoritative = ConfiguredNoteSpeed.IsPlausible(configuredSpeed);
         if (authoritative) original = configuredSpeed;
-        if (!enabled || !float.IsFinite(tempo) || tempo <= 0)
+        if (!enabled || !float.IsFinite(tempo) || tempo < .1f || tempo > 4)
         {
             bool owned = active;
             bool unchanged = active && Math.Abs(current - applied) < .001f;
@@ -20,11 +20,11 @@ public sealed class ScrollSpeedCompensation
         }
         if (!float.IsFinite(current) || current <= 0) return current;
         if (!authoritative && (!active || Math.Abs(current - applied) >= .001f)) original = current;
-        // Keep the raw renderer fields at the live profile setting. Practice
-        // tempo changes chart timing; multiplying or dividing this field causes
-        // the highway to run too fast or too slowly. The profile is read live,
-        // so this works at any configured note speed.
-        float target = original;
+        // Native speed inspection shows practice tempo only weakly affects the
+        // rendered highway. A small logarithmic correction addresses the slight
+        // slowdown observed at 135% without the large swings from using tempo
+        // directly. The profile is read live, so every configured speed works.
+        float target = original * MathF.Pow(tempo, .1f);
         if (!float.IsFinite(target) || target < .01f || target > 10000)
         {
             bool owned = active;
