@@ -187,3 +187,33 @@ verified; automatic guitar input restoration needs the user's Windows test.
   Use the available `GameObject.GetComponentInChildren<T>(bool)` and active-object
   `Object.FindObjectsOfType<T>()` paths instead. Child renderer collection overloads
   used by the mod and native renderer color/visibility properties pass this audit.
+
+
+## 0.3.1 repairs
+
+The supplied runtime log loaded 0.3.0 without managed exceptions; the reported
+speed/ring errors concern state management rather than failed bindings.
+
+Practice compensation now reads the same configured value used by all three
+native renderers at initialization. BasePlayer.player (`0x88`) → profile (`0x10`)
+→ note-speed setting (`0x20`) → raw int (`0x10`). The profile is explicitly
+viewed as `ObjectPublicObBoObAcBo1ObBoObObUnique` because the generated child
+profile shadows an identically named setting field at `0xD8`.
+`field_Public_Object2PublicBoSiInSiDoStSiStStUnique_0.field_Protected_T_0`
+is the raw configured int. The convenient `Method_Public_get_Int32_0` computes
+a derived percentage and must not be used here. Native reads: note renderer
+`0x1162A0A`, beat renderer `0x26DD18`, highway texture `0x37F84F`.
+
+FC sprites have `DesaturateSprite` shader properties `_OutputSaturation` and
+`_OutputHue`, IDs stored at component offsets `0x30`/`0x34` (Awake `0x2E2A30`).
+Vanilla hue setters (`0x2E3120`, `0x2E2E80`, `0x2E34A0`) select hues 0, ~0.167,
+and ~0.35; the saturation setter is `0x2E3900`. Scoped Harmony postfixes on the
+corresponding generated public methods capture native property changes and
+reapply the requested HSV to registered FC components only. Vertex grayscale
+controls brightness. Native alpha/activation remain unchanged; captured hue
+and saturation are restored on opt-out. Scene unload clears native references.
+
+New shader/property-block/HSV APIs and existing string IMGUI/slider APIs were
+checked for reachable unstripping-failed wrappers. 42 portable checks pass.
+Windows validation of the new hooks, shader result, and color picker is pending.
+No game-wide performance mode or FPS improvement is claimed in this release.

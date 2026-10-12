@@ -1,14 +1,14 @@
-# SlopHero 0.3.0 alpha
+# SlopHero 0.3.1 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.3.0 adds editable values, a separate song HUD, best streak,
-per-line visibility, highway visuals, and experimental practice-speed compensation.
-The new features build successfully but still need a Windows in-game test.**
+**Version 0.3.1 repairs the practice-speed baseline and overrides the FC ring's
+shader colors as well as its tint. All color editors now offer RGB sliders,
+hex entry, and previews. These repairs still need a Windows gameplay test.**
 
 ## Install
 
-[Download v0.3.0 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.0-alpha.zip?raw=true)
+[Download v0.3.1 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.1-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -37,6 +37,9 @@ F8 has five pages: **Controls**, **Counters**, **Song HUD**, **Highway**, and **
   Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.
   Colors accept six hex digits with an optional `#`, for example `FF8800`.
   Percentage inputs use 0–100; out-of-range numbers are clamped.
+  Each color has a swatch in the menu. Clicking the color value opens hex input and red,
+  green, and blue sliders with a larger preview. **Apply** commits the draft;
+  **Cancel** leaves the saved color unchanged.
 - Counters: individually show/hide misses, hit percentage, ghost inputs, and
   best streak. **Best streak** uses the game's highest streak for the current attempt.
 - Song HUD: chart title, artist, and charter are separate toggleable lines.
@@ -87,6 +90,27 @@ renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
 
+## 0.3.1 speed and ring repairs
+
+Constant practice speed now derives its baseline from the player's configured
+note-speed setting each frame, rather than whatever value happens to be on the
+renderer when toggled. Enabling it after changing tempo should give the same
+visual speed as enabling it first. The setting is also followed if you change
+your profile's note speed while compensation is active.
+
+The FC ring uses shader hue/saturation overrides, so sprite tint alone could
+revert visually after native FC state changes. SlopHero now applies the selected
+hue/saturation and brightness, and uses scoped Harmony postfixes on the game's
+ring-color setters to reapply it immediately. Normal visibility, alpha, and FC
+eligibility stay under game control. Disabling the override restores the latest
+observed vanilla shader state. Custom shaders from other mods need testing.
+
+A performance mode is **not included**. The requested scope is unnecessary
+background work or niche resources beyond existing in-game effects toggles.
+Static inspection has not established a removable bottleneck or measured FPS
+gain. A future mode needs Windows profiling and comparisons with matching
+charts, practice tempo, camera, and settings before choosing what to bypass.
+
 ## 0.2.2 practice input repair
 
 After selecting the captured section, the shortcut now completes the same
@@ -126,9 +150,9 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 
 ## First in-game check
 
-Version 0.3.0 compiles without warnings, and **37 portable logic checks pass**,
-including tempo changes, restoration, and protection against repeated speed
-compensation. The new GUI calls were checked against the supplied wrappers.
+Version 0.3.1 compiles without warnings, and **42 portable logic checks pass**,
+including enable-after-slowdown/speedup, native renderer rewrites, live profile
+changes, restoration, and protection against repeated speed compensation. The new GUI calls were checked against the supplied wrappers.
 `GUI.TextField` is an unstripping-failed stub, so numeric/color entry uses string
 controls with IMGUI keyboard events. Windows gameplay cannot be run in this
 Linux environment; the new features need the checks below.
@@ -144,8 +168,13 @@ Linux environment; the new features need the checks below.
    Verify best streak survives a miss and resets with a new attempt. Check title,
    artist, and charter against the song selection screen.
 6. Enable each highway/color option and turn it off to check restoration.
-7. Compare practice at 50%, 100%, and 150% with constant note speed on and off.
-8. Move the HUD to another corner and adjust opacity/text color. Restart the game
+7. Change practice to 50% **before** enabling constant speed, then repeat at
+   150%. Change tempo while enabled and change the configured note speed.
+   Both enable orders should produce the same visual speed at the same settings.
+   Toggle off and confirm vanilla behavior returns.
+8. Compare FC/PFC colors before and after ghost inputs, misses, and practice
+   restarts; toggle colors off and check the vanilla appearance is restored.
+9. Move the HUD to another corner and adjust opacity/text color. Restart the game
    and confirm those settings were retained.
 
 If the HUD is wrong, an action fails, or the mod disables itself, attach

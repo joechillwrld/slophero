@@ -14,9 +14,12 @@ public sealed partial class Core
     private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!;
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
     private readonly VisualOverrides visuals = new();
+    private readonly RingColors rings = new();
     private string songText = "", editText = "", editLabel = "", editError = "";
     private Action<string>? editApply;
-    private bool replaceEdit, moveSong;
+    private bool replaceEdit, moveSong, editColor;
+    private Color editPreview = Color.white;
+    private GUIStyle? colorPreviewStyle;
     private int settingsPage;
     private GUIStyle? songStyle;
 
@@ -53,7 +56,7 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.0 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.1 — F8 / Escape to close");
         string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors" };
         for (int i = 0; i < pages.Length; i++)
             if (GUI.Button(new Rect(x + 12 + i * 112, y + 32, 108, 30), pages[i])) settingsPage = i;
@@ -113,8 +116,9 @@ public sealed partial class Core
         else
         {
             string hex = ColorHex(new Color(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value)));
-            if (GUI.Button(new Rect(x, y + 80, 540, 32), "Text color: #" + hex))
-                Edit("Text color (#RRGGBB)", hex, s => { var c = ParseColor(s); textRed.Value = c.r; textGreen.Value = c.g; textBlue.Value = c.b; });
+            if (GUI.Button(new Rect(x, y + 80, 460, 32), "Text color: #" + hex))
+                EditColor("Text color (#RRGGBB)", hex, s => { var c = ParseColor(s); textRed.Value = c.r; textGreen.Value = c.g; textBlue.Value = c.b; });
+            Preview(new Rect(x + 470, y + 80, 70, 32), ParseColor(hex));
         }
         if (GUI.Button(new Rect(x, y + 126, 265, 32), "Move this HUD"))
         {
@@ -138,8 +142,10 @@ public sealed partial class Core
 
     private void Hex(MelonPreferences_Entry<string> entry, string label, float x, float y)
     {
-        if (GUI.Button(new Rect(x, y, 540, 32), label + ": #" + entry.Value))
-            Edit(label + " (#RRGGBB)", entry.Value, s => entry.Value = ColorHex(ParseColor(s)));
+        if (GUI.Button(new Rect(x, y, 460, 32), label + ": #" + entry.Value))
+            EditColor(label + " (#RRGGBB)", entry.Value, s => entry.Value = ColorHex(ParseColor(s)));
+        Color c; try { c = ParseColor(entry.Value); } catch (FormatException) { c = Color.white; }
+        Preview(new Rect(x + 470, y, 70, 32), c);
     }
     internal static Color ParseColor(string s)
     {
@@ -149,17 +155,49 @@ public sealed partial class Core
     }
     private static string ColorHex(Color c) => $"{(int)Math.Round(c.r * 255):X2}{(int)Math.Round(c.g * 255):X2}{(int)Math.Round(c.b * 255):X2}";
     private void Edit(string label, string value, Action<string> apply)
-    { editLabel = label; editText = value; editApply = apply; replaceEdit = true; editError = ""; capture = null; }
+    { editColor = false; editLabel = label; editText = value; editApply = apply; replaceEdit = true; editError = ""; capture = null; }
+
+    private void EditColor(string label, string value, Action<string> apply)
+    {
+        Edit(label, value, apply); editColor = true;
+        try { editPreview = ParseColor(value); } catch (FormatException) { editPreview = Color.white; }
+    }
+    private void Preview(Rect rect, Color color)
+    {
+        colorPreviewStyle ??= new GUIStyle(GUI.skin.label);
+        colorPreviewStyle.normal.background = colorPreviewStyle.hover.background =
+            colorPreviewStyle.active.background = colorPreviewStyle.focused.background = Texture2D.whiteTexture;
+        var old = GUI.backgroundColor;
+        try { GUI.backgroundColor = color; GUI.Box(rect, "", colorPreviewStyle); }
+        finally { GUI.backgroundColor = old; }
+    }
+    private void ColorSliders(float x, float y)
+    {
+        try { editPreview = ParseColor(editText); } catch (FormatException) { }
+        Preview(new Rect(x + 20, y + 118, 460, 40), editPreview);
+        float Channel(string label, float value, float row)
+        {
+            GUI.Label(new Rect(x + 20, row, 100, 25), $"{label}: {Math.Round(value * 255)}");
+            return GUI.HorizontalSlider(new Rect(x + 125, row + 7, 350, 20), value, 0, 1);
+        }
+        float r = Channel("Red", editPreview.r, y + 180), g = Channel("Green", editPreview.g, y + 218), b = Channel("Blue", editPreview.b, y + 256);
+        if (Math.Abs(r - editPreview.r) > .0001f || Math.Abs(g - editPreview.g) > .0001f || Math.Abs(b - editPreview.b) > .0001f)
+        { editPreview = new Color(r, g, b); editText = ColorHex(editPreview); replaceEdit = true; editError = ""; }
+        GUI.Label(new Rect(x + 20, y + 296, 460, 28), "Preview only until Apply. Type hex or use the RGB sliders.");
+    }
 
     private void DrawValueEditor()
     {
         // GUI.TextField/DoTextField is a throwing generated stub in this build.
         // Use native string controls and IMGUI keyboard events instead.
-        float x = Math.Max(10, (Screen.width - 500) / 2f), y = Math.Max(10, (Screen.height - 190) / 2f);
-        GUI.Box(new Rect(x, y, 500, 190), editLabel);
+        int height = editColor ? 390 : 190;
+        float x = Math.Max(10, (Screen.width - 500) / 2f), y = Math.Max(10, (Screen.height - height) / 2f);
+        GUI.Box(new Rect(x, y, 500, height), editLabel);
         GUI.Box(new Rect(x + 20, y + 40, 460, 34), editText + "|");
         GUI.Label(new Rect(x + 20, y + 82, 460, 28), editError.Length == 0 ? "Type to replace. Ctrl+A selects all; Ctrl+V pastes." : editError);
-        bool apply = GUI.Button(new Rect(x + 20, y + 126, 220, 32), "Apply"), cancel = GUI.Button(new Rect(x + 260, y + 126, 220, 32), "Cancel");
+        if (editColor) ColorSliders(x, y);
+        float buttonY = y + height - 64;
+        bool apply = GUI.Button(new Rect(x + 20, buttonY, 220, 32), "Apply"), cancel = GUI.Button(new Rect(x + 260, buttonY, 220, 32), "Cancel");
         var e = Event.current;
         if (e.type == EventType.KeyDown)
         {
@@ -224,7 +262,8 @@ public sealed partial class Core
         try
         {
             Color Read(MelonPreferences_Entry<string> e) { try { return ParseColor(e.Value); } catch (FormatException) { return Color.white; } }
-            visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value, tintFc.Value, Read(fcColor), Read(pfcColor),
+            rings.Update(game, tintFc.Value, Read(fcColor), Read(pfcColor));
+            visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value,
                 tintScore.Value, Read(starColor), Read(progressColor), Read(scoreColor), Read(songProgressColor), lockSpeed.Value);
         }
         catch (Exception ex)

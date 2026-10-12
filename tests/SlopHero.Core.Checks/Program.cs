@@ -60,4 +60,10 @@ Check(speed.Update(12, .5f, true) == 24, "New vanilla speed setting replaces bas
 Check(speed.Update(24, 0, true) == 12, "Invalid tempo restores speed without dividing by zero");
 Check(speed.Update(14, 1, false) == 14, "Disabled compensation preserves vanilla changes");
 Check(speed.Update(14, float.NaN, true) == 14, "Nonfinite tempo leaves normal speed intact");
+var profileSpeed = new ScrollSpeedCompensation();
+Check(profileSpeed.Update(5, .5f, true, 10) == 20, "Enable after slowdown uses configured profile speed");
+Check(profileSpeed.Update(15, 1.5f, true, 10) == 10 / 1.5f, "Vanilla rewrite cannot replace configured baseline");
+Check(profileSpeed.Update(10 / 1.5f, .5f, true, 12) == 24, "Profile note speed changes while compensation is enabled");
+Check(profileSpeed.Update(24, .5f, false, 12) == 12, "Disabling restores latest configured speed");
+Check(profileSpeed.Update(18, 1.5f, true, 12) == 8, "Enable after speedup uses configured baseline");
 Console.WriteLine($"Passed {checks} checks.");

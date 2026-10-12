@@ -5,7 +5,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.0", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.1", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -61,7 +61,11 @@ public sealed partial class Core : MelonMod
         }
         InitializeFeatures();
         compatible = BuildGuard.Matches(out status);
-        if (compatible) LoggerInstance.Msg(status);
+        if (compatible)
+        {
+            LoggerInstance.Msg(status);
+            try { rings.Install(HarmonyInstance); } catch (Exception ex) { LoggerInstance.Error($"FC hooks unavailable; frame overrides remain active: {ex}"); }
+        }
         else LoggerInstance.Warning(status);
         LoggerInstance.Msg("F8: SlopHero settings. Default: hold R to restart, hold P to practice the current section.");
     }
@@ -72,6 +76,7 @@ public sealed partial class Core : MelonMod
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
         visuals.Clear();
+        rings.Clear();
         visualError = false;
         statsEngine = IntPtr.Zero;
         nextStats = 0;
@@ -100,6 +105,7 @@ public sealed partial class Core : MelonMod
         UpdateCursor();
         statsText = songText = "";
         visuals.Clear();
+        rings.Clear();
         visualError = false;
         statsEngine = IntPtr.Zero;
         restartHold.RequireRelease();

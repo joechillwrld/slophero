@@ -1,0 +1,106 @@
+using System.Reflection;
+using HarmonyLib;
+using Il2Cpp;
+using UnityEngine;
+
+namespace SlopHero.Mod;
+
+internal sealed class RingColors
+{
+    private sealed class Ring
+    {
+        public DesaturateSprite Component = null!;
+        public SpriteRenderer Renderer = null!;
+        public BasePlayer Player = null!;
+        public Color Original;
+        public float Hue, Saturation;
+    }
+    private readonly Dictionary<IntPtr, Ring> rings = new();
+    private MaterialPropertyBlock? block;
+    private int hueId, saturationId;
+    private Color fc, perfect;
+    private bool enabled, callbackFailed;
+    internal static RingColors? Active;
+
+    public void Install(HarmonyLib.Harmony harmony)
+    {
+        Active = this;
+        var hue = new HarmonyMethod(typeof(RingColors).GetMethod(nameof(HueWritten), BindingFlags.NonPublic | BindingFlags.Static));
+        foreach (string name in new[] { "Method_Public_Void_0", "Method_Public_Void_1", "Method_Public_Void_2" })
+            harmony.Patch(typeof(DesaturateSprite).GetMethod(name), postfix: hue);
+        harmony.Patch(typeof(DesaturateSprite).GetMethod("Method_Public_Void_Single_0"),
+            postfix: new HarmonyMethod(typeof(RingColors).GetMethod(nameof(SaturationWritten), BindingFlags.NonPublic | BindingFlags.Static)));
+    }
+    public void Clear() { rings.Clear(); enabled = false; callbackFailed = false; }
+    private static void HueWritten(DesaturateSprite __instance) => Active?.Written(__instance, true);
+    private static void SaturationWritten(DesaturateSprite __instance) => Active?.Written(__instance, false);
+    private void Written(DesaturateSprite component, bool hue)
+    {
+        if (!enabled || callbackFailed || !rings.TryGetValue(component.Pointer, out var ring) || ring.Renderer == null) return;
+        try
+        {
+            ring.Renderer.GetPropertyBlock(block);
+            if (hue) ring.Hue = block!.GetFloat(hueId); else ring.Saturation = block!.GetFloat(saturationId);
+            Apply(ring);
+        }
+        catch (Exception ex)
+        {
+            // Stop callbacks on an unexpected shader binding; never break vanilla callers.
+            callbackFailed = true;
+            MelonLoader.MelonLogger.Error($"FC shader override stopped: {ex}");
+        }
+    }
+    public void Update(GameManager game, bool use, Color regular, Color pfc)
+    {
+        if (!use && rings.Count == 0) return;
+        if (block == null)
+        {
+            block = new MaterialPropertyBlock();
+            hueId = Shader.PropertyToID("_OutputHue");
+            saturationId = Shader.PropertyToID("_OutputSaturation");
+        }
+        fc = regular; perfect = pfc; enabled = use;
+        if (!use)
+        {
+            foreach (var ring in rings.Values)
+            {
+                if (ring.Renderer == null) continue;
+                ring.Renderer.GetPropertyBlock(block);
+                block.SetFloat(hueId, ring.Hue); block.SetFloat(saturationId, ring.Saturation);
+                ring.Renderer.SetPropertyBlock(block);
+                var c = ring.Original; c.a = ring.Renderer.color.a; ring.Renderer.color = c;
+            }
+            rings.Clear(); return;
+        }
+        if (game.playerObjects == null) return;
+        foreach (var p in game.playerObjects)
+        {
+            if (p == null || !p.enabled || p.TryCast<GuitarPlayer>() == null || p.FCIndicator == null || p.engine == null) continue;
+            if (p.field_Protected_Il2CppReferenceArray_1_DesaturateSprite_0 == null) continue;
+            foreach (var d in p.field_Protected_Il2CppReferenceArray_1_DesaturateSprite_0)
+            {
+                if (d == null || d.field_Private_SpriteRenderer_0 == null) continue;
+                if (!rings.TryGetValue(d.Pointer, out var ring))
+                {
+                    var r = d.field_Private_SpriteRenderer_0;
+                    r.GetPropertyBlock(block);
+                    ring = new Ring { Component = d, Renderer = r, Player = p, Original = r.color,
+                        Hue = block.GetFloat(hueId), Saturation = block.GetFloat(saturationId) };
+                    rings.Add(d.Pointer, ring);
+                }
+                Apply(ring);
+            }
+        }
+    }
+    private void Apply(Ring ring)
+    {
+        if (ring.Renderer == null || ring.Player == null || ring.Player.engine == null) return;
+        Color c = ring.Player.engine.field_Public_Int32_17 == 0 ? perfect : fc;
+        Color.RGBToHSV(c, out float h, out float s, out float v);
+        ring.Renderer.GetPropertyBlock(block);
+        block!.SetFloat(hueId, h); block.SetFloat(saturationId, s);
+        ring.Renderer.SetPropertyBlock(block);
+        // Hue/saturation live in the shader; grayscale vertex tint controls brightness.
+        ring.Renderer.color = new Color(v, v, v, ring.Renderer.color.a);
+    }
+}

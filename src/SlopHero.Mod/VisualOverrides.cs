@@ -69,7 +69,7 @@ internal sealed class VisualOverrides
 
     // Remember the unmodified value; repeated frames never divide an already
     // compensated speed. Changes made by vanilla settings replace the baseline.
-    private float Speed(IntPtr pointer, float current, float ratio, bool enabled)
+    private float Speed(IntPtr pointer, float current, float ratio, bool enabled, float configuredSpeed)
     {
         if (!speeds.TryGetValue(pointer, out var state))
         {
@@ -77,16 +77,16 @@ internal sealed class VisualOverrides
             state = new ScrollSpeedCompensation();
             speeds.Add(pointer, state);
         }
-        float value = state.Update(current, ratio, enabled);
+        float value = state.Update(current, ratio, enabled, configuredSpeed);
         if (!enabled) speeds.Remove(pointer);
         return value;
     }
 
-    public void Apply(GameManager game, bool sides, bool strings, bool beats, bool fc, Color fcColor, Color perfectColor,
+    public void Apply(GameManager game, bool sides, bool strings, bool beats,
         bool score, Color stars, Color progress, Color scoreText, Color songProgressColor, bool constantSpeed)
     {
         if (game.playerObjects == null) return;
-        if (!sides && !strings && !beats && !fc && !score && !constantSpeed && hidden.Count == 0 && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
+        if (!sides && !strings && !beats && !score && !constantSpeed && hidden.Count == 0 && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
         foreach (var p in game.playerObjects)
         {
             if (p == null || !p.enabled || p.TryCast<GuitarPlayer>() == null || p.engine == null) continue;
@@ -98,13 +98,12 @@ internal sealed class VisualOverrides
             var b = p.beatRenderer;
             if (b?.field_Protected_Il2CppReferenceArray_1_SpriteRenderer_0 != null)
                 foreach (var r in b.field_Protected_Il2CppReferenceArray_1_SpriteRenderer_0) Hide(r, beats);
-            if (p.FCIndicator != null)
-                foreach (var r in Sprites(p.FCIndicator))
-                    Tint(r, fc, p.engine.field_Public_Int32_17 == 0 ? perfectColor : fcColor);
             TintText(p.AccuracyText, score, scoreText);
             bool compensate = constantSpeed && game.globalVariables.isPracticeEnabled;
             float ratio = game.practiceSpeed;
             if (!constantSpeed && speeds.Count == 0) continue;
+            ObjectPublicObBoObAcBo1ObBoObObObUnique? profile = p.player?.field_Public_Object1PublicObBoObStBoObObObObUnique_0;
+            float configured = profile?.field_Public_Object2PublicBoSiInSiDoStSiStStUnique_0?.field_Protected_T_0 ?? float.NaN;
             if (!noteRenderers.TryGetValue(p.Pointer, out var notes))
             {
                 notes = p.gameObject.GetComponentInChildren<GuitarNoteRenderer>(true);
@@ -112,7 +111,7 @@ internal sealed class VisualOverrides
             }
             if (notes != null)
             {
-                float speed = Speed(notes.Pointer, notes.noteSpeed, ratio, compensate);
+                float speed = Speed(notes.Pointer, notes.noteSpeed, ratio, compensate, configured);
                 if (Math.Abs(speed - notes.noteSpeed) > .0001f)
                 {
                     notes.noteSpeed = speed;
@@ -120,9 +119,9 @@ internal sealed class VisualOverrides
                     notes.field_Protected_Double_0 = (notes.noteZPosFarLimit - notes.strikeLine) / speed;
                 }
             }
-            if (b != null) b.field_Private_Single_0 = Speed(b.Pointer, b.field_Private_Single_0, ratio, compensate);
+            if (b != null) b.field_Private_Single_0 = Speed(b.Pointer, b.field_Private_Single_0, ratio, compensate, configured);
             if (p.highwayScroll != null)
-                p.highwayScroll.field_Private_Single_1 = Speed(p.highwayScroll.Pointer, p.highwayScroll.field_Private_Single_1, ratio, compensate);
+                p.highwayScroll.field_Private_Single_1 = Speed(p.highwayScroll.Pointer, p.highwayScroll.field_Private_Single_1, ratio, compensate, configured);
         }
         if (score || colors.Count > 0)
         {
