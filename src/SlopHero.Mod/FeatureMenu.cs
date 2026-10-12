@@ -25,6 +25,9 @@ public sealed partial class Core
     private int settingsPage;
     private readonly Dictionary<string, Color> parsedColors = new();
     private GUIStyle? songStyle;
+    private int styledSongFont = -1;
+    private Color styledSongColor;
+    private string styledSongHex = "";
 
     private void InitializeFeatures()
     {
@@ -60,7 +63,7 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.2 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.3 — F8 / Escape to close");
         string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors" };
         for (int i = 0; i < pages.Length; i++)
             if (GUI.Button(new Rect(x + 12 + i * 112, y + 32, 108, 30), pages[i])) settingsPage = i;
@@ -235,14 +238,19 @@ public sealed partial class Core
     private void DrawSongHud(bool moving = false)
     {
         string text = songText.Length == 0 ? "Chart title\nArtist: Artist\nCharter: Charter" : songText;
-        songStyle ??= new GUIStyle(GUI.skin.label);
-        songStyle.fontSize = Math.Clamp(songFont.Value, 14, 48);
-        songStyle.wordWrap = true;
-        try { songStyle.normal.textColor = ParseColor(songColor.Value); } catch (FormatException) { songStyle.normal.textColor = Color.white; }
+        songStyle ??= new GUIStyle(GUI.skin.label) { wordWrap = true };
+        int size = Math.Clamp(songFont.Value, 14, 48);
+        if (styledSongFont != size) { songStyle.fontSize = size; styledSongFont = size; }
+        if (styledSongHex != songColor.Value)
+        {
+            try { styledSongColor = ParseColor(songColor.Value); } catch (FormatException) { styledSongColor = Color.white; }
+            songStyle.normal.textColor = styledSongColor;
+            styledSongHex = songColor.Value;
+        }
         int width = Math.Min(520, Screen.width);
-        int charsPerLine = Math.Max(8, (int)((width - 24) / (songStyle.fontSize * .6f)));
+        int charsPerLine = Math.Max(8, (int)((width - 24) / (size * .6f)));
         int lineCount = text.Split('\n').Sum(line => Math.Max(1, (line.Length + charsPerLine - 1) / charsPerLine));
-        int height = (int)(songStyle.fontSize * 1.35f) * lineCount + 20;
+        int height = (int)(size * 1.35f) * lineCount + 20;
         var p = HudLayout.ClampPosition(songX.Value, songY.Value, width, height, Screen.width, Screen.height);
         var rect = new Rect(p.X, p.Y, width, height);
         EnsureHudBackground();

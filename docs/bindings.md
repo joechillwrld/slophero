@@ -247,3 +247,29 @@ The optional two-Hz HUD mode trades display refresh rate for less counter work.
 Thirty-second optional callback captures use managed Stopwatch timestamps and
 write summaries only; no additional Unity APIs or removal of gameplay objects.
 There is no measured game-wide FPS improvement or game-system performance mode.
+
+
+## 0.3.3 concrete speed read
+
+Runtime evidence disproved the generated generic accessor used in 0.3.1/0.3.2:
+`field_Protected_T_0` produced 1,344,637,400 while the initialized note renderer
+reported 23. At tempo 1.9500008 this applied ~689,557,400, explaining disappearing
+notes independently of the lookahead window. The earlier generated-field mapping
+must not be treated as a working raw-value accessor in this IL2CPP installation.
+
+`ConfiguredNoteSpeed.Read` now uses read-only Marshal reads of the concrete native
+pointer path: BasePlayer.player's object → `+0x10` profile → `+0x20` setting →
+`+0x10` int. These are the same reads traced at native note renderer initialization
+(0x11629F0–0x1162A0A), beat initialization (0x26DCFE–0x26DD18), and highway texture
+initialization (0x37F835–0x37F84F). The caller remains under BuildGuard and initialized
+player gating. Missing pointers/implausible settings disable compensation rather
+than applying them. Effective speed has an additional finite/magnitude guard.
+Portable regression checks construct and free a real unmanaged pointer chain,
+covering the observed 23 and corrupt magnitude; 63 checks pass in total.
+
+The latest timing captures identify HUD repaint as the largest average mod
+callback, but overlapping FPS ranges do not demonstrate a benefit from reduced
+counter refresh. Native HUD style setters and song-color parsing now run only
+when the corresponding preferences change. No FPS gain or game-wide CPU/GPU
+bottleneck is claimed. The concrete reader and changed HUD path need Windows
+validation; logs are not included in the release package.

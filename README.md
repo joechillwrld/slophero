@@ -1,14 +1,14 @@
-# SlopHero 0.3.2 alpha
+# SlopHero 0.3.3 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.3.2 changes practice note visibility handling and reduces mod overhead.
-Color controls were confirmed working in the user's 0.3.1 test. The new visibility
-repair and performance changes need Windows testing; no FPS gain is measured yet.**
+**Version 0.3.3 replaces the corrupt generated note-speed field read identified
+in the user's log and rejects implausible speed values. It also caches unchanged
+HUD style settings. The corrected native reader still needs a Windows test.**
 
 ## Install
 
-[Download v0.3.2 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.2-alpha.zip?raw=true)
+[Download v0.3.3 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.3-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -89,6 +89,36 @@ menu, and beat renderer finish initializing. The previous build called into a
 renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
+
+## 0.3.3 disappearing-note cause
+
+The 0.3.2 log recorded `profile=1.3446374E+09`, `nativeSpeed=23`, and
+`targetSpeed=689557400` at 195% tempo. The generated generic field accessor
+returned a pointer-like magnitude rather than the configured note-speed int.
+Such a speed makes notes pass through the viewport almost immediately; the
+previous visibility-window changes did not address this cause.
+
+The reader now follows the exact concrete pointer layout used by the native
+renderer: player data → profile (`0x10`) → setting (`0x20`) → raw int (`0x10`).
+It is read only and used only after the build fingerprint matches. Configuration
+values outside 1–1000 are rejected; missing/invalid values skip compensation.
+Effective speeds above 10000 or nonfinite are also rejected. These deliberately
+broad bounds catch corruption without constraining ordinary note-speed settings.
+The initialized lookahead now scales to maintain the same world-space visibility
+range, avoiding excess offscreen lookahead at slower practice tempos.
+
+A synthetic native-memory layout check covers reading 23, a live edit to 31,
+null pointers, and the observed corrupt magnitude. Windows verification is still
+needed: at the logged 195% tempo, a configured speed of 23 should give an
+approximately 11.79 chart-time visual speed, not hundreds of millions.
+
+The FPS ranges reported with low-overhead HUD off (800–950) and on (~790–980)
+overlap. Callback averages were Update 0.009ms in both runs, Visuals 0.005ms in
+both, and HUD repaint 0.029ms versus 0.024ms. These measurements do not establish
+an FPS improvement. HUD repaint is the largest average measured mod callback,
+so this release avoids reapplying unchanged font sizes, word wrap, and text
+colors on each repaint. Repeat timing captures can evaluate that change; broader
+CPU/GPU profiling is still needed before removing game systems.
 
 ## 0.3.2 note visibility and mod overhead
 
@@ -187,9 +217,9 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 
 ## First in-game check
 
-Version 0.3.2 compiles without warnings, and **54 portable logic checks pass**,
-including enable-after-slowdown/speedup, native renderer rewrites, live profile
-changes, restoration, and protection against repeated speed compensation. The new GUI calls were checked against the supplied wrappers.
+Version 0.3.3 compiles without warnings, and **63 portable logic checks pass**,
+including the observed corrupt speed, concrete native-memory reads, live profile
+edits, missing pointers, extreme tempo, and earlier hold/accuracy/practice checks. The new GUI calls were checked against the supplied wrappers.
 `GUI.TextField` is an unstripping-failed stub, so numeric/color entry uses string
 controls with IMGUI keyboard events. Windows gameplay cannot be run in this
 Linux environment; the new features need the checks below.

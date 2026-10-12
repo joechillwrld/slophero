@@ -5,7 +5,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.2", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.3", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -35,6 +35,8 @@ public sealed partial class Core : MelonMod
     private IntPtr sourceManager;
     private IntPtr statsEngine;
     private GUIStyle? hudStyle;
+    private int styledHudFont = -1;
+    private Color styledHudColor;
     private GUIStyle? hudBackgroundStyle;
     private bool hudRenderFailed, hudRenderErrorLogged, settingsRenderErrorLogged, guiErrorLogged;
 
@@ -413,11 +415,12 @@ public sealed partial class Core : MelonMod
     {
         if (moveHud && moveSong) { DrawSongHud(true); return; }
         hudStyle ??= new GUIStyle(GUI.skin.label);
-        hudStyle.fontSize = Math.Clamp(fontSize.Value, 14, 48);
-        hudStyle.normal.textColor = new Color(HudLayout.Unit(textRed.Value),
-            HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1);
-        int width = Math.Max(240, hudStyle.fontSize * 12 + 24);
-        int height = (int)(hudStyle.fontSize * 1.25f) * (1 + text.Count(c => c == '\n')) + 20;
+        int size = Math.Clamp(fontSize.Value, 14, 48);
+        Color color = new(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1);
+        if (styledHudFont != size) { hudStyle.fontSize = size; styledHudFont = size; }
+        if (styledHudColor != color) { hudStyle.normal.textColor = color; styledHudColor = color; }
+        int width = Math.Max(240, size * 12 + 24);
+        int height = (int)(size * 1.25f) * (1 + text.Count(c => c == '\n')) + 20;
         var position = HudLayout.ClampPosition(hudX.Value, hudY.Value, width, height, Screen.width, Screen.height);
         Rect rect = new(position.X, position.Y, width, height);
         // DrawTexture's final overload is an unstripping-failed stub in the

@@ -11,6 +11,6 @@ public static class NoteVisibilityWindow
             !float.IsFinite(targetSpeed) || targetSpeed <= 0)
             return double.NaN;
         double scaled = initializedWindow * initializedSpeed / targetSpeed;
-        return double.IsFinite(scaled) ? Math.Max(initializedWindow, scaled) : double.NaN;
+        return double.IsFinite(scaled) && scaled > 0 ? scaled : double.NaN;
     }
 }

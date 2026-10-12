@@ -7,7 +7,9 @@ public sealed class ScrollSpeedCompensation
 
     public float Update(float current, float tempo, bool enabled, float configuredSpeed = float.NaN)
     {
-        bool authoritative = float.IsFinite(configuredSpeed) && configuredSpeed > 0;
+        // Invalid supplied settings must never become a billion-unit scroll speed.
+        if (!float.IsNaN(configuredSpeed) && !ConfiguredNoteSpeed.IsPlausible(configuredSpeed)) enabled = false;
+        bool authoritative = ConfiguredNoteSpeed.IsPlausible(configuredSpeed);
         if (authoritative) original = configuredSpeed;
         if (!enabled || !float.IsFinite(tempo) || tempo <= 0)
         {
@@ -18,7 +20,14 @@ public sealed class ScrollSpeedCompensation
         }
         if (!float.IsFinite(current) || current <= 0) return current;
         if (!authoritative && (!active || Math.Abs(current - applied) >= .001f)) original = current;
-        applied = original / tempo;
+        float target = original / tempo;
+        if (!float.IsFinite(target) || target <= 0 || target > 10000)
+        {
+            bool owned = active;
+            active = false;
+            return owned ? original : current;
+        }
+        applied = target;
         active = true;
         return applied;
     }

@@ -66,7 +66,7 @@ Check(profileSpeed.Update(15, 1.5f, true, 10) == 10 / 1.5f, "Vanilla rewrite can
 Check(profileSpeed.Update(10 / 1.5f, .5f, true, 12) == 24, "Profile note speed changes while compensation is enabled");
 Check(profileSpeed.Update(24, .5f, false, 12) == 12, "Disabling restores latest configured speed");
 Check(profileSpeed.Update(18, 1.5f, true, 12) == 8, "Enable after speedup uses configured baseline");
-Check(NoteVisibilityWindow.Calculate(3, 10, 20) == 3, "Faster visual speed retains initialized lookahead");
+Check(NoteVisibilityWindow.Calculate(3, 10, 20) == 1.5, "Faster speed preserves the same world-space visibility distance");
 Check(NoteVisibilityWindow.Calculate(3, 10, 5) == 6, "Slower visual speed expands lookahead");
 Check(NoteVisibilityWindow.Calculate(3, 10, 10) == 3, "Normal speed preserves native window");
 Check(double.IsNaN(NoteVisibilityWindow.Calculate(0, 10, 20)), "Zero initialized window cannot hide notes");
@@ -81,4 +81,33 @@ Check(OrderedNoteSearch.LowerBound(0, 10, _ => throw new Exception()) == 0, "Emp
 int reads = 0;
 Check(OrderedNoteSearch.LowerBound(100000, 99000, i => { reads++; return i; }) == 99000 && reads < 20,
     "Large practice seek needs logarithmic native reads");
+var corrupt = new ScrollSpeedCompensation();
+Check(corrupt.Update(23, 1.95f, true, 1344637400) == 23, "Regression: pointer-like configured speed leaves native speed intact");
+Check(corrupt.Update(23, 1.95f, true, 23) == 23 / 1.95f, "Observed native speed yields finite compensation");
+Check(corrupt.Update(23 / 1.95f, 1.95f, true, float.PositiveInfinity) == 23,
+    "Corrupt setting while active restores native baseline");
+Check(corrupt.Update(23, float.Epsilon, true, 23) == 23, "Extreme tempo cannot overflow into disappearing notes");
+IntPtr dataBuffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(64);
+IntPtr profileBuffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(64);
+IntPtr settingBuffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(64);
+try
+{
+    System.Runtime.InteropServices.Marshal.WriteIntPtr(dataBuffer, 0x10, profileBuffer);
+    System.Runtime.InteropServices.Marshal.WriteIntPtr(profileBuffer, 0x20, settingBuffer);
+    System.Runtime.InteropServices.Marshal.WriteInt32(settingBuffer, 0x10, 23);
+    Check(ConfiguredNoteSpeed.Read(dataBuffer) == 23, "Concrete native pointer chain reads raw speed, not object header");
+    System.Runtime.InteropServices.Marshal.WriteInt32(settingBuffer, 0x10, 31);
+    Check(ConfiguredNoteSpeed.Read(dataBuffer) == 31, "Live profile edits are read through concrete layout");
+    System.Runtime.InteropServices.Marshal.WriteInt32(settingBuffer, 0x10, 1344637400);
+    Check(float.IsNaN(ConfiguredNoteSpeed.Read(dataBuffer)), "Native reader rejects observed corrupt magnitude");
+    System.Runtime.InteropServices.Marshal.WriteIntPtr(profileBuffer, 0x20, IntPtr.Zero);
+    Check(float.IsNaN(ConfiguredNoteSpeed.Read(dataBuffer)), "Missing setting pointer leaves rendering alone");
+    Check(float.IsNaN(ConfiguredNoteSpeed.Read(IntPtr.Zero)), "Absent player data leaves rendering alone");
+}
+finally
+{
+    System.Runtime.InteropServices.Marshal.FreeHGlobal(settingBuffer);
+    System.Runtime.InteropServices.Marshal.FreeHGlobal(profileBuffer);
+    System.Runtime.InteropServices.Marshal.FreeHGlobal(dataBuffer);
+}
 Console.WriteLine($"Passed {checks} checks.");

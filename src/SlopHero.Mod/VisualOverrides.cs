@@ -115,8 +115,8 @@ internal sealed class VisualOverrides
             bool compensate = constantSpeed && game.globalVariables.isPracticeEnabled;
             float ratio = game.practiceSpeed;
             if (!constantSpeed && speeds.Count == 0) continue;
-            ObjectPublicObBoObAcBo1ObBoObObUnique? profile = p.player?.field_Public_Object1PublicObBoObStBoObObObObUnique_0;
-            float configured = profile?.field_Public_Object2PublicBoSiInSiDoStSiStStUnique_0?.field_Protected_T_0 ?? float.NaN;
+            float configured = ConfiguredNoteSpeed.Read(p.player?.Pointer ?? IntPtr.Zero);
+            compensate &= ConfiguredNoteSpeed.IsPlausible(configured);
             if (!noteRenderers.TryGetValue(p.Pointer, out var notes))
             {
                 notes = p.gameObject.GetComponentInChildren<GuitarNoteRenderer>(true);
@@ -131,7 +131,7 @@ internal sealed class VisualOverrides
                 }
                 float speed = Speed(notes.Pointer, notes.noteSpeed, ratio, compensate, configured);
                 double window = compensate ? NoteVisibilityWindow.Calculate(native.Window, native.Speed, speed) : native.Window;
-                if (double.IsFinite(window) && window > 0 && float.IsFinite(speed) && speed > 0)
+                if (double.IsFinite(window) && window > 0 && float.IsFinite(speed) && speed > 0 && speed <= 10000)
                 {
                     if (Math.Abs(speed - notes.noteSpeed) > .0001f) notes.noteSpeed = speed;
                     // Never derive the spawn window from live camera clipping limits.
@@ -142,7 +142,7 @@ internal sealed class VisualOverrides
                     if (native.Speed > 0 && float.IsFinite(native.Speed)) notes.noteSpeed = native.Speed;
                     if (native.Window > 0 && double.IsFinite(native.Window)) notes.field_Protected_Double_0 = native.Window;
                 }
-                if (compensate && speedLog.Add(notes.Pointer))
+                if (constantSpeed && game.globalVariables.isPracticeEnabled && speedLog.Add(notes.Pointer))
                     MelonLoader.MelonLogger.Msg($"Practice rendering: profile={configured}, tempo={ratio}, nativeSpeed={native.Speed}, targetSpeed={speed}, nativeWindow={native.Window}, targetWindow={window}.");
             }
             if (b != null) b.field_Private_Single_0 = Speed(b.Pointer, b.field_Private_Single_0, ratio, compensate, configured);
