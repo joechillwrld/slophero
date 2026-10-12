@@ -23,6 +23,8 @@ internal sealed class VisualOverrides
     private readonly HashSet<IntPtr> speedLog = new();
     private readonly HashSet<IntPtr> speedTransitionLog = new();
     private bool fullSongSpeedSyncPending = true;
+    public bool HasOverrides => hidden.Count != 0 || colors.Count != 0 || speeds.Count != 0 || texts.Count != 0;
+    public bool NeedsUpdate => fullSongSpeedSyncPending || HasOverrides;
     public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); speedTransitionLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
     private SpriteRenderer[] Sprites(GameObject go)
     {
@@ -100,8 +102,13 @@ internal sealed class VisualOverrides
     {
         if (game.playerObjects == null) return;
         bool practiceNow = game.globalVariables != null && game.globalVariables.isPracticeEnabled;
-        float clockRate = practiceClockRate.Update(game.songTimeVideoTime, realtime,
-            practiceNow && game.isSongPlaying && !game.isPaused);
+        // The playback-clock sample is only needed by the optional compensation
+        // feature. Avoid a clock read and stopwatch bookkeeping on the default path.
+        float clockRate = constantSpeed
+            ? practiceClockRate.Update(game.songTimeVideoTime, realtime,
+                practiceNow && game.isSongPlaying && !game.isPaused)
+            : float.NaN;
+        if (!constantSpeed) practiceClockRate.Reset();
         bool practiceChanged = practiceNow != oldPractice;
         if (practiceNow && !oldPractice)
         {

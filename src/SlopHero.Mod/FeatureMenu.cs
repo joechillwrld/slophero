@@ -62,7 +62,7 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.8 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.9 — F8 / Escape to close");
         string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors" };
         float tabWidth = 556f / pages.Length;
         for (int i = 0; i < pages.Length; i++)
@@ -282,6 +282,10 @@ public sealed partial class Core
         if (!compatible || !gameplay || !gameplayInitialized || transition || visualError) return;
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
         if (game == null || !game.songLoaded || !game.playersInit || game.globalVariables == null) return;
+        // Once the one-time full-song speed reconciliation is complete, skip
+        // the IL2CPP callback entirely when every optional override is idle.
+        bool visualRequested = hideSides.Value || hideStrings.Value || hideBeats.Value || tintScore.Value || lockSpeed.Value;
+        if (!visualRequested && !visuals.NeedsUpdate && !tintFc.Value && !rings.NeedsUpdate) return;
         try
         {
             Color Read(MelonPreferences_Entry<string> e)
@@ -292,7 +296,9 @@ public sealed partial class Core
                 parsedColors[e.Value] = color; return color;
             }
             long ringTiming = timings.Begin();
-            rings.Update(game, tintFc.Value, Read(fcColor), Read(pfcColor));
+            rings.Update(game, tintFc.Value,
+                tintFc.Value ? Read(fcColor) : Color.white,
+                tintFc.Value ? Read(pfcColor) : Color.white);
             timings.End(1, ringTiming);
             long visualTiming = timings.Begin();
             visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value,

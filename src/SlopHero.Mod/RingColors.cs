@@ -26,6 +26,7 @@ internal sealed class RingColors
     private bool enabled, callbackFailed;
     private long nextDiscovery, nextRefresh;
     internal static RingColors? Active;
+    public bool NeedsUpdate => enabled || rings.Count != 0;
 
     public void Install(HarmonyLib.Harmony harmony)
     {

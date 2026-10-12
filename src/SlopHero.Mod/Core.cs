@@ -5,7 +5,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.8", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.9", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -196,19 +196,18 @@ public sealed partial class Core : MelonMod
                 statsText = "";
                 return;
             }
-            var player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled);
-            if (player == null || player.TryCast<GuitarPlayer>() == null || player.engine == null)
-            {
-                statsText = "";
-                return;
-            }
-            if (player.engine.Pointer != statsEngine)
-            {
-                statsEngine = player.engine.Pointer;
-                nextStats = 0;
-            }
             if (now >= nextStats)
             {
+                // The HUD refreshes five times per second. Avoid walking the
+                // IL2CPP player array and casting its entries on every frame.
+                var player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled);
+                if (player == null || player.TryCast<GuitarPlayer>() == null || player.engine == null)
+                {
+                    statsText = "";
+                    nextStats = now + .2;
+                    return;
+                }
+                if (player.engine.Pointer != statsEngine) statsEngine = player.engine.Pointer;
                 var stats = statsReader.Read(player.engine, game);
                 string percentage = stats.HitPercentage?.ToString("0.00", CultureInfo.InvariantCulture) + "%";
                 if (stats.HitPercentage == null) percentage = "—";

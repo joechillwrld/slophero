@@ -1,13 +1,14 @@
-# SlopHero 0.4.8 alpha
+# SlopHero 0.4.9 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.8 compensates from the measured gameplay clock rate rather than
-assuming the practice percentage equals the renderer's effective rate.**
+**Version 0.4.9 reduces idle frame work in the mod. Version 0.4.8 compensates
+from the measured gameplay clock rate rather than assuming the practice
+percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.8 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.8-alpha.zip?raw=true)
+[Download v0.4.9 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.9-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -123,6 +124,16 @@ previous override. FC ring checks run at 10 Hz rather than every frame. The
 game's Harmony callbacks still update a changed ring immediately, and ring
 discovery remains at 2 Hz. Timing reports separate FC rings and other visual
 overrides to guide further profiling.
+
+## 0.4.9 idle-work reduction
+
+The supplied log confirms that the game and both mods loaded, but it has no
+frame-time capture. This build removes avoidable SlopHero work from idle frames:
+it skips visual callbacks when all related options are off and no prior changes
+need restoring, samples practice time only when constant-speed compensation is
+enabled, and scans the IL2CPP player list at the HUD's 5 Hz refresh rate instead
+of every frame. These changes reduce mod overhead; they cannot establish a whole-
+game FPS improvement without an in-game comparison using the same chart/settings.
 
 ## 0.3.9 profiling and renderer update
 
