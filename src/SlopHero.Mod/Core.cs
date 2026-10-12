@@ -5,7 +5,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.7", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.8", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -229,7 +229,7 @@ public sealed partial class Core : MelonMod
                     if (showCharter.Value) lines.Add("Charter: " + (song.Charter_StrippedTags ?? "Unknown"));
                 }
                 songText = string.Join("\n", lines);
-                nextStats = now + (lowOverhead.Value || (performanceMode.Value && performanceSlowHud.Value) ? .5 : .2);
+                nextStats = now + (lowOverhead.Value ? .5 : .2);
             }
         }
         catch (Exception ex)

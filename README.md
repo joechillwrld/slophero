@@ -1,13 +1,13 @@
-# SlopHero 0.3.7 alpha
+# SlopHero 0.3.8 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.3.7 adds customizable performance controls for optional gameplay
-effects, and broadens star HUD tinting while logging its renderer inventory.**
+**Version 0.3.8 removes repeated per-frame work from Performance mode and keeps
+the HUD refresh limiter in one place.**
 
 ## Install
 
-[Download v0.3.7 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.7-alpha.zip?raw=true)
+[Download v0.3.8 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.8-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -30,7 +30,7 @@ are needed. Remove `Mods/SlopHero.dll` to uninstall. Preferences can remain.
 
 Pause the game before editing settings. Press **F8** for the settings panel.
 
-F8 has five pages: **Controls**, **Counters**, **Song HUD**, **Highway**, and **Colors**.
+F8 has six pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colors**, and **Performance**.
 
 - Click a numeric or color value and type a replacement. Enter or **Apply** saves;
   Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.
@@ -88,6 +88,21 @@ menu, and beat renderer finish initializing. The previous build called into a
 renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
+
+## 0.3.8 performance update
+
+The supplied timing capture had Performance mode enabled and measured the mod's
+`Visuals` callback at 0.055 ms average (0.008 ms in the earlier capture). The
+cause was repeated traversal of cached effect lists and redundant Unity state
+calls each frame. Performance overrides now apply when enabled or when an
+option changes, then return immediately on subsequent frames. They still
+restore affected objects when disabled or when the scene changes.
+
+The HUD refresh limiter now appears only once, on **F8 → Performance**. It is
+independent of Performance mode and retains the existing `LowOverheadHud`
+preference. The provided timing measures mod callbacks rather than the full
+game CPU/GPU workload, so a new capture is needed to confirm the callback cost
+after this change and does not by itself establish whole-game FPS improvement.
 
 ## 0.3.7 performance controls and star HUD targeting
 
@@ -200,7 +215,7 @@ Automatic overhead reductions:
 - Practice counters binary-search the sorted chart to the start tick after resets,
   rather than scanning every earlier head again. Boundary chord heads are included.
 
-**F8 → Controls → Low overhead HUD** optionally reduces counter refresh from
+**F8 → Performance → Low overhead HUD** optionally reduces counter refresh from
 five to two updates per second. The restart/practice holds still update each
 frame. This reduces mod work; it does not disable game systems or existing
 vanilla effects.
@@ -274,7 +289,7 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 
 ## First in-game check
 
-Version 0.3.7 compiles without warnings. Earlier portable logic checks covered
+Version 0.3.8 compiles without warnings. Earlier portable logic checks covered
 title-speed formatting, native ring-state classification, chart-speed
 percentage formatting, native floating-point noise, the observed corrupt speed,
 concrete native-memory reads, and earlier gameplay logic. The new GUI calls were checked against the supplied wrappers.

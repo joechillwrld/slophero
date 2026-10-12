@@ -13,7 +13,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<float> songOpacity = null!;
     private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!;
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
-    private MelonPreferences_Entry<bool> performanceMode = null!, performanceFretEffects = null!, performanceNeckParticles = null!, performanceStarParticles = null!, performanceSlowHud = null!;
+    private MelonPreferences_Entry<bool> performanceMode = null!, performanceFretEffects = null!, performanceNeckParticles = null!, performanceStarParticles = null!;
     private readonly VisualOverrides visuals = new();
     private readonly PerformanceOverrides performance = new();
     private readonly RingColors rings = new();
@@ -58,7 +58,6 @@ public sealed partial class Core
         performanceFretEffects = preferences.CreateEntry("PerformanceDisableFretEffects", true);
         performanceNeckParticles = preferences.CreateEntry("PerformanceDisableNeckParticles", true);
         performanceStarParticles = preferences.CreateEntry("PerformanceDisableStarParticles", true);
-        performanceSlowHud = preferences.CreateEntry("PerformanceSlowHud", true);
         fcColor = preferences.CreateEntry("FcColor", "FFD700");
         pfcColor = preferences.CreateEntry("PerfectFcColor", "00FFFF");
         songProgressColor = preferences.CreateEntry("SongProgressColor", "00FFFF");
@@ -71,7 +70,7 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.7 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.8 — F8 / Escape to close");
         string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Performance" };
         float tabWidth = 556f / pages.Length;
         for (int i = 0; i < pages.Length; i++)
@@ -86,7 +85,6 @@ public sealed partial class Core
                 if (GUI.Button(new Rect(x, y + 44, 540, 34), $"Practice: {practiceButton.Value} — bind")) capture = "practice";
                 Number("Hold duration (seconds)", (float)Duration, x, y + 94, .25f, 3, v => holdSeconds.Value = v);
                 GUI.Label(new Rect(x, y + 150, 540, 70), capture == null ? "Song actions apply to solo Quickplay.\nPractice begins at the start of your current named section." : $"Press a key or controller button for {capture}.");
-                Toggle(lowOverhead, "Low overhead HUD (2 updates/sec)", x, y + 245);
                 if (GUI.Button(new Rect(x, y + 290, 540, 32), timings.Active ? "Finish timing report" : "Capture mod timings for 30 seconds"))
                 {
                     if (timings.Active) timings.Finish();
@@ -97,7 +95,7 @@ public sealed partial class Core
                     }
                     else Notice("Start a song before capturing mod timings.");
                 }
-                GUI.Label(new Rect(x, y + 338, 540, 70), "Timings are written to Latest.log. Close this menu and play.\nLow overhead HUD reduces counter refresh rate; input timing is unchanged.");
+                GUI.Label(new Rect(x, y + 338, 540, 70), "Timings are written to Latest.log. Close this menu and play.");
                 break;
             case 1:
                 Toggle(showHud, "Counter HUD", x, y); Toggle(showMisses, "Misses", x, y + 40);
@@ -130,7 +128,7 @@ public sealed partial class Core
                 Toggle(performanceFretEffects, "Disable fret sparks and flame animators", x, y + 44);
                 Toggle(performanceNeckParticles, "Disable note and sustain particles", x, y + 88);
                 Toggle(performanceStarParticles, "Disable score star particles", x, y + 132);
-                Toggle(performanceSlowHud, "Reduce HUD refresh to 2/sec", x, y + 176);
+                Toggle(lowOverhead, "Low overhead HUD (2 updates/sec)", x, y + 176);
                 GUI.Label(new Rect(x, y + 220, 540, 120), "Choose which optional effects to suppress. The particle option also disables inactive particle systems attached to the guitar neck. Player input, notes, scoring, and gameplay objects stay active. Effect overrides restore when Performance mode is off.");
                 break;
         }

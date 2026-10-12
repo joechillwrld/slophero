@@ -18,7 +18,8 @@ internal sealed class PerformanceOverrides
     private readonly Dictionary<IntPtr, NeckEffects> necks = new();
     private readonly Dictionary<IntPtr, ParticleSystem[]> starEffects = new();
     private StarProgress[]? starProgressObjects;
-    private bool starInventoryLogged;
+    private bool applied;
+    private bool lastFretEffects, lastNeckParticles, lastStarParticles;
 
     public void Clear()
     {
@@ -26,18 +27,23 @@ internal sealed class PerformanceOverrides
         necks.Clear();
         starEffects.Clear();
         starProgressObjects = null;
-        starInventoryLogged = false;
+        applied = false;
     }
 
     public void Apply(GameManager game, bool enabled, bool fretEffects, bool neckParticles, bool starParticles)
     {
-        starProgressObjects ??= UnityEngine.Object.FindObjectsOfType<StarProgress>().ToArray();
-        LogStarInventory();
         if (!enabled)
         {
-            RestoreAll();
+            if (applied || disabled.Count != 0 || disabledParticleObjects.Count != 0) RestoreAll();
+            applied = false;
             return;
         }
+
+        // Applying these changes walks the effect hierarchy and calls into Unity. Do it
+        // only on first enable or when an option changes, rather than once per frame.
+        if (applied && fretEffects == lastFretEffects && neckParticles == lastNeckParticles && starParticles == lastStarParticles)
+            return;
+        RestoreAll();
 
         if (game.playerObjects != null)
         foreach (var player in game.playerObjects)
@@ -65,33 +71,27 @@ internal sealed class PerformanceOverrides
             foreach (var particle in effects.Particles) SetParticleObjectDisabled(particle, neckParticles);
         }
 
-        foreach (var star in starProgressObjects)
+        if (starParticles)
         {
-            if (star == null) continue;
-            if (!starEffects.TryGetValue(star.Pointer, out var particles))
+            starProgressObjects ??= UnityEngine.Object.FindObjectsOfType<StarProgress>().ToArray();
+            foreach (var star in starProgressObjects)
             {
-                particles = star.gameObject.GetComponentsInChildren<ParticleSystem>(true).ToArray();
-                starEffects.Add(star.Pointer, particles);
-            }
-            foreach (var particle in particles) SetParticleObjectDisabled(particle, starParticles);
-        }
-    }
-
-    private void LogStarInventory()
-    {
-        if (starInventoryLogged || starProgressObjects == null) return;
-        starInventoryLogged = true;
-        try
-        {
-            var details = starProgressObjects.Where(star => star != null).SelectMany(star =>
-                star.gameObject.GetComponentsInChildren<SpriteRenderer>(true).Select(renderer =>
+                if (star == null) continue;
+                if (!starEffects.TryGetValue(star.Pointer, out var particles))
                 {
-                    string sprite = renderer.sprite == null ? "none" : renderer.sprite.name;
-                    return $"{renderer.name}[{sprite}]";
-                }));
-            MelonLoader.MelonLogger.Msg("Star HUD renderer inventory: " + string.Join("; ", details));
+                    particles = star.gameObject.GetComponentsInChildren<ParticleSystem>(true).ToArray();
+                    starEffects.Add(star.Pointer, particles);
+                }
+                foreach (var particle in particles) SetParticleObjectDisabled(particle, true);
+            }
         }
-        catch (Exception ex) { MelonLoader.MelonLogger.Warning($"Star HUD renderer inventory unavailable: {ex.Message}"); }
+
+        // A scene may initialize before player objects are ready. Retry until the neck
+        // hierarchy is found; after that the cached effect set is stable for the scene.
+        applied = necks.Count > 0 || (game.playerObjects != null && game.playerObjects.Length > 0);
+        lastFretEffects = fretEffects;
+        lastNeckParticles = neckParticles;
+        lastStarParticles = starParticles;
     }
 
     private static void Add(List<Behaviour> target, Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<Il2Cpp.Animator>? source)
