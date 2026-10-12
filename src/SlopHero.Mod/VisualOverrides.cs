@@ -20,7 +20,8 @@ internal sealed class VisualOverrides
     private bool oldSides, oldStrings, oldBeats, oldScore, oldPractice;
     private readonly HashSet<IntPtr> hiddenPlayers = new();
     private readonly HashSet<IntPtr> speedLog = new();
-    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; songProgress = null; starProgresses = null; }
+    private readonly HashSet<IntPtr> speedTransitionLog = new();
+    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); texts.Clear(); spriteChildren.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); speedLog.Clear(); speedTransitionLog.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; songProgress = null; starProgresses = null; }
     private SpriteRenderer[] Sprites(GameObject go)
     {
         if (!spriteChildren.TryGetValue(go.Pointer, out var result))
@@ -97,6 +98,7 @@ internal sealed class VisualOverrides
     {
         if (game.playerObjects == null) return;
         bool practiceNow = game.globalVariables != null && game.globalVariables.isPracticeEnabled;
+        bool practiceChanged = practiceNow != oldPractice;
         if (practiceNow && !oldPractice)
         {
             // Practice may reuse gameplay renderers after the player returns to
@@ -105,6 +107,7 @@ internal sealed class VisualOverrides
             speeds.Clear();
             visibility.Clear();
             speedLog.Clear();
+            speedTransitionLog.Clear();
         }
         if (!sides && !strings && !beats && !score && !constantSpeed && hidden.Count == 0 && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
         foreach (var p in game.playerObjects)
@@ -128,7 +131,7 @@ internal sealed class VisualOverrides
             }
             if (score || oldScore) TintText(p.AccuracyText, score, scoreText);
             bool compensate = constantSpeed && practiceNow;
-            if (!compensate && speeds.Count == 0) continue;
+            if (!compensate && speeds.Count == 0 && !practiceChanged) continue;
             float ratio = game.practiceSpeed;
             float configured = ConfiguredNoteSpeed.Read(p.player?.Pointer ?? IntPtr.Zero);
             compensate &= ConfiguredNoteSpeed.IsPlausible(configured);
@@ -137,6 +140,9 @@ internal sealed class VisualOverrides
                 notes = p.gameObject.GetComponentInChildren<GuitarNoteRenderer>(true);
                 if (notes != null) noteRenderers.Add(p.Pointer, notes);
             }
+            float noteSpeedBefore = notes == null ? float.NaN : notes.noteSpeed;
+            float beatSpeedBefore = b == null ? float.NaN : b.field_Private_Single_0;
+            float highwaySpeedBefore = p.highwayScroll == null ? float.NaN : p.highwayScroll.field_Private_Single_1;
             if (notes != null)
             {
                 if (!visibility.TryGetValue(notes.Pointer, out var native) || !double.IsFinite(native.Window) || native.Window <= 0 || native.Speed <= 0)
@@ -163,6 +169,8 @@ internal sealed class VisualOverrides
             if (b != null) b.field_Private_Single_0 = Speed(b.Pointer, b.field_Private_Single_0, ratio, compensate, configured);
             if (p.highwayScroll != null)
                 p.highwayScroll.field_Private_Single_1 = Speed(p.highwayScroll.Pointer, p.highwayScroll.field_Private_Single_1, ratio, compensate, configured);
+            if (practiceChanged && speedTransitionLog.Add(p.Pointer))
+                MelonLoader.MelonLogger.Msg($"Practice speed transition: practice={practiceNow}, tempo={ratio:0.###}, profile={configured:0.###}, note={noteSpeedBefore:0.###}->{(notes == null ? float.NaN : notes.noteSpeed):0.###}, beat={beatSpeedBefore:0.###}->{(b == null ? float.NaN : b.field_Private_Single_0):0.###}, highway={highwaySpeedBefore:0.###}->{(p.highwayScroll == null ? float.NaN : p.highwayScroll.field_Private_Single_1):0.###}.");
         }
         oldSides = sides; oldStrings = strings; oldBeats = beats;
         oldPractice = practiceNow;

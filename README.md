@@ -1,13 +1,13 @@
-# SlopHero 0.4.0 alpha
+# SlopHero 0.4.1 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.0 removes the irrelevant counter limiter and avoids note-speed
-work outside practice. Ring color checks are throttled and measured separately.**
+**Version 0.4.1 logs actual renderer speed values when practice starts or ends,
+to diagnose the intermittent speed drop.**
 
 ## Install
 
-[Download v0.4.0 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.0-alpha.zip?raw=true)
+[Download v0.4.1 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.1-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -88,6 +88,13 @@ menu, and beat renderer finish initializing. The previous build called into a
 renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
+
+## 0.4.1 practice transition diagnostics
+
+On every practice-mode entry and exit, `Latest.log` now records the note,
+beatline, and highway scroll speeds before and after SlopHero's update. This
+shows whether a slowdown comes from the base setting, stale renderer values,
+or the tempo compensation. Practice rendering target logs remain in place.
 
 ## 0.4.0 performance hot-path changes
 
