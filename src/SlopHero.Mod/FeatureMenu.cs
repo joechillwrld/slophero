@@ -8,7 +8,7 @@ namespace SlopHero.Mod;
 public sealed partial class Core
 {
     private MelonPreferences_Entry<bool> showMisses = null!, showHit = null!, showGhosts = null!, showBest = null!;
-    private MelonPreferences_Entry<bool> showSong = null!, showTitle = null!, showArtist = null!, showCharter = null!;
+    private MelonPreferences_Entry<bool> showSong = null!, showTitle = null!, showArtist = null!, showCharter = null!, showSpeed = null!;
     private MelonPreferences_Entry<int> songX = null!, songY = null!, songFont = null!;
     private MelonPreferences_Entry<float> songOpacity = null!;
     private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!;
@@ -40,6 +40,7 @@ public sealed partial class Core
         showTitle = preferences.CreateEntry("ShowSongTitle", true);
         showArtist = preferences.CreateEntry("ShowArtist", true);
         showCharter = preferences.CreateEntry("ShowCharter", true);
+        showSpeed = preferences.CreateEntry("ShowChartSpeed", true);
         songX = preferences.CreateEntry("SongHudX", 400);
         songY = preferences.CreateEntry("SongHudY", 110);
         songFont = preferences.CreateEntry("SongFontSize", 22);
@@ -63,7 +64,7 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.3 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.4 — F8 / Escape to close");
         string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors" };
         for (int i = 0; i < pages.Length; i++)
             if (GUI.Button(new Rect(x + 12 + i * 112, y + 32, 108, 30), pages[i])) settingsPage = i;
@@ -99,7 +100,8 @@ public sealed partial class Core
             case 2:
                 Toggle(showSong, "Song HUD", x, y); Toggle(showTitle, "Chart title", x, y + 40);
                 Toggle(showArtist, "Artist", x, y + 80); Toggle(showCharter, "Charter", x, y + 120);
-                Appearance(x, y + 170, true);
+                Toggle(showSpeed, "Chart speed", x, y + 160);
+                Appearance(x, y + 210, true);
                 break;
             case 3:
                 Toggle(hideSides, "Hide highway sides", x, y); Toggle(hideStrings, "Hide fret strings", x, y + 40);
@@ -237,7 +239,7 @@ public sealed partial class Core
 
     private void DrawSongHud(bool moving = false)
     {
-        string text = songText.Length == 0 ? "Chart title\nArtist: Artist\nCharter: Charter" : songText;
+        string text = songText.Length == 0 ? "Chart title\nArtist: Artist\nCharter: Charter\nChart speed: 100%" : songText;
         songStyle ??= new GUIStyle(GUI.skin.label) { wordWrap = true };
         int size = Math.Clamp(songFont.Value, 14, 48);
         if (styledSongFont != size) { songStyle.fontSize = size; styledSongFont = size; }

@@ -110,4 +110,10 @@ finally
     System.Runtime.InteropServices.Marshal.FreeHGlobal(profileBuffer);
     System.Runtime.InteropServices.Marshal.FreeHGlobal(dataBuffer);
 }
+Check(ChartSpeedLabel.Format(1.0000002f) == "100%", "Native floating-point noise does not show as chart speed drift");
+Check(ChartSpeedLabel.Format(.75f) == "75%", "Slowed chart display");
+Check(ChartSpeedLabel.Format(1.5f) == "150%", "Sped-up chart display");
+Check(ChartSpeedLabel.Format(1.9500008f) == "195%", "Observed practice tempo display");
+Check(ChartSpeedLabel.Format(1.125f) == "112.5%", "Fractional chart speed display");
+Check(ChartSpeedLabel.Format(float.NaN) == "—" && ChartSpeedLabel.Format(0) == "—", "Invalid tempo display");
 Console.WriteLine($"Passed {checks} checks.");

@@ -1,14 +1,14 @@
-# SlopHero 0.3.3 alpha
+# SlopHero 0.3.4 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.3.3 replaces the corrupt generated note-speed field read identified
-in the user's log and rejects implausible speed values. It also caches unchanged
-HUD style settings. The corrected native reader still needs a Windows test.**
+**Version 0.3.4 adds live chart speed to the song HUD and FC shader diagnostics.
+The corrected note-speed reader worked in the user's 0.3.3 test. Chart-speed
+HUD display still needs a Windows check; no FPS improvement is established.**
 
 ## Install
 
-[Download v0.3.3 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.3-alpha.zip?raw=true)
+[Download v0.3.4 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.4-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -42,7 +42,7 @@ F8 has five pages: **Controls**, **Counters**, **Song HUD**, **Highway**, and **
   **Cancel** leaves the saved color unchanged.
 - Counters: individually show/hide misses, hit percentage, ghost inputs, and
   best streak. **Best streak** uses the game's highest streak for the current attempt.
-- Song HUD: chart title, artist, and charter are separate toggleable lines.
+- Song HUD: chart title, artist, charter, and live chart speed are separate toggleable lines.
   It has independent position, text size, color, and background opacity.
 - Both HUDs have **Move this HUD**: drag and release to save. F8 returns to
   settings; Escape finishes. Coordinates can also be entered directly.
@@ -89,6 +89,31 @@ menu, and beat renderer finish initializing. The previous build called into a
 renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
+
+## 0.3.4 song speed and FC brightness investigation
+
+The song HUD now includes **Chart speed: 100% / 75% / 150% / ...**, using the
+current native tempo in both full-song and practice gameplay. It updates at the
+selected HUD refresh rate and follows practice tempo changes. Toggle it with
+**F8 → Song HUD → Chart speed**, or `ShowChartSpeed` in preferences. Native
+floating-point noise is rounded away; fractional percentages remain supported.
+
+The latest log confirms the repaired speed reader: configured/native speed 23,
+with a target of approximately 15.333 at 150% tempo. That implementation is
+retained. FC hue is reported broadly correct; the remaining difference is
+lighter/darker appearance. The ring retains its texture shading and native
+material, so it need not match a solid UI swatch pixel for pixel. Color-space
+conversion is another possibility; its contribution is not established yet.
+This release logs the active color space, shader name, selected RGB/HSV, and
+original vertex color once per registered ring when custom colors are enabled.
+It uses shared material references without cloning or changing materials.
+The working hue/saturation path is unchanged; no brightness correction is
+applied without evidence from the actual shader/rendering setup.
+
+The latest reported FPS ranges (off 950–980, on 850–1000) overlap. Callback
+averages were Update 0.009ms in both runs, Visuals 0.008ms in both, and HUD repaint
+0.027ms versus 0.021ms. Reduced callback averages do not establish a game FPS gain.
+The two-Hz HUD option remains optional and off by default.
 
 ## 0.3.3 disappearing-note cause
 
@@ -217,9 +242,9 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 
 ## First in-game check
 
-Version 0.3.3 compiles without warnings, and **63 portable logic checks pass**,
-including the observed corrupt speed, concrete native-memory reads, live profile
-edits, missing pointers, extreme tempo, and earlier hold/accuracy/practice checks. The new GUI calls were checked against the supplied wrappers.
+Version 0.3.4 compiles without warnings, and **69 portable logic checks pass**,
+including chart-speed percentage formatting, native floating-point noise, the
+observed corrupt speed, concrete native-memory reads, and earlier gameplay logic. The new GUI calls were checked against the supplied wrappers.
 `GUI.TextField` is an unstripping-failed stub, so numeric/color entry uses string
 controls with IMGUI keyboard events. Windows gameplay cannot be run in this
 Linux environment; the new features need the checks below.
@@ -243,7 +268,10 @@ Linux environment; the new features need the checks below.
    restarts; toggle colors off and check the vanilla appearance is restored.
 9. Capture the two timing reports above while playing a repeatable passage, then
    attach Latest.log with the FPS change observed on the game's FPS display.
-10. Move the HUD to another corner and adjust opacity/text color. Restart the game
+10. Verify the Chart speed line at 100%, 75%, and 150% in full-song/practice
+    play, then toggle that individual line off. Enable custom FC colors so the
+    next log includes the shader/color-space diagnostics.
+11. Move the HUD to another corner and adjust opacity/text color. Restart the game
    and confirm those settings were retained.
 
 If the HUD is wrong, an action fails, or the mod disables itself, attach

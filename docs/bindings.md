@@ -273,3 +273,28 @@ counter refresh. Native HUD style setters and song-color parsing now run only
 when the corresponding preferences change. No FPS gain or game-wide CPU/GPU
 bottleneck is claimed. The concrete reader and changed HUD path need Windows
 validation; logs are not included in the release package.
+
+
+## 0.3.4 chart-speed HUD and color investigation
+
+`GameManager.practiceSpeed` (`0xD8`) holds the current tempo ratio for gameplay,
+including full-song initialization: Awake calls the native normalized speed
+getter at `0xB435D` and stores its result at `0xB4362`. Practice adjustment routines
+update the same field. The HUD reads this live value and formats it as a percentage;
+it does not use the original-song-speed field, which could miss practice changes.
+Six portable display checks cover normal/slower/faster/fractional tempo, observed
+floating-point noise, and invalid values, bringing the total to 69.
+
+The new log confirms configured speed 23 and target 15.333333 at 150% tempo.
+The user reports the note-speed fix works and FC hue is roughly correct, with
+lighter/darker differences. Shader source and final rendered pixels are not
+available, so texture shading versus color-space contribution remains unverified.
+`RingColors` records shared-material shader name, `QualitySettings.activeColorSpace`,
+requested RGB/HSV, and original vertex RGB once per registered ring. The native
+shared-material/shader/name/color-space getters were audited for reachable
+unstripping-failed wrappers and passed. No material instantiation, shader swapping,
+or unverified gamma/brightness correction is introduced. Working color callbacks
+and the repaired speed reader are retained.
+
+FPS ranges overlap again; the latest callback timing averages do not establish a
+measured game FPS improvement from low-overhead HUD mode. No such claim is made.

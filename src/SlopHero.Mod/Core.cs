@@ -5,7 +5,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.3", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.4", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -226,6 +226,7 @@ public sealed partial class Core : MelonMod
                     if (showArtist.Value) lines.Add("Artist: " + (song.Artist_StrippedTags ?? "Unknown"));
                     if (showCharter.Value) lines.Add("Charter: " + (song.Charter_StrippedTags ?? "Unknown"));
                 }
+                if (showSpeed.Value) lines.Add("Chart speed: " + ChartSpeedLabel.Format(game.practiceSpeed));
                 songText = string.Join("\n", lines);
                 nextStats = now + (lowOverhead.Value ? .5 : .2);
             }
@@ -359,7 +360,7 @@ public sealed partial class Core : MelonMod
             if ((showHud.Value && gameplay && !string.IsNullOrEmpty(statsText)) || settingsOpen || moveHud)
             {
                 string text = string.IsNullOrEmpty(statsText) ? "Misses: 0\nHit: 100.00%\nGhosts: 0" : statsText;
-                if (moveHud && moveSong) text = string.IsNullOrEmpty(songText) ? "Chart title\nArtist: Artist\nCharter: Charter" : songText;
+                if (moveHud && moveSong) text = string.IsNullOrEmpty(songText) ? "Chart title\nArtist: Artist\nCharter: Charter\nChart speed: 100%" : songText;
                 if (hudRenderFailed) DrawBasicHud(text);
                 else
                 {
