@@ -20,7 +20,10 @@ public sealed class ScrollSpeedCompensation
         }
         if (!float.IsFinite(current) || current <= 0) return current;
         if (!authoritative && (!active || Math.Abs(current - applied) >= .001f)) original = current;
-        float target = original / tempo;
+        // The practice renderer already applies its own tempo scaling. Keep the
+        // configured raw renderer values fixed; dividing here scales twice and
+        // makes notes move too slowly at faster practice tempos.
+        float target = original;
         if (!float.IsFinite(target) || target <= 0 || target > 10000)
         {
             bool owned = active;

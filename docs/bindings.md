@@ -172,8 +172,9 @@ verified; automatic guitar input restoration needs the user's Windows test.
   Its cached horizon uses `(noteZPosFarLimit - strikeLine) / noteSpeed`
   (`BaseNoteRenderer.Start`, RVA `0x1162980`). Beat positions multiply chart-time
   difference by speed at offset `0x68` (`0x26E8BD`); highway texture scrolling
-  uses offset `0x50` (`0x38194D`). Divide these rendering speeds by tempo,
-  maintaining separate baselines and restoring them when disabled. Audio and
+  uses offset `0x50` (`0x38194D`). Keep these rendering speeds at the configured
+  profile value through tempo changes; practice already applies tempo scaling.
+  Maintain separate baselines and restore them when disabled. Audio and
   engine timing are unchanged. No Windows runtime validation yet.
 - All supplied `GUI.TextField` overloads reach an unstripping-failed
   `GUI.DoTextField` stub. The editor uses native string `GUI.Box/Button/Label`

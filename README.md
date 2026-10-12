@@ -1,13 +1,13 @@
-# SlopHero 0.4.2 alpha
+# SlopHero 0.4.3 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.2 restores configured note speed after scene reloads if a practice
-tempo value leaked into full-song play.**
+**Version 0.4.3 keeps the configured note speed during practice instead of
+dividing it by tempo, which caused the slowdown.**
 
 ## Install
 
-[Download v0.4.2 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.2-alpha.zip?raw=true)
+[Download v0.4.3 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.3-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -51,9 +51,10 @@ F8 has five pages: **Controls**, **Counters**, **Song HUD**, **Highway**, and **
   for rings, stars, score/accuracy text, star progress, and song progress bars.
   Ring color switches from perfect FC to regular FC when the guitar's native
   ghost-input counter becomes nonzero. Native ring visibility is preserved.
-- **Constant practice note speed** compensates note rendering, beatlines, and
-  scrolling highway textures for practice tempo. It is experimental and **off
-  by default**. It does not alter audio, chart timing, or hit judgments. Animated
+- **Constant practice note speed** keeps note rendering, beatlines, and
+  scrolling highway textures at the configured profile values through practice
+  tempo changes. It is experimental and **off by default**. It does not alter
+  audio, chart timing, or hit judgments. Animated
   video highways are not retimed. Test at 50%, 100%, and above 100%, and toggle
   it off to compare vanilla behavior.
 
@@ -88,6 +89,14 @@ menu, and beat renderer finish initializing. The previous build called into a
 renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
+
+## 0.4.3 practice tempo correction
+
+Timing logs showed that practice at 120% changed raw speed fields from 23 to
+19.167, while disabling the option removed the slowdown. Compensation now
+keeps raw renderer fields at the configured profile value; Clone Hero applies
+practice tempo itself. The former division by tempo scaled twice. Visibility
+windows consequently remain at their native range when speed is fixed.
 
 ## 0.4.2 full-song speed reset
 
