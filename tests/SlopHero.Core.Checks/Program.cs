@@ -52,20 +52,23 @@ Check(!PracticeReadiness.CanSelect(true, true, true, true, true, 1),
 Check(PracticeReadiness.CanSelect(true, true, true, true, true, 0),
     "Fully initialized practice scene allows selection");
 var speed = new ScrollSpeedCompensation();
-Check(speed.Update(10, .5f, true) == 10, "Half tempo preserves configured visual speed");
-Check(speed.Update(10, .5f, true) == 10, "Repeated frames preserve configured speed");
-Check(speed.Update(10, 2, true) == 10, "Fast tempo preserves original scroll setting");
+Check(speed.Update(10, .5f, true) == 20, "Half tempo compensates inferred visual speed");
+Check(speed.Update(20, .5f, true) == 20, "Repeated frames preserve compensated speed");
+Check(speed.Update(20, 2, true) == 5, "Fast tempo compensates inferred visual speed");
 Check(speed.Update(10, 1, false) == 10, "Toggle off restores unmodified speed");
-Check(speed.Update(12, .5f, true) == 12, "New vanilla speed setting replaces baseline");
+Check(speed.Update(12, .5f, true) == 24, "New vanilla speed setting replaces baseline");
 Check(speed.Update(12, 0, true) == 12, "Invalid tempo restores speed without dividing by zero");
 Check(speed.Update(14, 1, false) == 14, "Disabled compensation preserves vanilla changes");
 Check(speed.Update(14, float.NaN, true) == 14, "Nonfinite tempo leaves normal speed intact");
 var profileSpeed = new ScrollSpeedCompensation();
-Check(profileSpeed.Update(5, .5f, true, 10) == 10, "Enable after slowdown uses configured profile speed");
-Check(profileSpeed.Update(15, 1.5f, true, 10) == 10, "Vanilla rewrite cannot replace configured baseline");
-Check(profileSpeed.Update(10, .5f, true, 12) == 12, "Profile note speed changes while compensation is enabled");
+Check(profileSpeed.Update(5, .5f, true, 10) == 20, "Half tempo compensates configured profile speed");
+Check(profileSpeed.Update(15, 1.5f, true, 10) == 10f / 1.5f, "Fast tempo compensates without replacing profile baseline");
+Check(profileSpeed.Update(10, .5f, true, 12) == 24, "Live profile speed change is reflected during practice");
 Check(profileSpeed.Update(24, .5f, false, 12) == 12, "Disabling restores latest configured speed");
-Check(profileSpeed.Update(18, 1.5f, true, 12) == 12, "Enable after speedup uses configured baseline");
+Check(profileSpeed.Update(18, 1.5f, true, 12) == 8, "Enable after speedup uses configured baseline");
+var nonDefaultSpeed = new ScrollSpeedCompensation();
+Check(nonDefaultSpeed.Update(17, .75f, true, 17) == 17f / .75f, "Compensation uses arbitrary configured speed");
+Check(nonDefaultSpeed.Update(31, .5f, true, 31) == 62, "Compensation supports higher configured speed");
 Check(NoteVisibilityWindow.Calculate(3, 10, 20) == 1.5, "Faster speed preserves the same world-space visibility distance");
 Check(NoteVisibilityWindow.Calculate(3, 10, 5) == 6, "Slower visual speed expands lookahead");
 Check(NoteVisibilityWindow.Calculate(3, 10, 10) == 3, "Normal speed preserves native window");
@@ -83,7 +86,7 @@ Check(OrderedNoteSearch.LowerBound(100000, 99000, i => { reads++; return i; }) =
     "Large practice seek needs logarithmic native reads");
 var corrupt = new ScrollSpeedCompensation();
 Check(corrupt.Update(23, 1.95f, true, 1344637400) == 23, "Regression: pointer-like configured speed leaves native speed intact");
-Check(corrupt.Update(23, 1.95f, true, 23) == 23, "Observed native speed remains at configured value");
+Check(corrupt.Update(23, 1.95f, true, 23) == 23f / 1.95f, "Observed profile speed is compensated by current tempo");
 Check(corrupt.Update(23, 1.95f, true, float.PositiveInfinity) == 23,
     "Corrupt setting while active restores native baseline");
 Check(corrupt.Update(23, float.Epsilon, true, 23) == 23, "Extreme tempo cannot overflow into disappearing notes");

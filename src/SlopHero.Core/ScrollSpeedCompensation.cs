@@ -20,10 +20,11 @@ public sealed class ScrollSpeedCompensation
         }
         if (!float.IsFinite(current) || current <= 0) return current;
         if (!authoritative && (!active || Math.Abs(current - applied) >= .001f)) original = current;
-        // The practice renderer already applies its own tempo scaling. Keep the
-        // configured raw renderer values fixed; dividing here scales twice and
-        // makes notes move too slowly at faster practice tempos.
-        float target = original;
+        // Clone Hero applies practice tempo to the raw renderer speed. Counter
+        // that multiplier so the visible scroll speed remains at the profile
+        // value. `original` is refreshed from the live profile setting above,
+        // so this works for any configured note speed, not a particular default.
+        float target = original / tempo;
         if (!float.IsFinite(target) || target <= 0 || target > 10000)
         {
             bool owned = active;
