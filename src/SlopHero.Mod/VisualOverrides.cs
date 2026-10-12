@@ -102,7 +102,7 @@ internal sealed class VisualOverrides
             bool compensate = constantSpeed && game.globalVariables.isPracticeEnabled;
             float ratio = game.practiceSpeed;
             if (!constantSpeed && speeds.Count == 0) continue;
-            ObjectPublicObBoObAcBo1ObBoObObObUnique? profile = p.player?.field_Public_Object1PublicObBoObStBoObObObObUnique_0;
+            ObjectPublicObBoObAcBo1ObBoObObUnique? profile = p.player?.field_Public_Object1PublicObBoObStBoObObObObUnique_0;
             float configured = profile?.field_Public_Object2PublicBoSiInSiDoStSiStStUnique_0?.field_Protected_T_0 ?? float.NaN;
             if (!noteRenderers.TryGetValue(p.Pointer, out var notes))
             {
