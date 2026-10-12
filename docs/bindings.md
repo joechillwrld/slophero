@@ -124,3 +124,25 @@ HUD rendering failures fall back to the original native-backed string Label
 path. Settings failures close the editor instead of leaving invisible input
 gating enabled. Errors are logged once per rendering category to prevent the
 previous repeated-exception log growth. Practice selection logic remains unchanged.
+
+
+## 0.2.2 practice input restoration
+
+The user reports that the HUD, F8 editor, and section switching now work in
+0.2.1, with no errors in the latest log. Guitar input required a keyboard action
+following automatic practice selection.
+
+The vanilla PracticeSectionMenu confirmation routine at RVA 0x10B7E0 calls:
+
+1. Section selection at 0xBBC70 with the selected range and both booleans true.
+2. GameManager.Method_Public_Void_Boolean_0(true), native RVA 0xBF510, to reset
+   the practice attempt.
+3. GameManager.Method_Public_Void_2(), native RVA 0xB6570, which walks enabled
+   local player objects and sets BasePlayer.inputEnabled.
+4. Clears GameManager.RestartAfterPause.
+
+The shortcut previously stopped after step 1. Version 0.2.2 follows this native
+sequence through step 4 and logs the practice player's inputEnabled state.
+It uses the game's routine rather than writing player input flags directly.
+The existing scene and renderer readiness checks still apply. Compilation was
+verified; automatic guitar input restoration needs the user's Windows test.

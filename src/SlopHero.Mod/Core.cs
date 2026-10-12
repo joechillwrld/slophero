@@ -5,7 +5,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.2.1", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.2.2", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -288,10 +288,16 @@ public sealed class Core : MelonMod
             game.practiceDisplayStartTick = 0;
             game.practiceDisplayEndTick = 0;
             game.Method_Public_Void_Int32_Int32_Boolean_Boolean_0(section, 0, true, true);
+            // Complete the vanilla PracticeSectionMenu confirmation sequence:
+            // reset the attempt, enable local player input, clear the pause flag.
+            // Native RVAs 0xBF510 and 0xB6570, following 0x10B7E0.
+            game.Method_Public_Void_Boolean_0(true);
+            game.Method_Public_Void_2();
+            game.RestartAfterPause = false;
             transition = false;
             nextStats = 0;
             Notice("Practice: starting the section you left.");
-            LoggerInstance.Msg($"Selected practice section {section}; ticks {game.practiceDisplayStartTick}–{game.practiceDisplayEndTick}.");
+            LoggerInstance.Msg($"Selected practice section {section}; ticks {game.practiceDisplayStartTick}–{game.practiceDisplayEndTick}; guitar input enabled={game.practicePlayer.inputEnabled}.");
         }
         catch (Exception ex)
         {
@@ -444,7 +450,7 @@ public sealed class Core : MelonMod
     {
         float left = Math.Max(10, (Screen.width - 540) / 2f);
         float top = Math.Max(10, (Screen.height - 590) / 2f);
-        GUI.Box(new Rect(left, top, 540, 590), "SlopHero 0.2.1 — F8 / Escape to close");
+        GUI.Box(new Rect(left, top, 540, 590), "SlopHero 0.2.2 — F8 / Escape to close");
         GUI.Label(new Rect(left + 20, top + 35, 500, 40), "Pause the game before editing. Song controls apply to solo Quickplay.");
         if (GUI.Button(new Rect(left + 20, top + 78, 500, 32), $"Restart: {restartButton.Value} — click to bind")) capture = "restart";
         if (GUI.Button(new Rect(left + 20, top + 118, 500, 32), $"Practice: {practiceButton.Value} — click to bind")) capture = "practice";

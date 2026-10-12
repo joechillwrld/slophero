@@ -1,14 +1,14 @@
-# SlopHero 0.2.1 alpha
+# SlopHero 0.2.2 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Practice switching is confirmed working in the user's 0.2.0 test. Version
-0.2.1 fixes the rendering regression that hid the HUD and F8 menu. The repaired
-HUD editor still needs an in-game test.**
+**The HUD, F8 editor, and section switching worked in the user's 0.2.1 test.
+Version 0.2.2 completes the game's practice confirmation sequence to restore
+guitar input automatically; that small fix still needs an in-game test.**
 
 ## Install
 
-[Download v0.2.1 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.2.1-alpha.zip?raw=true)
+[Download v0.2.2 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.2.2-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -66,6 +66,14 @@ renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
 
+## 0.2.2 practice input repair
+
+After selecting the captured section, the shortcut now completes the same
+sequence as the game's practice confirmation: reset the attempt, enable local
+player input, and clear the pause/restart flag. This addresses the need to use
+the keyboard before the guitar starts responding. The scene-readiness checks
+and working HUD editor are retained.
+
 ## 0.2.1 rendering repair
 
 The supplied Unity assemblies route `GUI.DrawTexture` to a stub that throws
@@ -99,14 +107,15 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 Compilation passed with no warnings, and all **29 portable logic checks passed**.
 Native hooks were traced in the supplied binary. The latest Windows log confirms
 practice selected sections 0 and 2 successfully. Version 0.2.1 replaces the
-unsupported background-drawing call; the repaired overlay needs Windows testing.
+unsupported background-drawing call; the repaired overlay worked in the user's Windows test. The 0.2.2 input-restoration change needs a new test.
 
 1. Hit some notes, intentionally miss a few, and press extra frets. Compare the
    final HUD counters against the guitar results screen.
 2. Tap R briefly: it should do nothing. Hold R: it should restart once. Keep
    holding through the reload: it should not restart again until released.
 3. Hold P midway through a named section. Confirm practice starts that section
-   from its beginning, then check misses/ghosts across a practice restart.
+   from its beginning, verify the guitar responds immediately without a keyboard
+   action, then check misses/ghosts across a practice restart.
 4. Use F8 to bind a spare guitar button and repeat the hold checks.
 5. Move the HUD to another corner and adjust opacity/text color. Restart the game
    and confirm those settings were retained.
