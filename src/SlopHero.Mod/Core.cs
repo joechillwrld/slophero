@@ -5,7 +5,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.8", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.9", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -78,7 +78,6 @@ public sealed partial class Core : MelonMod
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
         visuals.Clear();
-        performance.Clear();
         rings.Clear();
         visualError = false;
         statsEngine = IntPtr.Zero;
@@ -108,7 +107,6 @@ public sealed partial class Core : MelonMod
         UpdateCursor();
         statsText = songText = "";
         visuals.Clear();
-        performance.Clear();
         rings.Clear();
         visualError = false;
         statsEngine = IntPtr.Zero;
@@ -410,7 +408,7 @@ public sealed partial class Core : MelonMod
                 LoggerInstance.Error($"Overlay rendering failed; editor closed. Send Latest.log: {ex}");
             }
         }
-        finally { GUI.color = previousColor; timings.End(2, timingStart); }
+        finally { GUI.color = previousColor; timings.End(3, timingStart); }
     }
 
     private void DrawHud(string text)

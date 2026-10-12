@@ -5,7 +5,7 @@ namespace SlopHero.Mod;
 
 internal sealed class RuntimeTimings
 {
-    private readonly long[] total = new long[3], maximum = new long[3], calls = new long[3];
+    private readonly long[] total = new long[4], maximum = new long[4], calls = new long[4];
     private long start, deadline;
     public bool Active => deadline != 0;
     public void Start()
@@ -28,6 +28,6 @@ internal sealed class RuntimeTimings
         double seconds = (Stopwatch.GetTimestamp() - start) / (double)Stopwatch.Frequency;
         deadline = 0;
         string Describe(int i, string name) => $"{name}: calls={calls[i]}, avg={(calls[i] > 0 ? total[i] * 1000d / Stopwatch.Frequency / calls[i] : 0):0.000}ms, max={maximum[i] * 1000d / Stopwatch.Frequency:0.000}ms";
-        MelonLogger.Msg($"Mod timing capture ({seconds:0.0}s), observed update rate={calls[0] / Math.Max(seconds, .001):0.0}/s; {Describe(0, "Update")}; {Describe(1, "Visuals")}; {Describe(2, "HUD repaint")}. Measures mod callbacks, not the whole game's CPU/GPU workload.");
+        MelonLogger.Msg($"Mod timing capture ({seconds:0.0}s), observed update rate={calls[0] / Math.Max(seconds, .001):0.0}/s; {Describe(0, "Update")}; {Describe(1, "FC rings")}; {Describe(2, "Visual overrides")}; {Describe(3, "HUD repaint")}. Measures mod callbacks, not the whole game's CPU/GPU workload.");
     }
 }

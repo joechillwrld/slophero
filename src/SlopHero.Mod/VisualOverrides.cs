@@ -52,7 +52,9 @@ internal sealed class VisualOverrides
         {
             if (!colors.ContainsKey(r.Pointer)) colors.Add(r.Pointer, (r, r.color));
             // Preserve alpha: fades and native visibility remain authoritative.
-            color.a = r.color.a;
+            var current = r.color;
+            if (current.r == color.r && current.g == color.g && current.b == color.b) return;
+            color.a = current.a;
             r.color = color;
         }
         else if (colors.Remove(r.Pointer, out var old)) { var c = old.Original; c.a = r.color.a; r.color = c; }
@@ -63,7 +65,9 @@ internal sealed class VisualOverrides
         if (enabled)
         {
             if (!texts.ContainsKey(t.Pointer)) texts.Add(t.Pointer, (t, t.color));
-            color.a = t.color.a; t.color = color;
+            var current = t.color;
+            if (current.r == color.r && current.g == color.g && current.b == color.b) return;
+            color.a = current.a; t.color = color;
         }
         else if (texts.Remove(t.Pointer, out var old)) { var c = old.Original; c.a = t.color.a; t.color = c; }
     }

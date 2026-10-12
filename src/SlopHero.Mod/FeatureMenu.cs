@@ -13,9 +13,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<float> songOpacity = null!;
     private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!;
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
-    private MelonPreferences_Entry<bool> performanceMode = null!, performanceFretEffects = null!, performanceNeckParticles = null!, performanceStarParticles = null!;
     private readonly VisualOverrides visuals = new();
-    private readonly PerformanceOverrides performance = new();
     private readonly RingColors rings = new();
     private readonly RuntimeTimings timings = new();
     private MelonPreferences_Entry<bool> lowOverhead = null!;
@@ -54,10 +52,6 @@ public sealed partial class Core
         tintFc = preferences.CreateEntry("CustomizeFcRings", false);
         tintScore = preferences.CreateEntry("CustomizeScoreColors", false);
         lockSpeed = preferences.CreateEntry("ConstantPracticeNoteSpeed", false);
-        performanceMode = preferences.CreateEntry("PerformanceMode", false);
-        performanceFretEffects = preferences.CreateEntry("PerformanceDisableFretEffects", true);
-        performanceNeckParticles = preferences.CreateEntry("PerformanceDisableNeckParticles", true);
-        performanceStarParticles = preferences.CreateEntry("PerformanceDisableStarParticles", true);
         fcColor = preferences.CreateEntry("FcColor", "FFD700");
         pfcColor = preferences.CreateEntry("PerfectFcColor", "00FFFF");
         songProgressColor = preferences.CreateEntry("SongProgressColor", "00FFFF");
@@ -70,7 +64,7 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.8 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.9 — F8 / Escape to close");
         string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Performance" };
         float tabWidth = 556f / pages.Length;
         for (int i = 0; i < pages.Length; i++)
@@ -90,7 +84,7 @@ public sealed partial class Core
                     if (timings.Active) timings.Finish();
                     else if (gameplayInitialized)
                     {
-                        LoggerInstance.Msg($"Timing settings: lowOverheadHud={lowOverhead.Value}, performanceMode={performanceMode.Value}, FC colors={tintFc.Value}, score colors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}.");
+                        LoggerInstance.Msg($"Timing settings: lowOverheadHud={lowOverhead.Value}, FC colors={tintFc.Value}, score colors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}.");
                         timings.Start();
                     }
                     else Notice("Start a song before capturing mod timings.");
@@ -124,12 +118,8 @@ public sealed partial class Core
                 Hex(songProgressColor, "Song progress bar", x, y + 302);
                 break;
             case 5:
-                Toggle(performanceMode, "Performance mode", x, y);
-                Toggle(performanceFretEffects, "Disable fret sparks and flame animators", x, y + 44);
-                Toggle(performanceNeckParticles, "Disable note and sustain particles", x, y + 88);
-                Toggle(performanceStarParticles, "Disable score star particles", x, y + 132);
-                Toggle(lowOverhead, "Low overhead HUD (2 updates/sec)", x, y + 176);
-                GUI.Label(new Rect(x, y + 220, 540, 120), "Choose which optional effects to suppress. The particle option also disables inactive particle systems attached to the guitar neck. Player input, notes, scoring, and gameplay objects stay active. Effect overrides restore when Performance mode is off.");
+                Toggle(lowOverhead, "Low overhead HUD (2 updates/sec)", x, y);
+                GUI.Label(new Rect(x, y + 48, 540, 150), "This reduces SlopHero counter polling from 5 to 2 updates per second. It does not change Clone Hero effects or gameplay settings. The timing capture below separates the mod's update, ring, and other visual work.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -298,7 +288,6 @@ public sealed partial class Core
         if (!compatible || !gameplay || !gameplayInitialized || transition || visualError) return;
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
         if (game == null || !game.songLoaded || !game.playersInit || game.globalVariables == null) return;
-        long timingStart = timings.Begin();
         try
         {
             Color Read(MelonPreferences_Entry<string> e)
@@ -308,11 +297,13 @@ public sealed partial class Core
                 if (parsedColors.Count > 64) parsedColors.Clear();
                 parsedColors[e.Value] = color; return color;
             }
+            long ringTiming = timings.Begin();
             rings.Update(game, tintFc.Value, Read(fcColor), Read(pfcColor));
-            performance.Apply(game, performanceMode.Value, performanceFretEffects.Value,
-                performanceNeckParticles.Value, performanceStarParticles.Value);
+            timings.End(1, ringTiming);
+            long visualTiming = timings.Begin();
             visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value,
                 tintScore.Value, Read(starColor), Read(progressColor), Read(scoreColor), Read(songProgressColor), lockSpeed.Value);
+            timings.End(2, visualTiming);
         }
         catch (Exception ex)
         {
@@ -320,7 +311,6 @@ public sealed partial class Core
             LoggerInstance.Error($"Visual overrides paused after an error; counters and controls remain available: {ex}");
             Notice("Visual overrides stopped after an error. Send Latest.log.");
         }
-        finally { timings.End(1, timingStart); }
     }
 
 }

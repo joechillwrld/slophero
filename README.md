@@ -1,13 +1,13 @@
-# SlopHero 0.3.8 alpha
+# SlopHero 0.3.9 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.3.8 removes repeated per-frame work from Performance mode and keeps
-the HUD refresh limiter in one place.**
+**Version 0.3.9 removes redundant game-effect controls and adds separate timings
+for SlopHero's ring and visual overrides.**
 
 ## Install
 
-[Download v0.3.8 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.8-alpha.zip?raw=true)
+[Download v0.3.9 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.9-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -89,6 +89,15 @@ renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
 
+## 0.3.9 profiling and renderer update
+
+Performance no longer duplicates Clone Hero's fret, flame, or particle controls.
+The Performance page keeps only SlopHero's own low-overhead counter refresh
+setting. The timing capture now reports FC rings and other visual overrides
+separately, to identify which mod feature accounts for callback cost. Custom
+color overrides skip redundant renderer writes when the target RGB is already
+applied. This optimization preserves native alpha/fades.
+
 ## 0.3.8 performance update
 
 The supplied timing capture had Performance mode enabled and measured the mod's
@@ -106,12 +115,10 @@ after this change and does not by itself establish whole-game FPS improvement.
 
 ## 0.3.7 performance controls and star HUD targeting
 
-**F8 → Performance** lets you enable the mode and choose which effects to
-suppress: fret sparks/flame animators, note and sustain particles, score star
-particles, and a 2 Hz counter refresh. Particle systems on the guitar neck are
-disabled even when idle. The mode restores each affected object when turned
-off; notes, input, scoring, and gameplay objects stay active. These are
-experimental removal options, and no FPS gain has been measured yet.
+**F8 → Performance** previously exposed effect removals now understood to
+overlap with in-game controls. Those controls were removed in v0.3.9. The
+renderer inventory diagnostics from this release identified the star graphic
+as `star_inner[score_star_outline_gold]`.
 
 The star tint now covers graphic renderers on all active StarProgress HUDs,
 excluding the numeric count and progress-bar renderers. The latest log also
@@ -289,7 +296,7 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 
 ## First in-game check
 
-Version 0.3.8 compiles without warnings. Earlier portable logic checks covered
+Version 0.3.9 compiles without warnings. Earlier portable logic checks covered
 title-speed formatting, native ring-state classification, chart-speed
 percentage formatting, native floating-point noise, the observed corrupt speed,
 concrete native-memory reads, and earlier gameplay logic. The new GUI calls were checked against the supplied wrappers.
@@ -325,9 +332,8 @@ Linux environment; the new features need the checks below.
 12. Enter practice, exit to the song, then enter practice again at both 100% and
     a changed tempo. Confirm note speed does not compound. Change the star color
     and verify the star graphic changes while its number follows the score text color.
-13. In F8 → Performance, test each removal by itself and in combination. Check
-    that turning the mode off restores all effects. Compare FPS and attach the
-    before/after Latest.log because removal does not guarantee an FPS increase.
+13. Capture timings with the same chart and visual settings. Compare `FC rings`
+    and `Visual overrides`, and include the FPS display reading with Latest.log.
 
 If the HUD is wrong, an action fails, or the mod disables itself, attach
 `MelonLoader/Latest.log` and describe the action. Include whether other mods were
