@@ -5,7 +5,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.13", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.14", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -15,6 +15,7 @@ public sealed partial class Core : MelonMod
     private readonly HoldTrigger restartHold = new();
     private readonly HoldTrigger practiceHold = new();
     private readonly ChartStats statsReader = new();
+    private readonly NativeHudLayout nativeHud = new();
     private readonly Stopwatch clock = Stopwatch.StartNew();
     private MelonPreferences_Category preferences = null!;
     private MelonPreferences_Entry<string> restartButton = null!, practiceButton = null!;
@@ -24,6 +25,9 @@ public sealed partial class Core : MelonMod
     private MelonPreferences_Entry<bool> showHud = null!;
     private bool compatible, gameplay, gameplayInitialized, settingsOpen, transition, practiceFailed;
     private bool moveHud, hudDragging, preferencesDirty, cursorOverridden, savedCursorVisible;
+    private int nativeMoveTarget;
+    private bool nativeHudDragging, nativeHudError, nativeHudErrorLogged, nativeHudActive;
+    private Vector2 nativeHudLastMouse;
     private CursorLockMode savedCursorLock;
     private Vector2 dragOffset;
     private string? capture;
@@ -78,6 +82,11 @@ public sealed partial class Core : MelonMod
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
         visuals.Clear();
+        nativeHud.Clear();
+        nativeMoveTarget = 0;
+        nativeHudDragging = false;
+        nativeHudError = false;
+        nativeHudActive = false;
         rings.Clear();
         visualError = false;
         statsEngine = IntPtr.Zero;
@@ -100,12 +109,16 @@ public sealed partial class Core : MelonMod
     {
         if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; }
         settingsOpen = moveHud = hudDragging = false;
+        nativeMoveTarget = 0;
+        nativeHudDragging = false;
         capture = null;
         editApply = null;
         SavePreferences();
         UpdateCursor();
         statsText = songText = "";
         visuals.Clear();
+        nativeHud.Clear();
+        nativeHudActive = false;
         rings.Clear();
         visualError = false;
         statsEngine = IntPtr.Zero;
@@ -124,6 +137,8 @@ public sealed partial class Core : MelonMod
                 if (moveHud) { moveHud = false; settingsOpen = true; }
                 else settingsOpen = !settingsOpen;
                 hudDragging = false;
+                nativeMoveTarget = 0;
+                nativeHudDragging = false;
                 SavePreferences();
                 UpdateCursor();
                 capture = null;
@@ -136,6 +151,8 @@ public sealed partial class Core : MelonMod
                 settingsOpen = false;
                 moveHud = false;
                 hudDragging = false;
+                nativeMoveTarget = 0;
+                nativeHudDragging = false;
                 capture = null;
                 SavePreferences();
                 UpdateCursor();
@@ -148,6 +165,8 @@ public sealed partial class Core : MelonMod
             if (!Application.isFocused && (settingsOpen || moveHud))
             {
                 settingsOpen = moveHud = hudDragging = false;
+                nativeMoveTarget = 0;
+                nativeHudDragging = false;
                 capture = null;
                 SavePreferences();
                 UpdateCursor();
@@ -197,6 +216,14 @@ public sealed partial class Core : MelonMod
             }
             if (now >= nextStats)
             {
+                if (!showHud.Value && !showSong.Value && !moveHud)
+                {
+                    // With both mod HUDs hidden, there is nothing to sample or
+                    // format. The song controls above still stay responsive.
+                    statsText = songText = "";
+                    nextStats = now + .2;
+                    return;
+                }
                 // The HUD refreshes five times per second. Avoid walking the
                 // IL2CPP player array and casting its entries on every frame.
                 var player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled);
@@ -356,29 +383,33 @@ public sealed partial class Core : MelonMod
         {
             if ((showHud.Value && gameplay && !string.IsNullOrEmpty(statsText)) || settingsOpen || moveHud)
             {
-                string text = string.IsNullOrEmpty(statsText) ? "Misses: 0\nHit: 100.00%\nGhosts: 0" : statsText;
-                if (moveHud && moveSong) text = string.IsNullOrEmpty(songText) ? "Chart title (100%)\nArtist: Artist\nCharter: Charter" : songText;
-                if (hudRenderFailed) DrawBasicHud(text);
+                if (nativeMoveTarget != 0) DrawNativeHudMove();
                 else
                 {
-                    try { DrawHud(text); }
-                    catch (Exception ex)
+                    string text = string.IsNullOrEmpty(statsText) ? "Misses: 0\nHit: 100.00%\nGhosts: 0" : statsText;
+                    if (moveHud && moveSong) text = string.IsNullOrEmpty(songText) ? "Chart title (100%)\nArtist: Artist\nCharter: Charter" : songText;
+                    if (hudRenderFailed) DrawBasicHud(text);
+                    else
                     {
-                        hudRenderFailed = true;
-                        hudDragging = false;
-                        if (!hudRenderErrorLogged)
+                        try { DrawHud(text); }
+                        catch (Exception ex)
                         {
-                            hudRenderErrorLogged = true;
-                            LoggerInstance.Error($"HUD appearance renderer failed; using basic counters: {ex}");
+                            hudRenderFailed = true;
+                            hudDragging = false;
+                            if (!hudRenderErrorLogged)
+                            {
+                                hudRenderErrorLogged = true;
+                                LoggerInstance.Error($"HUD appearance renderer failed; using basic counters: {ex}");
+                            }
+                            DrawBasicHud(text);
                         }
-                        DrawBasicHud(text);
                     }
                 }
             }
-            if (!(moveHud && moveSong) && showSong.Value && gameplay && !string.IsNullOrEmpty(songText)) DrawSongHudSafely();
+            if (!(moveHud && (moveSong || nativeMoveTarget != 0)) && showSong.Value && gameplay && !string.IsNullOrEmpty(songText)) DrawSongHudSafely();
             if (!compatible || clock.Elapsed.TotalSeconds < noticeUntil)
                 GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44), status);
-            if (moveHud)
+            if (moveHud && nativeMoveTarget == 0)
                 GUI.Box(new Rect(20, Screen.height - 110, Math.Max(300, Screen.width - 40), 44),
                     "Drag the HUD anywhere. F8 returns to settings; Escape finishes. Position saves when released.");
             if (settingsOpen)
@@ -476,9 +507,58 @@ public sealed partial class Core : MelonMod
         GUI.Label(new Rect(position.X + 12, position.Y + 8, 300, 140), text);
     }
 
+    private void DrawNativeHudMove()
+    {
+        if (!nativeHud.TryGetScreenRect(nativeMoveTarget, out var rect))
+        {
+            string hint = nativeMoveTarget == 1
+                ? "Practice stats UI not found. Enter Practice mode, then reopen F8 → Game HUD."
+                : "FPS display not found. Enable the game's FPS display, then reopen F8 → Game HUD.";
+            GUI.Box(new Rect(20, Screen.height - 110, Math.Max(300, Screen.width - 40), 44), hint);
+            return;
+        }
+        string label = nativeMoveTarget == 1 ? "Practice stats — drag to move" : "FPS display — drag to move";
+        GUI.Box(rect, label);
+        GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44),
+            "Drag the highlighted native HUD. F8 returns to settings; Escape finishes.");
+        var e = Event.current;
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        {
+            nativeHudDragging = true;
+            nativeHudLastMouse = e.mousePosition;
+            e.Use();
+        }
+        if (nativeHudDragging && e.type == EventType.MouseDrag)
+        {
+            var delta = nativeHud.MoveByScreenDelta(nativeMoveTarget,
+                e.mousePosition.x - nativeHudLastMouse.x,
+                e.mousePosition.y - nativeHudLastMouse.y);
+            if (nativeMoveTarget == 1)
+            {
+                practiceHudX.Value += delta.x;
+                practiceHudY.Value += delta.y;
+            }
+            else
+            {
+                fpsHudX.Value += delta.x;
+                fpsHudY.Value += delta.y;
+            }
+            nativeHudLastMouse = e.mousePosition;
+            preferencesDirty = true;
+            e.Use();
+        }
+        if (nativeHudDragging && e.rawType == EventType.MouseUp)
+        {
+            nativeHudDragging = false;
+            SavePreferences();
+        }
+    }
+
     private void CloseEditor()
     {
         settingsOpen = moveHud = hudDragging = false;
+        nativeMoveTarget = 0;
+        nativeHudDragging = false;
         capture = null;
         editApply = null;
         SavePreferences();

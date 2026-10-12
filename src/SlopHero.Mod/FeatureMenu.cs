@@ -10,9 +10,12 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> showMisses = null!, showHit = null!, showGhosts = null!, showBest = null!;
     private MelonPreferences_Entry<bool> showSong = null!, showTitle = null!, showArtist = null!, showCharter = null!, showSpeed = null!;
     private MelonPreferences_Entry<int> songX = null!, songY = null!, songFont = null!;
+    private MelonPreferences_Entry<float> practiceHudX = null!, practiceHudY = null!, fpsHudX = null!, fpsHudY = null!;
     private MelonPreferences_Entry<float> songOpacity = null!;
     private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!;
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
+    private MelonPreferences_Entry<bool> customizeFpsColor = null!;
+    private MelonPreferences_Entry<string> fpsTextColor = null!;
     private readonly VisualOverrides visuals = new();
     private readonly RingColors rings = new();
     private readonly RuntimeTimings timings = new();
@@ -44,6 +47,12 @@ public sealed partial class Core
         songFont = preferences.CreateEntry("SongFontSize", 22);
         songOpacity = preferences.CreateEntry("SongBackgroundOpacity", .65f);
         songColor = preferences.CreateEntry("SongTextColor", "FFFFFF");
+        practiceHudX = preferences.CreateEntry("PracticeHudOffsetX", 0f);
+        practiceHudY = preferences.CreateEntry("PracticeHudOffsetY", 0f);
+        fpsHudX = preferences.CreateEntry("FpsHudOffsetX", 0f);
+        fpsHudY = preferences.CreateEntry("FpsHudOffsetY", 0f);
+        customizeFpsColor = preferences.CreateEntry("CustomizeFpsColor", false);
+        fpsTextColor = preferences.CreateEntry("FpsTextColor", "FFFFFF");
         hideSides = preferences.CreateEntry("HideHighwaySides", false);
         hideStrings = preferences.CreateEntry("HideFretStrings", false);
         hideBeats = preferences.CreateEntry("HideBeatlines", false);
@@ -62,8 +71,8 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.13 — F8 / Escape to close");
-        string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors" };
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.14 — F8 / Escape to close");
+        string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Game HUD" };
         float tabWidth = 556f / pages.Length;
         for (int i = 0; i < pages.Length; i++)
             if (GUI.Button(new Rect(x + 12 + i * tabWidth, y + 32, tabWidth - 4, 30), pages[i])) settingsPage = i;
@@ -115,6 +124,22 @@ public sealed partial class Core
                 Hex(scoreColor, "Score / accuracy text", x, y + 260);
                 Hex(songProgressColor, "Song progress bar", x, y + 302);
                 break;
+            case 5:
+                GUI.Label(new Rect(x, y, 540, 28), "Native game HUD. Offsets use the UI canvas's units.");
+                if (GUI.Button(new Rect(x, y + 36, 390, 32), "Move practice stats bar")) BeginNativeHudMove(1);
+                if (GUI.Button(new Rect(x + 400, y + 36, 140, 32), "Reset"))
+                { practiceHudX.Value = practiceHudY.Value = 0; preferencesDirty = true; }
+                Number("Practice stats horizontal offset", practiceHudX.Value, x, y + 74, -1500, 1500, v => practiceHudX.Value = v);
+                Number("Practice stats vertical offset", practiceHudY.Value, x, y + 112, -1500, 1500, v => practiceHudY.Value = v);
+                if (GUI.Button(new Rect(x, y + 158, 390, 32), "Move FPS display")) BeginNativeHudMove(2);
+                if (GUI.Button(new Rect(x + 400, y + 158, 140, 32), "Reset"))
+                { fpsHudX.Value = fpsHudY.Value = 0; preferencesDirty = true; }
+                Number("FPS horizontal offset", fpsHudX.Value, x, y + 196, -1500, 1500, v => fpsHudX.Value = v);
+                Number("FPS vertical offset", fpsHudY.Value, x, y + 234, -1500, 1500, v => fpsHudY.Value = v);
+                Toggle(customizeFpsColor, "Customize FPS text color", x, y + 276);
+                Hex(fpsTextColor, "FPS text color", x, y + 314);
+                GUI.Label(new Rect(x, y + 356, 540, 60), "Move the practice bar while in practice. The game's FPS display must be enabled before you move or recolor it.");
+                break;
         }
         if (editApply != null) DrawValueEditor();
     }
@@ -123,6 +148,19 @@ public sealed partial class Core
     {
         if (GUI.Button(new Rect(x, y, 540, 32), $"{label}: {(entry.Value ? "On" : "Off")}"))
         { entry.Value = !entry.Value; preferencesDirty = true; nextStats = 0; }
+    }
+
+    private void BeginNativeHudMove(int target)
+    {
+        nativeMoveTarget = target;
+        nativeHudDragging = false;
+        moveHud = true;
+        moveSong = false;
+        settingsOpen = false;
+        capture = null;
+        UpdateCursor();
+        restartHold.RequireRelease();
+        practiceHold.RequireRelease();
     }
 
     private void Appearance(float x, float y, bool song)
@@ -141,7 +179,7 @@ public sealed partial class Core
         }
         if (GUI.Button(new Rect(x, y + 126, 265, 32), "Move this HUD"))
         {
-            moveSong = song; moveHud = true; settingsOpen = false; capture = null; UpdateCursor();
+            moveSong = song; moveHud = true; nativeMoveTarget = 0; nativeHudDragging = false; settingsOpen = false; capture = null; UpdateCursor();
             restartHold.RequireRelease(); practiceHold.RequireRelease();
         }
         if (GUI.Button(new Rect(x + 275, y + 126, 265, 32), "Reset position"))
@@ -279,9 +317,34 @@ public sealed partial class Core
     private bool visualError;
     public override void OnLateUpdate()
     {
-        if (!compatible || !gameplay || !gameplayInitialized || transition || visualError) return;
+        if (!compatible || !gameplay || !gameplayInitialized || transition) return;
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
         if (game == null || !game.songLoaded || !game.playersInit || game.globalVariables == null) return;
+        bool nativeHudRequested = nativeMoveTarget != 0 || practiceHudX.Value != 0 || practiceHudY.Value != 0
+            || fpsHudX.Value != 0 || fpsHudY.Value != 0 || customizeFpsColor.Value;
+        if (!nativeHudError && (nativeHudRequested || nativeHudActive))
+        {
+            try
+            {
+                Color fpsTint;
+                try { fpsTint = ParseColor(fpsTextColor.Value); } catch (FormatException) { fpsTint = Color.white; }
+                nativeHud.Apply(game, game.globalVariables.isPracticeEnabled,
+                    practiceHudX.Value, practiceHudY.Value, fpsHudX.Value, fpsHudY.Value,
+                    customizeFpsColor.Value, fpsTint, clock.Elapsed.TotalSeconds);
+                nativeHudActive = nativeHudRequested;
+            }
+            catch (Exception ex)
+            {
+                nativeHudActive = false;
+                nativeHudError = true;
+                if (!nativeHudErrorLogged)
+                {
+                    nativeHudErrorLogged = true;
+                    LoggerInstance.Error($"Native HUD customization stopped after an error: {ex}");
+                }
+            }
+        }
+        if (visualError) return;
         // Once the one-time full-song speed reconciliation is complete, skip
         // the IL2CPP callback entirely when every optional override is idle.
         bool visualRequested = hideSides.Value || hideStrings.Value || hideBeats.Value || tintScore.Value || lockSpeed.Value;
