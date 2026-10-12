@@ -5,12 +5,12 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.2.2", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.3.0", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
 
-public sealed class Core : MelonMod
+public sealed partial class Core : MelonMod
 {
     private readonly HoldTrigger restartHold = new();
     private readonly HoldTrigger practiceHold = new();
@@ -59,6 +59,7 @@ public sealed class Core : MelonMod
             layoutVersion.Value = 1;
             preferences.SaveToFile();
         }
+        InitializeFeatures();
         compatible = BuildGuard.Matches(out status);
         if (compatible) LoggerInstance.Msg(status);
         else LoggerInstance.Warning(status);
@@ -69,7 +70,9 @@ public sealed class Core : MelonMod
     {
         gameplayInitialized = false;
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
-        statsText = "";
+        statsText = songText = "";
+        visuals.Clear();
+        visualError = false;
         statsEngine = IntPtr.Zero;
         nextStats = 0;
         restartHold.RequireRelease();
@@ -92,9 +95,12 @@ public sealed class Core : MelonMod
         if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; }
         settingsOpen = moveHud = hudDragging = false;
         capture = null;
+        editApply = null;
         SavePreferences();
         UpdateCursor();
-        statsText = "";
+        statsText = songText = "";
+        visuals.Clear();
+        visualError = false;
         statsEngine = IntPtr.Zero;
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
@@ -113,10 +119,11 @@ public sealed class Core : MelonMod
                 SavePreferences();
                 UpdateCursor();
                 capture = null;
+                editApply = null;
                 restartHold.RequireRelease();
                 practiceHold.RequireRelease();
             }
-            if ((settingsOpen || moveHud) && Input.GetKeyDown(KeyCode.Escape))
+            if ((settingsOpen || moveHud) && editApply == null && Input.GetKeyDown(KeyCode.Escape))
             {
                 settingsOpen = false;
                 moveHud = false;
@@ -196,7 +203,21 @@ public sealed class Core : MelonMod
                 var stats = statsReader.Read(player.engine, game);
                 string percentage = stats.HitPercentage?.ToString("0.00", CultureInfo.InvariantCulture) + "%";
                 if (stats.HitPercentage == null) percentage = "—";
-                statsText = $"Misses: {stats.Misses}\nHit: {percentage}\nGhosts: {stats.GhostInputs}";
+                var lines = new List<string>();
+                if (showMisses.Value) lines.Add($"Misses: {stats.Misses}");
+                if (showHit.Value) lines.Add($"Hit: {percentage}");
+                if (showGhosts.Value) lines.Add($"Ghosts: {stats.GhostInputs}");
+                if (showBest.Value) lines.Add($"Best streak: {player.engine.field_Public_Int32_5}");
+                statsText = string.Join("\n", lines);
+                var song = game.globalVariables!.currentSongEntry;
+                lines.Clear();
+                if (song != null)
+                {
+                    if (showTitle.Value) lines.Add(song.Name_StrippedTags ?? "Unknown title");
+                    if (showArtist.Value) lines.Add("Artist: " + (song.Artist_StrippedTags ?? "Unknown"));
+                    if (showCharter.Value) lines.Add("Charter: " + (song.Charter_StrippedTags ?? "Unknown"));
+                }
+                songText = string.Join("\n", lines);
                 nextStats = now + .2;
             }
         }
@@ -324,6 +345,7 @@ public sealed class Core : MelonMod
             if ((showHud.Value && gameplay && !string.IsNullOrEmpty(statsText)) || settingsOpen || moveHud)
             {
                 string text = string.IsNullOrEmpty(statsText) ? "Misses: 0\nHit: 100.00%\nGhosts: 0" : statsText;
+                if (moveHud && moveSong) text = string.IsNullOrEmpty(songText) ? "Chart title\nArtist: Artist\nCharter: Charter" : songText;
                 if (hudRenderFailed) DrawBasicHud(text);
                 else
                 {
@@ -341,6 +363,7 @@ public sealed class Core : MelonMod
                     }
                 }
             }
+            if (!(moveHud && moveSong) && showSong.Value && gameplay && !string.IsNullOrEmpty(songText)) DrawSongHudSafely();
             if (!compatible || clock.Elapsed.TotalSeconds < noticeUntil)
                 GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44), status);
             if (moveHud)
@@ -376,12 +399,13 @@ public sealed class Core : MelonMod
 
     private void DrawHud(string text)
     {
+        if (moveHud && moveSong) { DrawSongHud(true); return; }
         hudStyle ??= new GUIStyle(GUI.skin.label);
         hudStyle.fontSize = Math.Clamp(fontSize.Value, 14, 48);
         hudStyle.normal.textColor = new Color(HudLayout.Unit(textRed.Value),
             HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1);
         int width = Math.Max(240, hudStyle.fontSize * 12 + 24);
-        int height = hudStyle.fontSize * 4 + 16;
+        int height = (int)(hudStyle.fontSize * 1.25f) * text.Split('\n').Length + 20;
         var position = HudLayout.ClampPosition(hudX.Value, hudY.Value, width, height, Screen.width, Screen.height);
         Rect rect = new(position.X, position.Y, width, height);
         // DrawTexture's final overload is an unstripping-failed stub in the
@@ -440,81 +464,11 @@ public sealed class Core : MelonMod
     {
         settingsOpen = moveHud = hudDragging = false;
         capture = null;
+        editApply = null;
         SavePreferences();
         UpdateCursor();
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
-    }
-
-    private void DrawSettings()
-    {
-        float left = Math.Max(10, (Screen.width - 540) / 2f);
-        float top = Math.Max(10, (Screen.height - 590) / 2f);
-        GUI.Box(new Rect(left, top, 540, 590), "SlopHero 0.2.2 — F8 / Escape to close");
-        GUI.Label(new Rect(left + 20, top + 35, 500, 40), "Pause the game before editing. Song controls apply to solo Quickplay.");
-        if (GUI.Button(new Rect(left + 20, top + 78, 500, 32), $"Restart: {restartButton.Value} — click to bind")) capture = "restart";
-        if (GUI.Button(new Rect(left + 20, top + 118, 500, 32), $"Practice: {practiceButton.Value} — click to bind")) capture = "practice";
-        GUI.Label(new Rect(left + 20, top + 160, 300, 25), $"Hold duration: {Duration:0.00}s");
-        if (GUI.Button(new Rect(left + 340, top + 158, 80, 30), "Shorter")) ChangeDuration(-.1f);
-        if (GUI.Button(new Rect(left + 430, top + 158, 80, 30), "Longer")) ChangeDuration(.1f);
-        if (GUI.Button(new Rect(left + 20, top + 202, 240, 32), showHud.Value ? "HUD: shown" : "HUD: hidden"))
-        {
-            showHud.Value = !showHud.Value;
-            preferencesDirty = true;
-        }
-        if (GUI.Button(new Rect(left + 280, top + 202, 240, 32), "Move HUD — drag anywhere"))
-        {
-            capture = null;
-            settingsOpen = false;
-            moveHud = true;
-            restartHold.RequireRelease();
-            practiceHold.RequireRelease();
-            UpdateCursor();
-        }
-        GUI.Label(new Rect(left + 20, top + 246, 300, 25), $"Text size: {Math.Clamp(fontSize.Value, 14, 48)}");
-        if (GUI.Button(new Rect(left + 340, top + 242, 80, 30), "Smaller"))
-        {
-            fontSize.Value = Math.Clamp(fontSize.Value - 2, 14, 48);
-            preferencesDirty = true;
-        }
-        if (GUI.Button(new Rect(left + 430, top + 242, 80, 30), "Larger"))
-        {
-            fontSize.Value = Math.Clamp(fontSize.Value + 2, 14, 48);
-            preferencesDirty = true;
-        }
-        DrawSlider(backgroundOpacity, "Background opacity", left + 20, top + 288, .65f);
-        DrawSlider(textRed, "Text red", left + 20, top + 326);
-        DrawSlider(textGreen, "Text green", left + 20, top + 364);
-        DrawSlider(textBlue, "Text blue", left + 20, top + 402);
-        if (GUI.Button(new Rect(left + 20, top + 446, 240, 30), "White text / default background"))
-        {
-            textRed.Value = textGreen.Value = textBlue.Value = 1;
-            backgroundOpacity.Value = .65f;
-            preferencesDirty = true;
-        }
-        if (GUI.Button(new Rect(left + 280, top + 446, 240, 30), "Reset HUD position"))
-        {
-            hudX.Value = 24;
-            hudY.Value = 110;
-            preferencesDirty = true;
-        }
-        GUI.Label(new Rect(left + 20, top + 488, 500, 62), capture == null
-            ? "Changes save automatically. Practice starts the current section from its beginning."
-            : $"Press a key or controller button to bind {capture}.\nF8 / Escape cancels. Avoid fret and strum buttons.");
-        if (restartButton.Value == practiceButton.Value)
-            GUI.Label(new Rect(left + 20, top + 550, 500, 25), "Both actions share a button; restart takes priority. Choose different buttons.");
-    }
-
-    private void DrawSlider(MelonPreferences_Entry<float> entry, string label, float x, float y, float fallback = 1)
-    {
-        float current = HudLayout.Unit(entry.Value, fallback);
-        GUI.Label(new Rect(x, y, 200, 25), $"{label}: {current * 100:0}%");
-        float value = GUI.HorizontalSlider(new Rect(x + 210, y + 7, 280, 20), current, 0, 1);
-        if (Math.Abs(entry.Value - value) > .0001f || !float.IsFinite(entry.Value))
-        {
-            entry.Value = value;
-            preferencesDirty = true;
-        }
     }
 
     private void SavePreferences()

@@ -51,4 +51,13 @@ Check(!PracticeReadiness.CanSelect(true, true, true, true, true, 1),
     "Initialization coroutines block selection");
 Check(PracticeReadiness.CanSelect(true, true, true, true, true, 0),
     "Fully initialized practice scene allows selection");
+var speed = new ScrollSpeedCompensation();
+Check(speed.Update(10, .5f, true) == 20, "Half-tempo visual compensation");
+Check(speed.Update(20, .5f, true) == 20, "Repeated frames do not compound compensation");
+Check(speed.Update(20, 2, true) == 5, "Changing tempo retains original scroll setting");
+Check(speed.Update(5, 1, false) == 10, "Toggle off restores unmodified speed");
+Check(speed.Update(12, .5f, true) == 24, "New vanilla speed setting replaces baseline");
+Check(speed.Update(24, 0, true) == 12, "Invalid tempo restores speed without dividing by zero");
+Check(speed.Update(14, 1, false) == 14, "Disabled compensation preserves vanilla changes");
+Check(speed.Update(14, float.NaN, true) == 14, "Nonfinite tempo leaves normal speed intact");
 Console.WriteLine($"Passed {checks} checks.");

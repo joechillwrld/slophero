@@ -1,14 +1,14 @@
-# SlopHero 0.2.2 alpha
+# SlopHero 0.3.0 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**The HUD, F8 editor, and section switching worked in the user's 0.2.1 test.
-Version 0.2.2 completes the game's practice confirmation sequence to restore
-guitar input automatically; that small fix still needs an in-game test.**
+**Version 0.3.0 adds editable values, a separate song HUD, best streak,
+per-line visibility, highway visuals, and experimental practice-speed compensation.
+The new features build successfully but still need a Windows in-game test.**
 
 ## Install
 
-[Download v0.2.2 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.2.2-alpha.zip?raw=true)
+[Download v0.3.0 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.3.0-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -31,13 +31,34 @@ are needed. Remove `Mods/SlopHero.dll` to uninstall. Preferences can remain.
 
 Pause the game before editing settings. Press **F8** for the settings panel.
 
-- Click **Move HUD**, then drag the HUD anywhere on the screen. Release to save.
-  F8 returns to settings; Escape finishes. Your mouse cursor is shown while editing.
-- Adjust **Background opacity** from fully transparent to opaque black.
-- Adjust the **Text red/green/blue** sliders to choose any text color.
-- Use **Smaller/Larger** to change text size, or **Reset HUD position** if needed.
-- Appearance and position changes are saved automatically. The old default HUD
-  position moves below the FPS bar once when upgrading; custom positions stay.
+F8 has five pages: **Controls**, **Counters**, **Song HUD**, **Highway**, and **Colors**.
+
+- Click a numeric or color value and type a replacement. Enter or **Apply** saves;
+  Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.
+  Colors accept six hex digits with an optional `#`, for example `FF8800`.
+  Percentage inputs use 0–100; out-of-range numbers are clamped.
+- Counters: individually show/hide misses, hit percentage, ghost inputs, and
+  best streak. **Best streak** uses the game's highest streak for the current attempt.
+- Song HUD: chart title, artist, and charter are separate toggleable lines.
+  It has independent position, text size, color, and background opacity.
+- Both HUDs have **Move this HUD**: drag and release to save. F8 returns to
+  settings; Escape finishes. Coordinates can also be entered directly.
+- Highway: optionally hide sides, fret strings, or beatlines. These options
+  affect renderers, preserving gameplay objects and practice initialization.
+- Colors: enable custom FC/perfect-FC rings or score colors, then enter colors
+  for rings, stars, score/accuracy text, star progress, and song progress bars.
+  Ring color switches from perfect FC to regular FC when the guitar's native
+  ghost-input counter becomes nonzero. Native ring visibility is preserved.
+- **Constant practice note speed** compensates note rendering, beatlines, and
+  scrolling highway textures for practice tempo. It is experimental and **off
+  by default**. It does not alter audio, chart timing, or hit judgments. Animated
+  video highways are not retimed. Test at 50%, 100%, and above 100%, and toggle
+  it off to compare vanilla behavior.
+
+Changes persist in `UserData/MelonPreferences.cfg` under `SlopHero`. Visual
+options default off. Turning them off restores the properties captured before
+SlopHero applied the override. Other mods that edit the same renderer properties
+may compete with these options.
 
 Click a binding button, then press a
 keyboard key or a guitar/controller button. Controller buttons are read through
@@ -95,6 +116,7 @@ controls. Each rendering-error category logs once per session instead of floodin
 - **Hit:** `hits / (hits + misses) * 100` for resolved notes in the current run.
   Before any note resolves it shows an em dash. Extra fret inputs do not reduce
   this percentage.
+- **Best streak:** the native highest combo of this run or practice attempt.
 - **Ghosts:** the game's live **Ghost Inputs** counter, which feeds the guitar
   results screen. This is separate from overstrums and drum ghost-note hits.
 
@@ -104,11 +126,12 @@ is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 
 ## First in-game check
 
-Compilation passed with no warnings, and all **29 portable logic checks passed**.
-Native hooks were traced in the supplied binary. The latest Windows log confirms
-practice selected sections 0 and 2 successfully. Version 0.2.1 replaces the
-unsupported background-drawing call; the repaired overlay worked in the user's Windows test. The 0.2.2 input-restoration change needs a new test.
-
+Version 0.3.0 compiles without warnings, and **37 portable logic checks pass**,
+including tempo changes, restoration, and protection against repeated speed
+compensation. The new GUI calls were checked against the supplied wrappers.
+`GUI.TextField` is an unstripping-failed stub, so numeric/color entry uses string
+controls with IMGUI keyboard events. Windows gameplay cannot be run in this
+Linux environment; the new features need the checks below.
 1. Hit some notes, intentionally miss a few, and press extra frets. Compare the
    final HUD counters against the guitar results screen.
 2. Tap R briefly: it should do nothing. Hold R: it should restart once. Keep
@@ -117,7 +140,12 @@ unsupported background-drawing call; the repaired overlay worked in the user's W
    from its beginning, verify the guitar responds immediately without a keyboard
    action, then check misses/ghosts across a practice restart.
 4. Use F8 to bind a spare guitar button and repeat the hold checks.
-5. Move the HUD to another corner and adjust opacity/text color. Restart the game
+5. Type an opacity and hex color, toggle individual lines, and move both HUDs.
+   Verify best streak survives a miss and resets with a new attempt. Check title,
+   artist, and charter against the song selection screen.
+6. Enable each highway/color option and turn it off to check restoration.
+7. Compare practice at 50%, 100%, and 150% with constant note speed on and off.
+8. Move the HUD to another corner and adjust opacity/text color. Restart the game
    and confirm those settings were retained.
 
 If the HUD is wrong, an action fails, or the mod disables itself, attach

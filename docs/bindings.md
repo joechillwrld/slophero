@@ -146,3 +146,44 @@ sequence through step 4 and logs the practice player's inputEnabled state.
 It uses the game's routine rather than writing player input flags directly.
 The existing scene and renderer readiness checks still apply. Compilation was
 verified; automatic guitar input restoration needs the user's Windows test.
+
+
+## 0.3.0 feature bindings
+
+- Best streak: native engine offset `0x98`, generated `field_Public_Int32_5`.
+  The results snapshot copies it into `0x20` (factory RVA `0x20F3DC0`), which
+  PlayerStatsBox reads for “Best Streak”. Read the native value rather than
+  sampling the current combo, which could lose a peak between refreshes.
+- Song metadata: `SongEntry.Name_StrippedTags`, `Artist_StrippedTags`, and
+  `Charter_StrippedTags`; chart title uses Name rather than the chart filename.
+- Highway sides: `TrackSidebarColoring.field_Private_SpriteRenderer_0`.
+  Strings: renderers beneath `BaseNeckController.fretStrings`. Beatlines:
+  `BeatRenderer.field_Protected_Il2CppReferenceArray_1_SpriteRenderer_0`.
+  Leave components/game objects active, particularly the practice beat renderer.
+- FC rings: sprites beneath `BasePlayer.FCIndicator`; guitar ghost-input count
+  distinguishes zero-ghost perfect FC from regular FC. This does not turn the
+  ring on after a miss. RGB overrides preserve native alpha and visibility.
+- Score text: `ScoreManager.scoreFont/comboFont` sprite renderers and
+  `BasePlayer.AccuracyText`. Stars: `StarProgress.starCount`. Star progress:
+  `progressBar/progressBarEnd`. Song progress: `SongProgress.barTransform/endTransform`.
+- Practice compensation uses `GameManager.practiceSpeed`, a tempo ratio (native
+  restart telemetry multiplies it by 100 for `songSpeed`, RVA `0xBFDB9`).
+  `GuitarNoteRenderer.noteSpeed` is initialized from the profile at `0x1162A0A`.
+  Its cached horizon uses `(noteZPosFarLimit - strikeLine) / noteSpeed`
+  (`BaseNoteRenderer.Start`, RVA `0x1162980`). Beat positions multiply chart-time
+  difference by speed at offset `0x68` (`0x26E8BD`); highway texture scrolling
+  uses offset `0x50` (`0x38194D`). Divide these rendering speeds by tempo,
+  maintaining separate baselines and restoring them when disabled. Audio and
+  engine timing are unchanged. No Windows runtime validation yet.
+- All supplied `GUI.TextField` overloads reach an unstripping-failed
+  `GUI.DoTextField` stub. The editor uses native string `GUI.Box/Button/Label`
+  and `Event` character/key input. Audited character/key/control/rawType getters,
+  GUIStyle font/wordWrap setters, and clipboard getter contain no reachable
+  unstripping-failed wrapper stubs. Source inspection does not establish runtime
+  compatibility, so keyboard/color editing still needs an in-game test.
+
+- CoreModule audit also found throwing generic overloads for
+  `Component.GetComponentInChildren<T>(bool)` and `Object.FindObjectsOfType<T>(bool)`.
+  Use the available `GameObject.GetComponentInChildren<T>(bool)` and active-object
+  `Object.FindObjectsOfType<T>()` paths instead. Child renderer collection overloads
+  used by the mod and native renderer color/visibility properties pass this audit.

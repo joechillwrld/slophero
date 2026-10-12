@@ -1,0 +1,238 @@
+using System.Globalization;
+using MelonLoader;
+using SlopHero.Core;
+using UnityEngine;
+
+namespace SlopHero.Mod;
+
+public sealed partial class Core
+{
+    private MelonPreferences_Entry<bool> showMisses = null!, showHit = null!, showGhosts = null!, showBest = null!;
+    private MelonPreferences_Entry<bool> showSong = null!, showTitle = null!, showArtist = null!, showCharter = null!;
+    private MelonPreferences_Entry<int> songX = null!, songY = null!, songFont = null!;
+    private MelonPreferences_Entry<float> songOpacity = null!;
+    private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!;
+    private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
+    private readonly VisualOverrides visuals = new();
+    private string songText = "", editText = "", editLabel = "", editError = "";
+    private Action<string>? editApply;
+    private bool replaceEdit, moveSong;
+    private int settingsPage;
+    private GUIStyle? songStyle;
+
+    private void InitializeFeatures()
+    {
+        showMisses = preferences.CreateEntry("ShowMisses", true);
+        showHit = preferences.CreateEntry("ShowHitPercentage", true);
+        showGhosts = preferences.CreateEntry("ShowGhosts", true);
+        showBest = preferences.CreateEntry("ShowBestStreak", true);
+        showSong = preferences.CreateEntry("ShowSongHud", true);
+        showTitle = preferences.CreateEntry("ShowSongTitle", true);
+        showArtist = preferences.CreateEntry("ShowArtist", true);
+        showCharter = preferences.CreateEntry("ShowCharter", true);
+        songX = preferences.CreateEntry("SongHudX", 400);
+        songY = preferences.CreateEntry("SongHudY", 110);
+        songFont = preferences.CreateEntry("SongFontSize", 22);
+        songOpacity = preferences.CreateEntry("SongBackgroundOpacity", .65f);
+        songColor = preferences.CreateEntry("SongTextColor", "FFFFFF");
+        hideSides = preferences.CreateEntry("HideHighwaySides", false);
+        hideStrings = preferences.CreateEntry("HideFretStrings", false);
+        hideBeats = preferences.CreateEntry("HideBeatlines", false);
+        tintFc = preferences.CreateEntry("CustomizeFcRings", false);
+        tintScore = preferences.CreateEntry("CustomizeScoreColors", false);
+        lockSpeed = preferences.CreateEntry("ConstantPracticeNoteSpeed", false);
+        fcColor = preferences.CreateEntry("FcColor", "FFD700");
+        pfcColor = preferences.CreateEntry("PerfectFcColor", "00FFFF");
+        songProgressColor = preferences.CreateEntry("SongProgressColor", "00FFFF");
+        starColor = preferences.CreateEntry("StarColor", "FFD700");
+        progressColor = preferences.CreateEntry("ProgressColor", "00FFFF");
+        scoreColor = preferences.CreateEntry("ScoreTextColor", "FFFFFF");
+    }
+
+    private void DrawSettings()
+    {
+        if (editApply != null) { DrawValueEditor(); return; }
+        float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.3.0 — F8 / Escape to close");
+        string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors" };
+        for (int i = 0; i < pages.Length; i++)
+            if (GUI.Button(new Rect(x + 12 + i * 112, y + 32, 108, 30), pages[i])) settingsPage = i;
+        x += 20; y += 80;
+        GUI.Label(new Rect(x, y, 540, 25), "Pause before editing. Click a value to type; Enter applies, Escape cancels.");
+        y += 34;
+        switch (settingsPage)
+        {
+            case 0:
+                if (GUI.Button(new Rect(x, y, 540, 34), $"Restart: {restartButton.Value} — bind")) capture = "restart";
+                if (GUI.Button(new Rect(x, y + 44, 540, 34), $"Practice: {practiceButton.Value} — bind")) capture = "practice";
+                Number("Hold duration (seconds)", (float)Duration, x, y + 94, .25f, 3, v => holdSeconds.Value = v);
+                GUI.Label(new Rect(x, y + 150, 540, 70), capture == null ? "Song actions apply to solo Quickplay.\nPractice begins at the start of your current named section." : $"Press a key or controller button for {capture}.");
+                break;
+            case 1:
+                Toggle(showHud, "Counter HUD", x, y); Toggle(showMisses, "Misses", x, y + 40);
+                Toggle(showHit, "Hit percentage", x, y + 80); Toggle(showGhosts, "Ghost inputs", x, y + 120);
+                Toggle(showBest, "Best streak", x, y + 160);
+                Appearance(x, y + 208, false);
+                break;
+            case 2:
+                Toggle(showSong, "Song HUD", x, y); Toggle(showTitle, "Chart title", x, y + 40);
+                Toggle(showArtist, "Artist", x, y + 80); Toggle(showCharter, "Charter", x, y + 120);
+                Appearance(x, y + 170, true);
+                break;
+            case 3:
+                Toggle(hideSides, "Hide highway sides", x, y); Toggle(hideStrings, "Hide fret strings", x, y + 40);
+                Toggle(hideBeats, "Hide beatlines", x, y + 80);
+                Toggle(lockSpeed, "Constant practice note speed (experimental)", x, y + 130);
+                GUI.Label(new Rect(x, y + 180, 540, 100), "Visual changes preserve gameplay and note timing.\nPractice speed compensation applies only in practice.\nTurn an option off to restore its normal appearance.");
+                break;
+            case 4:
+                Toggle(tintFc, "Custom FC / perfect FC rings", x, y);
+                Hex(fcColor, "FC ring", x, y + 44); Hex(pfcColor, "Perfect FC ring", x, y + 86);
+                Toggle(tintScore, "Custom score colors", x, y + 132);
+                Hex(starColor, "Stars", x, y + 176); Hex(progressColor, "Star progress bar", x, y + 218);
+                Hex(scoreColor, "Score / accuracy text", x, y + 260);
+                Hex(songProgressColor, "Song progress bar", x, y + 302);
+                break;
+        }
+        if (editApply != null) DrawValueEditor();
+    }
+
+    private void Toggle(MelonPreferences_Entry<bool> entry, string label, float x, float y)
+    {
+        if (GUI.Button(new Rect(x, y, 540, 32), $"{label}: {(entry.Value ? "On" : "Off")}"))
+        { entry.Value = !entry.Value; preferencesDirty = true; nextStats = 0; }
+    }
+
+    private void Appearance(float x, float y, bool song)
+    {
+        var size = song ? songFont : fontSize;
+        var opacity = song ? songOpacity : backgroundOpacity;
+        Number("Font size", size.Value, x, y, 14, 48, v => size.Value = (int)Math.Round(v));
+        Number("Background opacity (%)", HudLayout.Unit(opacity.Value) * 100, x, y + 40, 0, 100, v => opacity.Value = v / 100);
+        if (song) Hex(songColor, "Text color", x, y + 80);
+        else
+        {
+            string hex = ColorHex(new Color(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value)));
+            if (GUI.Button(new Rect(x, y + 80, 540, 32), "Text color: #" + hex))
+                Edit("Text color (#RRGGBB)", hex, s => { var c = ParseColor(s); textRed.Value = c.r; textGreen.Value = c.g; textBlue.Value = c.b; });
+        }
+        if (GUI.Button(new Rect(x, y + 126, 265, 32), "Move this HUD"))
+        {
+            moveSong = song; moveHud = true; settingsOpen = false; capture = null; UpdateCursor();
+            restartHold.RequireRelease(); practiceHold.RequireRelease();
+        }
+        if (GUI.Button(new Rect(x + 275, y + 126, 265, 32), "Reset position"))
+        { if (song) { songX.Value = 400; songY.Value = 110; } else { hudX.Value = 24; hudY.Value = 110; } preferencesDirty = true; }
+        Number("Position X", song ? songX.Value : hudX.Value, x, y + 166, 0, Screen.width, v => { if (song) songX.Value = (int)v; else hudX.Value = (int)v; });
+        Number("Position Y", song ? songY.Value : hudY.Value, x, y + 206, 0, Screen.height, v => { if (song) songY.Value = (int)v; else hudY.Value = (int)v; });
+    }
+
+    private void Number(string label, float value, float x, float y, float min, float max, Action<float> apply)
+    {
+        if (GUI.Button(new Rect(x, y, 540, 32), label + ": " + value.ToString("0.##", CultureInfo.InvariantCulture)))
+            Edit($"{label} ({min}–{max})", value.ToString("0.##", CultureInfo.InvariantCulture), s => {
+                if (!float.TryParse(s.Trim().TrimEnd('%'), NumberStyles.Float, CultureInfo.InvariantCulture, out float n) || !float.IsFinite(n)) throw new FormatException("Enter a number.");
+                apply(Math.Clamp(n, min, max));
+            });
+    }
+
+    private void Hex(MelonPreferences_Entry<string> entry, string label, float x, float y)
+    {
+        if (GUI.Button(new Rect(x, y, 540, 32), label + ": #" + entry.Value))
+            Edit(label + " (#RRGGBB)", entry.Value, s => entry.Value = ColorHex(ParseColor(s)));
+    }
+    internal static Color ParseColor(string s)
+    {
+        s = s.Trim().TrimStart('#');
+        if (s.Length != 6 || !uint.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint n)) throw new FormatException("Use six hex digits, e.g. FF8800.");
+        return new Color(((n >> 16) & 255) / 255f, ((n >> 8) & 255) / 255f, (n & 255) / 255f, 1);
+    }
+    private static string ColorHex(Color c) => $"{(int)Math.Round(c.r * 255):X2}{(int)Math.Round(c.g * 255):X2}{(int)Math.Round(c.b * 255):X2}";
+    private void Edit(string label, string value, Action<string> apply)
+    { editLabel = label; editText = value; editApply = apply; replaceEdit = true; editError = ""; capture = null; }
+
+    private void DrawValueEditor()
+    {
+        // GUI.TextField/DoTextField is a throwing generated stub in this build.
+        // Use native string controls and IMGUI keyboard events instead.
+        float x = Math.Max(10, (Screen.width - 500) / 2f), y = Math.Max(10, (Screen.height - 190) / 2f);
+        GUI.Box(new Rect(x, y, 500, 190), editLabel);
+        GUI.Box(new Rect(x + 20, y + 40, 460, 34), editText + "|");
+        GUI.Label(new Rect(x + 20, y + 82, 460, 28), editError.Length == 0 ? "Type to replace. Ctrl+A selects all; Ctrl+V pastes." : editError);
+        bool apply = GUI.Button(new Rect(x + 20, y + 126, 220, 32), "Apply"), cancel = GUI.Button(new Rect(x + 260, y + 126, 220, 32), "Cancel");
+        var e = Event.current;
+        if (e.type == EventType.KeyDown)
+        {
+            if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter) apply = true;
+            else if (e.keyCode == KeyCode.Escape) cancel = true;
+            else if (e.control && e.keyCode == KeyCode.A) replaceEdit = true;
+            else if (e.control && e.keyCode == KeyCode.V)
+            { string paste = GUIUtility.systemCopyBuffer ?? ""; editText = (replaceEdit ? "" : editText) + paste; editText = editText[..Math.Min(editText.Length, 40)]; replaceEdit = false; }
+            else if (e.keyCode == KeyCode.Backspace) { editText = replaceEdit ? "" : editText.Length > 0 ? editText[..^1] : ""; replaceEdit = false; }
+            else if (!char.IsControl(e.character) && e.character != '\0' && editText.Length < 40)
+            { if (replaceEdit) editText = ""; replaceEdit = false; editText += e.character; }
+            e.Use();
+        }
+        if (cancel) editApply = null;
+        else if (apply) try { editApply!(editText); editApply = null; preferencesDirty = true; SavePreferences(); }
+            catch (FormatException ex) { editError = ex.Message; }
+    }
+
+    private void DrawSongHud(bool moving = false)
+    {
+        string text = songText.Length == 0 ? "Chart title\nArtist: Artist\nCharter: Charter" : songText;
+        songStyle ??= new GUIStyle(GUI.skin.label);
+        songStyle.fontSize = Math.Clamp(songFont.Value, 14, 48);
+        songStyle.wordWrap = true;
+        try { songStyle.normal.textColor = ParseColor(songColor.Value); } catch (FormatException) { songStyle.normal.textColor = Color.white; }
+        int width = Math.Min(520, Screen.width);
+        int charsPerLine = Math.Max(8, (int)((width - 24) / (songStyle.fontSize * .6f)));
+        int lineCount = text.Split('\n').Sum(line => Math.Max(1, (line.Length + charsPerLine - 1) / charsPerLine));
+        int height = (int)(songStyle.fontSize * 1.35f) * lineCount + 20;
+        var p = HudLayout.ClampPosition(songX.Value, songY.Value, width, height, Screen.width, Screen.height);
+        var rect = new Rect(p.X, p.Y, width, height);
+        hudBackgroundStyle ??= new GUIStyle(GUI.skin.label);
+        hudBackgroundStyle.normal.background = Texture2D.whiteTexture;
+        var old = GUI.backgroundColor;
+        try { GUI.backgroundColor = new Color(0, 0, 0, HudLayout.Unit(songOpacity.Value, .65f)); GUI.Box(rect, "", hudBackgroundStyle); }
+        finally { GUI.backgroundColor = old; }
+        GUI.Label(new Rect(rect.x + 12, rect.y + 8, width - 24, height - 16), text, songStyle);
+        if (!moving) return;
+        var e = Event.current;
+        if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
+        { hudDragging = true; dragOffset = e.mousePosition - new Vector2(rect.x, rect.y); e.Use(); }
+        if (hudDragging && e.type == EventType.MouseDrag)
+        {
+            var n = HudLayout.ClampPosition((int)(e.mousePosition.x - dragOffset.x), (int)(e.mousePosition.y - dragOffset.y), width, height, Screen.width, Screen.height);
+            songX.Value = n.X; songY.Value = n.Y; preferencesDirty = true; e.Use();
+        }
+    }
+    private bool songRenderError;
+    private void DrawSongHudSafely()
+    {
+        if (songRenderError) return;
+        try { DrawSongHud(); }
+        catch (Exception ex) { songRenderError = true; LoggerInstance.Error($"Song HUD stopped after a rendering error: {ex}"); }
+    }
+
+    private bool visualError;
+    public override void OnLateUpdate()
+    {
+        if (!compatible || !gameplay || !gameplayInitialized || transition || visualError) return;
+        var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
+        if (game == null || !game.songLoaded || !game.playersInit || game.globalVariables == null) return;
+        try
+        {
+            Color Read(MelonPreferences_Entry<string> e) { try { return ParseColor(e.Value); } catch (FormatException) { return Color.white; } }
+            visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value, tintFc.Value, Read(fcColor), Read(pfcColor),
+                tintScore.Value, Read(starColor), Read(progressColor), Read(scoreColor), Read(songProgressColor), lockSpeed.Value);
+        }
+        catch (Exception ex)
+        {
+            visualError = true;
+            LoggerInstance.Error($"Visual overrides paused after an error; counters and controls remain available: {ex}");
+            Notice("Visual overrides stopped after an error. Send Latest.log.");
+        }
+    }
+
+}
