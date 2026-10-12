@@ -1,13 +1,13 @@
-# SlopHero 0.4.4 alpha
+# SlopHero 0.4.5 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.4 compensates for Clone Hero's practice tempo scaling, using the
+**Version 0.4.5 corrects the practice speed adjustment direction, using the
 current configured note speed at any profile value.**
 
 ## Install
 
-[Download v0.4.4 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.4-alpha.zip?raw=true)
+[Download v0.4.5 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.5-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -90,12 +90,12 @@ renderer before it was ready. A section-selection error now leaves the HUD
 running and lets you choose a section manually instead of disabling the mod. Before the
 first named section, it leaves the song alone and displays a notice.
 
-## 0.4.4 practice tempo correction
+## 0.4.5 practice tempo correction
 
-The constant practice speed option now divides each live configured profile
-speed by the current practice tempo, countering Clone Hero's own tempo scaling.
-This supports any valid configured note speed. Visibility windows adjust with
-the compensated renderer speed to preserve the same visible range.
+The constant practice speed option now scales each live configured profile
+speed by the current practice tempo. This supports any valid configured note
+speed. Visibility windows adjust with the compensated renderer speed to
+preserve the same visible range.
 
 ## 0.4.2 full-song speed reset
 
