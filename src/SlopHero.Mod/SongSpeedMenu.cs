@@ -42,7 +42,7 @@ public sealed partial class Core
         if (GUI.Button(new Rect(x + 184, y + 66, 70, 30), "−")) AdjustSongSpeed(-1);
         if (GUI.Button(new Rect(x + 260, y + 66, 75, 30), "+")) AdjustSongSpeed(1);
         GUI.Label(new Rect(x + 12, y + 100, 323, 22), songSpeedError.Length == 0
-            ? $"Current: {liveSpeed}%  ·  Enter 1–1000, then Apply or use ±."
+            ? $"Current: {liveSpeed}%  ·  Enter 1–5000, then Apply or use ±."
             : songSpeedError);
     }
 
@@ -50,7 +50,7 @@ public sealed partial class Core
     {
         if (!SongSpeedControl.TryParsePercent(songSpeedInput, out int speed))
         {
-            songSpeedError = "Enter a whole percent from 1 to 1000.";
+            songSpeedError = "Enter a whole percent from 1 to 5000.";
             return;
         }
         songSpeedInputDirty = true;
@@ -66,7 +66,7 @@ public sealed partial class Core
         songSpeedStepInput = step.ToString(System.Globalization.CultureInfo.InvariantCulture);
         if (!SongSpeedControl.TryParsePercent(songSpeedInput, out int speed)
             && !SongSpeedControl.TryRead(out speed)) return;
-        int adjusted = Math.Clamp(speed + direction * step, 1, 1000);
+        int adjusted = Math.Clamp(speed + direction * step, 1, 5000);
         songSpeedInput = adjusted.ToString(System.Globalization.CultureInfo.InvariantCulture);
         songSpeedInputDirty = true;
         songSpeedError = SongSpeedControl.TryWrite(adjusted) ? "" : "The game did not accept that speed value.";

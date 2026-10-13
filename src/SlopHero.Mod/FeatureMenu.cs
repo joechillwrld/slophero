@@ -97,7 +97,7 @@ public sealed partial class Core
     private void DrawScaledSettingsPage(float scale)
     {
         float x = Math.Max(10, (Screen.width / scale - 680) / 2f), y = Math.Max(10, (Screen.height / scale - 660) / 2f);
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.21 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.22 — F8 / Escape to close");
         float tabWidth = 656f / SettingsPages.Length;
         for (int i = 0; i < SettingsPages.Length; i++)
         {

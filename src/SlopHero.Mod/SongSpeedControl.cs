@@ -10,7 +10,7 @@ internal static class SongSpeedControl
     private const int SongOptionsSelectionOffset = 0x19C;
     private const int SpeedValueOffset = 0x10;
     private const int MinimumSpeed = 1;
-    private const int MaximumSpeed = 1000;
+    private const int MaximumSpeed = 5000;
     private const string SettingsClass = "ʹʺʽˁʽˁˀʼʶʷʼ";
     private const string SpeedSettingField = "ʳʷʴʺʳʹʷʾʲʷʾ";
     private const string UpdateValueMethod = "ʸʾʵʽʳʾʾʻʷʲʽ";

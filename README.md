@@ -1,8 +1,8 @@
-# SlopHero 0.4.21 alpha
+# SlopHero 0.4.22 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.21 adds a pre-song speed editor with direct percentage entry and a configurable step size.** Version 0.4.20 adds a larger, resizable settings panel, scaling controls for selected game HUD groups, and star-progress coloring that follows the live fill fraction. It removes the barely visible menu-theme selector. Version 0.4.19 restores standard navigation buttons and gives the open profile list more breathing room. Version 0.4.18 added a profile dropdown with per-profile rename controls.
+**Version 0.4.22 raises the pre-song speed editor's limit to the game's 5000% ceiling.** Version 0.4.21 adds direct percentage entry and a configurable step size. Version 0.4.20 adds a larger, resizable settings panel, scaling controls for selected game HUD groups, and star-progress coloring that follows the live fill fraction. It removes the barely visible menu-theme selector. Version 0.4.19 restores standard navigation buttons and gives the open profile list more breathing room. Version 0.4.18 added a profile dropdown with per-profile rename controls.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.21 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.21-alpha.zip?raw=true)
+[Download v0.4.22 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.22-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -42,7 +42,7 @@ are needed. Remove `Mods/SlopHero.dll` to uninstall. Preferences can remain.
 Pause the game before editing settings. Press **F8** for the settings panel.
 
 On the pre-song menu, highlight **Song Speed** to open SlopHero's editor. Enter
-any whole percentage from 1 to 1000 and apply it, or set a step size and use the
+any whole percentage from 1 to 5000 and apply it, or set a step size and use the
 minus/plus buttons to change speed by that amount. The default step is 5%.
 
 F8 has seven pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, and **Profiles**.
@@ -223,11 +223,15 @@ themes now tint only the active tab, using restrained Ocean, Sage, and Amber
 accents. The profile dropdown shows four rows per page to leave more room for
 the controls and status below it.
 
+## 0.4.22 pre-song speed range
+
+Raised the editor's maximum from 1000% to the game's normal 5000% ceiling.
+
 ## 0.4.21 pre-song speed editing
 
 When the pre-song **Song Speed** option is highlighted, SlopHero shows an editor
 for the game's profile speed setting. Enter and apply a whole percentage from 1
-to 1000, or use the minus/plus buttons with a configurable step size (5% by
+to 5000, or use the minus/plus buttons with a configurable step size (5% by
 default). Writes go through the game's setting update method so native setting
 callbacks run. The editor is only shown while that option is selected.
 
