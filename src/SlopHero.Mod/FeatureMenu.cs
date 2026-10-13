@@ -108,7 +108,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.31 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.32 — F8 / Escape to close");
         float tabWidth = 656f / SettingsPages.Length;
         for (int i = 0; i < SettingsPages.Length; i++)
         {
@@ -141,7 +141,7 @@ public sealed partial class Core
                             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
                             || songProgressHudScale.Value != 1 || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                         SongSpeedControl.TryRead(out int speedSetting);
-                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(score/input/SP/song/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{songProgressHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(score/input/SP/song/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{songProgressHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                         timings.Start();
                     }
                     else Notice("Start a song before capturing mod timings.");
@@ -607,11 +607,27 @@ public sealed partial class Core
         if (!compatible || !gameplay || !gameplayInitialized || transition) return;
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
         if (game == null || !game.songLoaded || !game.playersInit || game.globalVariables == null) return;
+        double now = clock.Elapsed.TotalSeconds;
         bool nativeHudRequested = nativeMoveTarget != 0 || practiceHudX.Value != 0 || practiceHudY.Value != 0
             || fpsHudX.Value != 0 || fpsHudY.Value != 0 || customizeFpsColor.Value
             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
             || songProgressHudScale.Value != 1 || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
-        if (!nativeHudError && (nativeHudRequested || nativeHudActive))
+        bool nativeHudPending = !nativeHudError && (nativeHudRequested || nativeHudActive);
+        bool visualRequested = hideSides.Value || hideStrings.Value || hideBeats.Value || tintScore.Value;
+        bool practiceSpeedRequested = lockSpeed.Value && game.globalVariables.isPracticeEnabled;
+        bool performanceRequested = disableHitParticles.Value || disableSustainParticles.Value || disableFretEffects.Value;
+        bool visualPending = !visualError && (visualRequested || practiceSpeedRequested || visuals.NeedsUpdate
+            || tintFc.Value || rings.NeedsUpdate || performanceRequested || performance.NeedsUpdate);
+        if (!nativeHudPending && !visualPending) return;
+
+        // The visual internals already refresh at 5–20 Hz. Entering them at
+        // Clone Hero's unlocked Update rate (2,300+ calls/sec in the latest
+        // capture) only repeated their cheap deadline checks. Keep the outer
+        // dispatcher at 20 Hz, matching the practice clock sampler's rate.
+        if (now < nextOverridePass) return;
+        nextOverridePass = now + .05;
+
+        if (nativeHudPending)
         {
             try
             {
@@ -621,7 +637,7 @@ public sealed partial class Core
                     practiceHudX.Value, practiceHudY.Value, fpsHudX.Value, fpsHudY.Value,
                     customizeFpsColor.Value, fpsTint, scoreHudScale.Value, inputViewerScale.Value,
                     starPowerHudScale.Value, songProgressHudScale.Value, practiceHudScale.Value,
-                    fpsHudScale.Value, clock.Elapsed.TotalSeconds);
+                    fpsHudScale.Value, now);
                 nativeHudActive = nativeHudRequested;
             }
             catch (Exception ex)
@@ -635,18 +651,11 @@ public sealed partial class Core
                 }
             }
         }
-        if (visualError) return;
-        // Once the one-time full-song speed reconciliation is complete, skip
-        // the IL2CPP callback entirely when every optional override is idle.
-        bool visualRequested = hideSides.Value || hideStrings.Value || hideBeats.Value || tintScore.Value;
-        bool practiceSpeedRequested = lockSpeed.Value && game.globalVariables.isPracticeEnabled;
-        bool performanceRequested = disableHitParticles.Value || disableSustainParticles.Value || disableFretEffects.Value;
-        if (!visualRequested && !practiceSpeedRequested && !visuals.NeedsUpdate && !tintFc.Value && !rings.NeedsUpdate
-            && !performanceRequested && !performance.NeedsUpdate) return;
+        if (!visualPending) return;
         try
         {
             performance.Apply(game, disableHitParticles.Value, disableSustainParticles.Value,
-                disableFretEffects.Value, clock.Elapsed.TotalSeconds);
+                disableFretEffects.Value, now);
             Color Read(MelonPreferences_Entry<string> e)
             {
                 if (parsedColors.TryGetValue(e.Value, out var cached)) return cached;
@@ -662,7 +671,7 @@ public sealed partial class Core
             long visualTiming = timings.Begin();
             visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value,
                 tintScore.Value, Read(starColor), Read(progressColor), Read(scoreColor), Read(songProgressColor), lockSpeed.Value,
-                clock.Elapsed.TotalSeconds, timings);
+                now, timings);
             timings.End(2, visualTiming);
         }
         catch (Exception ex)

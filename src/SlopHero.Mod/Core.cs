@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.31", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.32", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -39,7 +39,7 @@ public sealed partial class Core : MelonMod
     private string? capture;
     private string status = "Starting...", statsText = "";
     private string practiceWaitState = "";
-    private double nextStats, transitionStarted, noticeUntil;
+    private double nextStats, nextOverridePass, transitionStarted, noticeUntil;
     private int? pendingSection;
     private IntPtr pendingSong;
     private IntPtr sourceManager;
@@ -102,6 +102,7 @@ public sealed partial class Core : MelonMod
         rings.Clear();
         visualError = false;
         nextStats = 0;
+        nextOverridePass = 0;
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
         if (!gameplay && sceneName != "Loading") pendingSection = null;
