@@ -8,6 +8,10 @@ namespace SlopHero.Mod;
 /// <summary>Applies saved offsets to Clone Hero's practice and FPS HUDs.</summary>
 internal sealed class NativeHudLayout
 {
+    private readonly Dictionary<IntPtr, (Transform Transform, Vector3 Original, int Kind)> resized = new();
+    private InputViewer[]? inputViewers;
+    private SPBar[]? spBars;
+    private SongProgress[]? songProgress;
     private RectTransform? practiceRect, fpsRect;
     private IntPtr practicePointer, fpsPointer;
     private Vector2 practiceOriginal, fpsOriginal;
@@ -18,29 +22,39 @@ internal sealed class NativeHudLayout
     private bool lastPracticeEnabled, lastFpsTint;
     private Color lastFpsColor;
     private double nextProbe;
+    private double nextScaleProbe;
+    private float oldScoreScale = float.NaN, oldInputScale = float.NaN, oldSpScale = float.NaN, oldSongProgressScale = float.NaN, oldPracticeScale = float.NaN, oldFpsScale = float.NaN;
 
     public void Clear()
     {
+        RestoreScales();
         RestorePractice();
         RestoreFps();
         practiceRect = fpsRect = null;
         practicePointer = fpsPointer = IntPtr.Zero;
+        inputViewers = null;
+        spBars = null;
+        songProgress = null;
         fpsGraphics = Array.Empty<Graphic>();
         fpsOriginalColors = Array.Empty<Color>();
         lastPracticeX = lastPracticeY = lastFpsX = lastFpsY = float.NaN;
         lastPracticeEnabled = lastFpsTint = false;
         nextProbe = 0;
+        nextScaleProbe = 0;
     }
 
     public void Apply(GameManager game, bool practiceEnabled,
         float practiceX, float practiceY, float fpsX, float fpsY,
-        bool tintFps, Color fpsColor, double realtime)
+        bool tintFps, Color fpsColor, float scoreScale, float inputScale, float spScale,
+        float songProgressScale, float practiceScale, float fpsScale, double realtime)
     {
         bool changed = practiceEnabled != lastPracticeEnabled
             || practiceX != lastPracticeX || practiceY != lastPracticeY
             || fpsX != lastFpsX || fpsY != lastFpsY
             || tintFps != lastFpsTint || fpsColor != lastFpsColor;
-        if (!changed && realtime < nextProbe) return;
+        bool scaleChanged = scoreScale != oldScoreScale || inputScale != oldInputScale || spScale != oldSpScale
+            || songProgressScale != oldSongProgressScale || practiceScale != oldPracticeScale || fpsScale != oldFpsScale;
+        if (!changed && !scaleChanged && realtime < nextProbe && realtime < nextScaleProbe) return;
         nextProbe = realtime + .25;
 
         var fpsObject = game.FPSText;
@@ -73,6 +87,7 @@ internal sealed class NativeHudLayout
         else RestorePractice();
 
         ApplyPosition(fpsRect, fpsOriginal, fpsX, fpsY, ref lastFpsX, ref lastFpsY);
+        ApplyHudScales(game, scoreScale, inputScale, spScale, songProgressScale, practiceScale, fpsScale, realtime, scaleChanged);
         if (tintFps != lastFpsTint || fpsColor != lastFpsColor || nextFps?.Pointer != fpsPointer)
         {
             ApplyFpsColor(tintFps, fpsColor);
@@ -85,6 +100,72 @@ internal sealed class NativeHudLayout
         lastPracticeY = practiceY;
         lastFpsX = fpsX;
         lastFpsY = fpsY;
+    }
+
+    private void ApplyHudScales(GameManager game, float scoreScale, float inputScale, float spScale,
+        float songProgressScale, float practiceScale, float fpsScale, double realtime, bool changed)
+    {
+        bool enabled = scoreScale != 1 || inputScale != 1 || spScale != 1 || songProgressScale != 1 || practiceScale != 1 || fpsScale != 1;
+        if (!changed && (!enabled || realtime < nextScaleProbe)) return;
+        nextScaleProbe = realtime + .5;
+        if (changed && (!enabled || scoreScale == 1)) RestoreKind(game.scoreManager?.transform);
+        if (scoreScale != 1) Scale(game.scoreManager?.transform, scoreScale, 1);
+        if (inputScale != 1)
+        {
+            inputViewers ??= UnityEngine.Object.FindObjectsOfType<InputViewer>();
+            foreach (var viewer in inputViewers) if (viewer != null) Scale(viewer.transform, inputScale, 2);
+        }
+        else RestoreKind(typeof(InputViewer));
+        if (spScale != 1)
+        {
+            spBars ??= UnityEngine.Object.FindObjectsOfType<SPBar>();
+            foreach (var bar in spBars) if (bar != null) Scale(bar.transform, spScale, 3);
+        }
+        else RestoreKind(typeof(SPBar));
+        if (songProgressScale != 1)
+        {
+            songProgress ??= UnityEngine.Object.FindObjectsOfType<SongProgress>();
+            foreach (var bar in songProgress) if (bar != null) Scale(bar.transform, songProgressScale, 4);
+        }
+        else RestoreKind(typeof(SongProgress));
+        if (practiceScale != 1) Scale(practiceRect, practiceScale, 5); else RestoreKind(practiceRect);
+        if (fpsScale != 1) Scale(fpsRect, fpsScale, 6); else RestoreKind(fpsRect);
+        oldScoreScale = scoreScale; oldInputScale = inputScale; oldSpScale = spScale;
+        oldSongProgressScale = songProgressScale; oldPracticeScale = practiceScale; oldFpsScale = fpsScale;
+    }
+
+    private void Scale(Transform? transform, float factor, int kind)
+    {
+        if (transform == null) return;
+        if (!resized.TryGetValue(transform.Pointer, out var state))
+            resized[transform.Pointer] = state = (transform, transform.localScale, kind);
+        var target = state.Original * Math.Clamp(factor, .5f, 2.5f);
+        if (transform.localScale != target) transform.localScale = target;
+    }
+
+    private void RestoreKind(Transform? transform)
+    {
+        if (transform == null) return;
+        if (resized.Remove(transform.Pointer, out var state) && state.Transform != null) state.Transform.localScale = state.Original;
+    }
+
+    private void RestoreKind(Type componentType)
+    {
+        foreach (var pair in resized.ToArray())
+        {
+            if (pair.Value.Transform == null) { resized.Remove(pair.Key); continue; }
+            int kind = componentType == typeof(InputViewer) ? 2 : componentType == typeof(SPBar) ? 3 : componentType == typeof(SongProgress) ? 4 : 0;
+            if (pair.Value.Kind != kind) continue;
+            pair.Value.Transform.localScale = pair.Value.Original;
+            resized.Remove(pair.Key);
+        }
+    }
+
+    private void RestoreScales()
+    {
+        foreach (var pair in resized.Values) if (pair.Transform != null) pair.Transform.localScale = pair.Original;
+        resized.Clear();
+        oldScoreScale = oldInputScale = oldSpScale = oldSongProgressScale = oldPracticeScale = oldFpsScale = float.NaN;
     }
 
     public bool TryGetScreenRect(int target, out Rect rect)

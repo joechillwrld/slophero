@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.19", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.21", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -89,6 +89,7 @@ public sealed partial class Core : MelonMod
 
     public override void OnSceneWasLoaded(int buildIndex, string sceneName)
     {
+        SongSpeedControl.ResetMenuCache();
         gameplayInitialized = false;
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
@@ -118,6 +119,7 @@ public sealed partial class Core : MelonMod
 
     public override void OnSceneWasUnloaded(int buildIndex, string sceneName)
     {
+        SongSpeedControl.ResetMenuCache();
         if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; }
         settingsOpen = moveHud = hudDragging = false;
         nativeMoveTarget = 0;
@@ -384,9 +386,10 @@ public sealed partial class Core : MelonMod
 
     public override void OnGUI()
     {
+        bool speedMenuVisible = !gameplay && !settingsOpen && !moveHud && SongSpeedControl.IsSpeedOptionOpen();
         // Passive HUDs need only the repaint event. Keep full event processing
         // while editing so sliders, typing, and dragging remain responsive.
-        if (!settingsOpen && !moveHud && Event.current.type != EventType.Repaint) return;
+        if (!settingsOpen && !moveHud && !speedMenuVisible && Event.current.type != EventType.Repaint) return;
         long timingStart = timings.Begin();
         Color previousColor = GUI.color;
         GUI.color = Color.white;
@@ -423,6 +426,7 @@ public sealed partial class Core : MelonMod
             if (moveHud && nativeMoveTarget == 0)
                 GUI.Box(new Rect(20, Screen.height - 110, Math.Max(300, Screen.width - 40), 44),
                     "Drag the HUD anywhere. F8 returns to settings; Escape finishes. Position saves when released.");
+            if (speedMenuVisible) DrawSongSpeedMenu();
             if (settingsOpen)
             {
                 try { DrawSettings(); }
