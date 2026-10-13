@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.28", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.29", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -234,7 +234,9 @@ public sealed partial class Core : MelonMod
             }
             if (now >= nextStats)
             {
-                if (!showHud.Value && !showSong.Value && !moveHud)
+                bool countersVisible = showHud.Value || (moveHud && !moveSong);
+                bool songVisible = showSong.Value || (moveHud && moveSong);
+                if (!countersVisible && !songVisible)
                 {
                     // With both mod HUDs hidden, there is nothing to sample or
                     // format. The song controls above still stay responsive.
@@ -242,34 +244,46 @@ public sealed partial class Core : MelonMod
                     nextStats = now + .2;
                     return;
                 }
-                // The HUD refreshes five times per second. Avoid walking the
-                // IL2CPP player array and casting its entries on every frame.
-                var player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled);
-                if (player == null || player.TryCast<GuitarPlayer>() == null || player.engine == null)
+                bool detailedCounters = countersVisible && (showMisses.Value || showHit.Value || showGhosts.Value);
+                bool streakVisible = countersVisible && showBest.Value;
+                if (detailedCounters || streakVisible)
                 {
-                    statsText = "";
-                    nextStats = now + .2;
-                    return;
+                    // Scan chart notes only for counter data that is actually
+                    // displayed. The song-info HUD doesn't depend on a player.
+                    var player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled);
+                    if (player == null || player.TryCast<GuitarPlayer>() == null || player.engine == null)
+                        statsText = "";
+                    else
+                    {
+                        if (player.engine.Pointer != statsEngine) statsEngine = player.engine.Pointer;
+                        LiveStats stats = detailedCounters ? statsReader.Read(player.engine, game) : default;
+                        var lines = new List<string>();
+                        if (showMisses.Value) lines.Add($"Misses: {stats.Misses}");
+                        if (showHit.Value)
+                        {
+                            string percentage = stats.HitPercentage?.ToString("0.00", CultureInfo.InvariantCulture) + "%";
+                            if (stats.HitPercentage == null) percentage = "—";
+                            lines.Add($"Hit: {percentage}");
+                        }
+                        if (showGhosts.Value) lines.Add($"Ghosts: {stats.GhostInputs}");
+                        if (showBest.Value) lines.Add($"Best streak: {player.engine.field_Public_Int32_5}");
+                        statsText = string.Join("\n", lines);
+                    }
                 }
-                if (player.engine.Pointer != statsEngine) statsEngine = player.engine.Pointer;
-                var stats = statsReader.Read(player.engine, game);
-                string percentage = stats.HitPercentage?.ToString("0.00", CultureInfo.InvariantCulture) + "%";
-                if (stats.HitPercentage == null) percentage = "—";
-                var lines = new List<string>();
-                if (showMisses.Value) lines.Add($"Misses: {stats.Misses}");
-                if (showHit.Value) lines.Add($"Hit: {percentage}");
-                if (showGhosts.Value) lines.Add($"Ghosts: {stats.GhostInputs}");
-                if (showBest.Value) lines.Add($"Best streak: {player.engine.field_Public_Int32_5}");
-                statsText = string.Join("\n", lines);
-                var song = game.globalVariables!.currentSongEntry;
-                lines.Clear();
-                if (song != null)
+                else statsText = "";
+                if (songVisible)
                 {
-                    if (showTitle.Value) lines.Add(SongTitleLabel.Format(song.Name_StrippedTags ?? "Unknown title", game.practiceSpeed, showSpeed.Value));
-                    if (showArtist.Value) lines.Add("Artist: " + (song.Artist_StrippedTags ?? "Unknown"));
-                    if (showCharter.Value) lines.Add("Charter: " + (song.Charter_StrippedTags ?? "Unknown"));
+                    var song = game.globalVariables!.currentSongEntry;
+                    var lines = new List<string>();
+                    if (song != null)
+                    {
+                        if (showTitle.Value) lines.Add(SongTitleLabel.Format(song.Name_StrippedTags ?? "Unknown title", game.practiceSpeed, showSpeed.Value));
+                        if (showArtist.Value) lines.Add("Artist: " + (song.Artist_StrippedTags ?? "Unknown"));
+                        if (showCharter.Value) lines.Add("Charter: " + (song.Charter_StrippedTags ?? "Unknown"));
+                    }
+                    songText = string.Join("\n", lines);
                 }
-                songText = string.Join("\n", lines);
+                else songText = "";
                 nextStats = now + .2;
             }
         }
@@ -394,6 +408,10 @@ public sealed partial class Core : MelonMod
         // Passive HUDs need only the repaint event. Keep full event processing
         // while editing so sliders, typing, and dragging remain responsive.
         if (!settingsOpen && !moveHud && Event.current.type != EventType.Repaint) return;
+        bool noticeVisible = !compatible || (noticeUntil > 0 && clock.Elapsed.TotalSeconds < noticeUntil);
+        bool counterHudVisible = showHud.Value && gameplay && !string.IsNullOrEmpty(statsText);
+        bool songHudVisible = showSong.Value && gameplay && !string.IsNullOrEmpty(songText);
+        if (!settingsOpen && !moveHud && !noticeVisible && !counterHudVisible && !songHudVisible) return;
         long timingStart = timings.Begin();
         Color previousColor = GUI.color;
         GUI.color = Color.white;
@@ -425,7 +443,7 @@ public sealed partial class Core : MelonMod
                 }
             }
             if (!(moveHud && (moveSong || nativeMoveTarget != 0)) && showSong.Value && gameplay && !string.IsNullOrEmpty(songText)) DrawSongHudSafely();
-            if (!compatible || clock.Elapsed.TotalSeconds < noticeUntil)
+            if (noticeVisible)
                 GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44), status);
             if (moveHud && nativeMoveTarget == 0)
                 GUI.Box(new Rect(20, Screen.height - 110, Math.Max(300, Screen.width - 40), 44),
