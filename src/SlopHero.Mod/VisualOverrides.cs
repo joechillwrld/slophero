@@ -50,12 +50,18 @@ internal sealed class VisualOverrides
         var gameObject = star.gameObject;
         if (starFaceSprites.TryGetValue(gameObject.Pointer, out var result)) return result;
         var starCount = star.starCount?.Pointer ?? IntPtr.Zero;
+        // `starCountBG` is the empty track behind the progress fill. It lives
+        // beside the star graphics under the same root, so a generic sprite
+        // scan would otherwise tint the unfilled portion as a star.
+        var starCountBackground = star.starCountBG;
+        var starCountBackgroundPointer = starCountBackground?.Pointer ?? IntPtr.Zero;
         var progressBar = star.progressBar;
         var progressEnd = star.progressBarEnd;
         var faces = new List<SpriteRenderer>();
         foreach (var renderer in Sprites(gameObject))
         {
-            if (renderer == null || renderer.Pointer == starCount) continue;
+            if (renderer == null || renderer.Pointer == starCount || renderer.Pointer == starCountBackgroundPointer) continue;
+            if (Under(renderer.transform, starCountBackground?.transform)) continue;
             if (Under(renderer.transform, progressBar) || Under(renderer.transform, progressEnd)) continue;
             faces.Add(renderer);
         }

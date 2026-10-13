@@ -1,8 +1,8 @@
-# SlopHero 0.4.33 alpha
+# SlopHero 0.4.34 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.33 fixes star-progress coloring so only the filled sprite receives the custom color.** The Sizing page now lets you choose a HUD and edit it in-game with a selection outline and corner handles; custom HUDs can also be moved by dragging inside them. Version 0.4.32 limits native HUD and visual-override dispatch to 20 Hz, matching practice clock sampling while avoiding repeated checks at Clone Hero's unlocked update rate. Timing reports record Performance switch states. Earlier changes and the five optional Performance switches are described below.
+**Version 0.4.34 fixes the Sizing page crash and clipped menu titles.** The crash was the IL2CPP `SelectionGrid(string[])` wrapper failing on this game build; the HUD picker now uses individually drawn buttons. Navigation uses two rows so page names fit. The star tint excludes the actual empty-track renderer (`StarProgress.starCountBG`), which had been mistaken for a star graphic. Resize outlines now include the game's SpriteRenderer-based HUD, and star-rating progress has its own size control, separate from the star-power meter. The in-game selection outline and resize handles are available from Sizing. Version 0.4.34 also moves the 20 Hz gate ahead of the `OnLateUpdate` settings and Unity-object checks. Version 0.4.32 limits visual-override dispatch to 20 Hz; timing reports record Performance switch states. Earlier changes and the five optional Performance switches are described below.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.33 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.33-alpha.zip?raw=true)
+[Download v0.4.34 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.34-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -48,7 +48,7 @@ Backspace removes the last digit; Delete clears the entry; Escape cancels the ed
 game's normal left/right controls to change the value by the configured step (5%
 by default). Set that step on the SlopHero **Controls** page.
 
-F8 has seven pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, and **Profiles**.
+F8 has nine pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, and **Performance**. The page buttons use two centered rows so every title stays readable.
 
 - Click a numeric or color value and type a replacement. Enter or **Apply** saves;
   Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.
@@ -263,13 +263,18 @@ MIDI restores when switched off. Discord Rich Presence shuts down for the
 current session; switch it off and restart the game to restore it. Online play,
 leaderboards, scoring, notes, timing, and all SlopHero features are preserved.
 
-## 0.4.33 HUD editing and star progress
+## 0.4.34 sizing menu and star background
 
-The star progress option colors only the filled sprite; the background and fixed
-end marker retain their game colors. The Sizing page has a target picker and an
-in-game editor with an outline and four drag handles. Custom counters and song
-info can be positioned by dragging inside the selection. Native game HUDs use
-their existing position controls and scale settings.
+The HUD picker uses individual buttons instead of Unity's array-based selection
+grid, whose IL2CPP wrapper throws `Method unstripping failed` in v1.1.0.6142.
+Two navigation rows keep all page titles visible. The page can resize
+score/combo, input, star-power, star-progress, song-progress, practice stats,
+and FPS HUDs. Its target outline uses screen-projected UI and sprite bounds,
+cached at 20 Hz while the editor is open. Corner scaling keeps a fixed drag
+origin so refreshed bounds do not shift the resize ratio mid-gesture. Star graphics exclude the
+`starCountBG` renderer, so the empty progress track keeps its original color.
+The 20 Hz visual-dispatch gate now runs before preference and `GameManager`
+reads, removing those repeated checks from unlocked update frames.
 
 ## 0.4.32 override dispatch
 
@@ -319,12 +324,12 @@ callbacks run. The editor is only shown while that option is selected.
 
 ## 0.4.20 sizing and progress color
 
-The settings panel is larger by default and can be resized. The new Sizing page
-can scale score/combo/stars, the input viewer, star-power and song-progress bars,
-practice stats, and the FPS row. Each native group restores its original scale
-when returned to 1.0× or when the gameplay scene changes. Custom star-progress
-color blends in according to Clone Hero's live progress fraction. The menu-theme
-selector was removed; saved profiles still support named color themes.
+The settings panel is larger by default and can be resized. The Sizing page can
+scale score/combo, the input viewer, star-power meter, star-rating progress,
+song-progress bar, practice stats, and FPS row. Each game HUD group restores its
+original scale when returned to 1.0× or when the gameplay scene changes. Custom
+star-progress color follows the fill while preserving the empty track. The
+menu-theme selector was removed; saved profiles still support named color themes.
 
 ## 0.3.9 profiling and renderer update
 

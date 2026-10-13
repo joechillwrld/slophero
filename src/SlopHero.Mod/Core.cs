@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.33", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.34", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -29,7 +29,7 @@ public sealed partial class Core : MelonMod
     private MelonPreferences_Entry<float> backgroundOpacity = null!, textRed = null!, textGreen = null!, textBlue = null!;
     private MelonPreferences_Entry<int> hudX = null!, hudY = null!, fontSize = null!;
     private MelonPreferences_Entry<bool> showHud = null!;
-    private bool compatible, gameplay, gameplayInitialized, settingsOpen, transition, practiceFailed;
+    private bool compatible, gameplay, gameplayInitialized, practiceModeActive, settingsOpen, transition, practiceFailed;
     private bool moveHud, hudDragging, preferencesDirty, cursorOverridden, savedCursorVisible;
     private int nativeMoveTarget;
     private bool nativeHudDragging, nativeHudError, nativeHudErrorLogged, nativeHudActive;
@@ -90,6 +90,7 @@ public sealed partial class Core : MelonMod
     {
         SongSpeedControl.ResetMenuCache();
         gameplayInitialized = false;
+        practiceModeActive = false;
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
         visuals.Clear();
@@ -123,7 +124,7 @@ public sealed partial class Core : MelonMod
     public override void OnSceneWasUnloaded(int buildIndex, string sceneName)
     {
         SongSpeedControl.ResetMenuCache();
-        if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; }
+        if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; practiceModeActive = false; }
         settingsOpen = moveHud = hudDragging = false;
         resizeTarget = -1;
         resizeHandle = -1;
@@ -223,11 +224,12 @@ public sealed partial class Core : MelonMod
             }
             var game = gameplay && gameplayInitialized ? GameManager.field_Private_Static_GameManager_0 : null;
             bool ready = game != null && game.songLoaded && game.playersInit && game.globalVariables != null;
+            practiceModeActive = ready && game!.globalVariables!.isPracticeEnabled;
             if (ready) CompletePracticeTransition(game!);
             bool allow = ready && !transition && !settingsOpen && !moveHud && resizeTarget < 0 && Application.isFocused && !game!.isPaused
                 && !game.isSongOver && game.isSongPlaying && game.coroutinesRunning == 0
                 && game.actualPlayerCount == 1 && (int)game.globalVariables!.gameMode == 0
-                && !game.globalVariables.isPracticeEnabled && !game.globalVariables.isPlayingSetlist
+                && !practiceModeActive && !game.globalVariables.isPlayingSetlist
                 && (CHNetManager.instance == null || (int)CHNetManager.instance.field_Private_ConnectionState_0 == 0);
             if (restartHold.Update(allow && InputBinding.Pressed(restartButton.Value, ref restartBinding), allow, now, Duration))
             {

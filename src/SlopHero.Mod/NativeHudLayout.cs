@@ -10,9 +10,12 @@ internal sealed class NativeHudLayout
 {
     private readonly Dictionary<IntPtr, (Transform Transform, Vector3 Original, int Kind)> resized = new();
     private readonly Dictionary<IntPtr, Graphic[]> resizeGraphics = new();
-    private readonly Vector3[] resizeCorners = new Vector3[4];
+    private readonly Dictionary<IntPtr, Renderer[]> resizeRenderers = new();
+    private readonly Vector3[] resizeGraphicCorners = new Vector3[4];
+    private readonly Vector3[] resizeRendererCorners = new Vector3[8];
     private InputViewer[]? inputViewers;
     private SPBar[]? spBars;
+    private StarProgress[]? starProgresses;
     private SongProgress[]? songProgress;
     private RectTransform? practiceRect, fpsRect;
     private IntPtr practicePointer, fpsPointer;
@@ -25,7 +28,7 @@ internal sealed class NativeHudLayout
     private Color lastFpsColor;
     private double nextProbe;
     private double nextScaleProbe;
-    private float oldScoreScale = float.NaN, oldInputScale = float.NaN, oldSpScale = float.NaN, oldSongProgressScale = float.NaN, oldPracticeScale = float.NaN, oldFpsScale = float.NaN;
+    private float oldScoreScale = float.NaN, oldInputScale = float.NaN, oldSpScale = float.NaN, oldStarProgressScale = float.NaN, oldSongProgressScale = float.NaN, oldPracticeScale = float.NaN, oldFpsScale = float.NaN;
 
     public void Clear()
     {
@@ -36,8 +39,10 @@ internal sealed class NativeHudLayout
         practicePointer = fpsPointer = IntPtr.Zero;
         inputViewers = null;
         spBars = null;
+        starProgresses = null;
         songProgress = null;
         resizeGraphics.Clear();
+        resizeRenderers.Clear();
         fpsGraphics = Array.Empty<Graphic>();
         fpsOriginalColors = Array.Empty<Color>();
         lastPracticeX = lastPracticeY = lastFpsX = lastFpsY = float.NaN;
@@ -49,13 +54,13 @@ internal sealed class NativeHudLayout
     public void Apply(GameManager game, bool practiceEnabled,
         float practiceX, float practiceY, float fpsX, float fpsY,
         bool tintFps, Color fpsColor, float scoreScale, float inputScale, float spScale,
-        float songProgressScale, float practiceScale, float fpsScale, double realtime)
+        float starProgressScale, float songProgressScale, float practiceScale, float fpsScale, double realtime)
     {
         bool changed = practiceEnabled != lastPracticeEnabled
             || practiceX != lastPracticeX || practiceY != lastPracticeY
             || fpsX != lastFpsX || fpsY != lastFpsY
             || tintFps != lastFpsTint || fpsColor != lastFpsColor;
-        bool scaleChanged = scoreScale != oldScoreScale || inputScale != oldInputScale || spScale != oldSpScale
+        bool scaleChanged = scoreScale != oldScoreScale || inputScale != oldInputScale || spScale != oldSpScale || starProgressScale != oldStarProgressScale
             || songProgressScale != oldSongProgressScale || practiceScale != oldPracticeScale || fpsScale != oldFpsScale;
         if (!changed && !scaleChanged && realtime < nextProbe && realtime < nextScaleProbe) return;
         nextProbe = realtime + .25;
@@ -90,7 +95,7 @@ internal sealed class NativeHudLayout
         else RestorePractice();
 
         ApplyPosition(fpsRect, fpsOriginal, fpsX, fpsY, ref lastFpsX, ref lastFpsY);
-        ApplyHudScales(game, scoreScale, inputScale, spScale, songProgressScale, practiceScale, fpsScale, realtime, scaleChanged);
+        ApplyHudScales(game, scoreScale, inputScale, spScale, starProgressScale, songProgressScale, practiceScale, fpsScale, realtime, scaleChanged);
         if (tintFps != lastFpsTint || fpsColor != lastFpsColor || nextFps?.Pointer != fpsPointer)
         {
             ApplyFpsColor(tintFps, fpsColor);
@@ -106,9 +111,10 @@ internal sealed class NativeHudLayout
     }
 
     private void ApplyHudScales(GameManager game, float scoreScale, float inputScale, float spScale,
-        float songProgressScale, float practiceScale, float fpsScale, double realtime, bool changed)
+        float starProgressScale, float songProgressScale, float practiceScale, float fpsScale, double realtime, bool changed)
     {
-        bool enabled = scoreScale != 1 || inputScale != 1 || spScale != 1 || songProgressScale != 1 || practiceScale != 1 || fpsScale != 1;
+        bool enabled = scoreScale != 1 || inputScale != 1 || spScale != 1 || starProgressScale != 1
+            || songProgressScale != 1 || practiceScale != 1 || fpsScale != 1;
         if (!changed && (!enabled || realtime < nextScaleProbe)) return;
         nextScaleProbe = realtime + .5;
         if (changed && (!enabled || scoreScale == 1)) RestoreKind(game.scoreManager?.transform);
@@ -125,6 +131,12 @@ internal sealed class NativeHudLayout
             foreach (var bar in spBars) if (bar != null) Scale(bar.transform, spScale, 3);
         }
         else RestoreKind(typeof(SPBar));
+        if (starProgressScale != 1)
+        {
+            starProgresses ??= UnityEngine.Object.FindObjectsOfType<StarProgress>();
+            foreach (var progress in starProgresses) if (progress != null) Scale(progress.transform, starProgressScale, 7);
+        }
+        else RestoreKind(typeof(StarProgress));
         if (songProgressScale != 1)
         {
             songProgress ??= UnityEngine.Object.FindObjectsOfType<SongProgress>();
@@ -134,7 +146,8 @@ internal sealed class NativeHudLayout
         if (practiceScale != 1) Scale(practiceRect, practiceScale, 5); else RestoreKind(practiceRect);
         if (fpsScale != 1) Scale(fpsRect, fpsScale, 6); else RestoreKind(fpsRect);
         oldScoreScale = scoreScale; oldInputScale = inputScale; oldSpScale = spScale;
-        oldSongProgressScale = songProgressScale; oldPracticeScale = practiceScale; oldFpsScale = fpsScale;
+        oldStarProgressScale = starProgressScale; oldSongProgressScale = songProgressScale;
+        oldPracticeScale = practiceScale; oldFpsScale = fpsScale;
     }
 
     private void Scale(Transform? transform, float factor, int kind)
@@ -157,7 +170,8 @@ internal sealed class NativeHudLayout
         foreach (var pair in resized.ToArray())
         {
             if (pair.Value.Transform == null) { resized.Remove(pair.Key); continue; }
-            int kind = componentType == typeof(InputViewer) ? 2 : componentType == typeof(SPBar) ? 3 : componentType == typeof(SongProgress) ? 4 : 0;
+            int kind = componentType == typeof(InputViewer) ? 2 : componentType == typeof(SPBar) ? 3
+                : componentType == typeof(StarProgress) ? 7 : componentType == typeof(SongProgress) ? 4 : 0;
             if (pair.Value.Kind != kind) continue;
             pair.Value.Transform.localScale = pair.Value.Original;
             resized.Remove(pair.Key);
@@ -168,7 +182,7 @@ internal sealed class NativeHudLayout
     {
         foreach (var pair in resized.Values) if (pair.Transform != null) pair.Transform.localScale = pair.Original;
         resized.Clear();
-        oldScoreScale = oldInputScale = oldSpScale = oldSongProgressScale = oldPracticeScale = oldFpsScale = float.NaN;
+        oldScoreScale = oldInputScale = oldSpScale = oldStarProgressScale = oldSongProgressScale = oldPracticeScale = oldFpsScale = float.NaN;
     }
 
     public bool TryGetScreenRect(int target, out Rect rect)
@@ -192,53 +206,89 @@ internal sealed class NativeHudLayout
     /// <summary>Finds screen bounds for the HUD groups edited by corner handles.</summary>
     public bool TryGetResizeScreenRect(GameManager game, int target, out Rect rect)
     {
-        if (target == 6) return TryGetScreenRect(1, out rect);
-        if (target == 7) return TryGetScreenRect(2, out rect);
+        if (target == 7) return TryGetScreenRect(1, out rect);
+        if (target == 8) return TryGetScreenRect(2, out rect);
 
         bool found = false;
         float minX = float.PositiveInfinity, minY = float.PositiveInfinity;
         float maxX = float.NegativeInfinity, maxY = float.NegativeInfinity;
-        void Add(Transform? transform)
-        {
-            if (transform == null || !transform.gameObject.activeInHierarchy) return;
-            if (!resizeGraphics.TryGetValue(transform.Pointer, out var graphics))
-                resizeGraphics.Add(transform.Pointer, graphics = transform.GetComponentsInChildren<Graphic>(true));
-            foreach (var graphic in graphics)
-            {
-                if (graphic == null || graphic.rectTransform == null || !graphic.gameObject.activeInHierarchy) continue;
-                var canvas = graphic.GetComponentInParent<Canvas>();
-                Camera? camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-                graphic.rectTransform.GetWorldCorners(resizeCorners);
-                for (int i = 0; i < resizeCorners.Length; i++)
-                {
-                    Vector2 point = RectTransformUtility.WorldToScreenPoint(camera, resizeCorners[i]);
-                    minX = Math.Min(minX, point.x); maxX = Math.Max(maxX, point.x);
-                    minY = Math.Min(minY, Screen.height - point.y); maxY = Math.Max(maxY, Screen.height - point.y);
-                    found = true;
-                }
-            }
-        }
+        Camera? worldCamera = Camera.main;
 
         switch (target)
         {
-            case 2: Add(game.scoreManager?.transform); break;
+            case 2: AddResizeBounds(game.scoreManager?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY); break;
             case 3:
                 inputViewers ??= UnityEngine.Object.FindObjectsOfType<InputViewer>();
-                foreach (var viewer in inputViewers) if (viewer != null) Add(viewer.transform);
+                foreach (var viewer in inputViewers) if (viewer != null) AddResizeBounds(viewer.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 break;
             case 4:
                 spBars ??= UnityEngine.Object.FindObjectsOfType<SPBar>();
-                foreach (var bar in spBars) if (bar != null) Add(bar.transform);
+                foreach (var bar in spBars) if (bar != null) AddResizeBounds(bar.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 break;
             case 5:
+                starProgresses ??= UnityEngine.Object.FindObjectsOfType<StarProgress>();
+                foreach (var progress in starProgresses) if (progress != null) AddResizeBounds(progress.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                break;
+            case 6:
                 songProgress ??= UnityEngine.Object.FindObjectsOfType<SongProgress>();
-                foreach (var bar in songProgress) if (bar != null) Add(bar.transform);
+                foreach (var bar in songProgress) if (bar != null) AddResizeBounds(bar.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 break;
             default: rect = default; return false;
         }
 
         rect = found ? Rect.MinMaxRect(minX, minY, maxX, maxY) : default;
         return found && rect.width > 1 && rect.height > 1;
+    }
+
+    private void AddResizeBounds(Transform? transform, Camera? worldCamera,
+        ref bool found, ref float minX, ref float minY, ref float maxX, ref float maxY)
+    {
+        if (transform == null || !transform.gameObject.activeInHierarchy) return;
+        if (!resizeGraphics.TryGetValue(transform.Pointer, out var graphics))
+            resizeGraphics.Add(transform.Pointer, graphics = transform.GetComponentsInChildren<Graphic>(true));
+        if (!resizeRenderers.TryGetValue(transform.Pointer, out var renderers))
+            resizeRenderers.Add(transform.Pointer, renderers = transform.GetComponentsInChildren<Renderer>(true));
+
+        foreach (var graphic in graphics)
+        {
+            if (graphic == null || graphic.rectTransform == null || !graphic.gameObject.activeInHierarchy) continue;
+            var canvas = graphic.GetComponentInParent<Canvas>();
+            Camera? camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                ? null : (canvas.worldCamera ?? worldCamera);
+            graphic.rectTransform.GetWorldCorners(resizeGraphicCorners);
+            for (int i = 0; i < resizeGraphicCorners.Length; i++)
+                IncludeResizePoint(resizeGraphicCorners[i], camera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+        }
+
+        // Clone Hero's gameplay HUD is built from SpriteRenderers, not UI
+        // Graphics. Project all eight bounds corners through the game camera
+        // so score, star, and song-progress controls get a selectable outline.
+        foreach (var renderer in renderers)
+        {
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
+            var bounds = renderer.bounds;
+            var center = bounds.center;
+            var extents = bounds.extents;
+            resizeRendererCorners[0] = center + new Vector3(-extents.x, -extents.y, -extents.z);
+            resizeRendererCorners[1] = center + new Vector3(-extents.x, -extents.y, extents.z);
+            resizeRendererCorners[2] = center + new Vector3(-extents.x, extents.y, -extents.z);
+            resizeRendererCorners[3] = center + new Vector3(-extents.x, extents.y, extents.z);
+            resizeRendererCorners[4] = center + new Vector3(extents.x, -extents.y, -extents.z);
+            resizeRendererCorners[5] = center + new Vector3(extents.x, -extents.y, extents.z);
+            resizeRendererCorners[6] = center + new Vector3(extents.x, extents.y, -extents.z);
+            resizeRendererCorners[7] = center + new Vector3(extents.x, extents.y, extents.z);
+            for (int i = 0; i < resizeRendererCorners.Length; i++)
+                IncludeResizePoint(resizeRendererCorners[i], worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+        }
+    }
+
+    private static void IncludeResizePoint(Vector3 world, Camera? camera,
+        ref bool found, ref float minX, ref float minY, ref float maxX, ref float maxY)
+    {
+        Vector3 point = camera != null ? camera.WorldToScreenPoint(world) : world;
+        minX = Math.Min(minX, point.x); maxX = Math.Max(maxX, point.x);
+        minY = Math.Min(minY, Screen.height - point.y); maxY = Math.Max(maxY, Screen.height - point.y);
+        found = true;
     }
 
     public Vector2 MoveByScreenDelta(int target, float deltaX, float deltaY)
