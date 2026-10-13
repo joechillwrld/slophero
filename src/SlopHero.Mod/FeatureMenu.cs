@@ -34,6 +34,12 @@ public sealed partial class Core
     private bool profileDropdownOpen;
     private int profileListStart;
     private readonly Dictionary<string, Color> parsedColors = new();
+    private static readonly string[] ResizeTargetLabels = { "Counters", "Song HUD", "Score HUD", "Input viewer", "Star power", "Song progress", "Practice stats", "FPS display" };
+    private int resizeSelection;
+    private int resizeTarget = -1, resizeHandle = -1;
+    private bool resizeMoveDragging;
+    private float resizeStartValue, resizeStartRadius;
+    private Vector2 resizeDragOffset;
     private GUIStyle? songStyle;
     private int styledSongFont = -1;
     private Color styledSongColor;
@@ -192,14 +198,17 @@ public sealed partial class Core
                 GUI.Label(new Rect(x, y + 356, 540, 60), "Move the practice bar while in practice. The game's FPS display must be enabled before you move or recolor it.");
                 break;
             case 6:
-                GUI.Label(new Rect(x, y, 632, 32), "Resize selected native game HUD groups. Set any value back to 1.0× to restore its game size.");
+                GUI.Label(new Rect(x, y, 632, 32), "Resize with sliders or select a HUD and drag its corner handles in-game.");
                 Number("Score, combo and star HUD", scoreHudScale.Value, x, y + 42, .5f, 2.5f, v => { scoreHudScale.Value = v; preferencesDirty = true; });
                 Number("Input viewer", inputViewerScale.Value, x, y + 82, .5f, 2.5f, v => { inputViewerScale.Value = v; preferencesDirty = true; });
                 Number("Star power bar", starPowerHudScale.Value, x, y + 122, .5f, 2.5f, v => { starPowerHudScale.Value = v; preferencesDirty = true; });
                 Number("Song progress bar", songProgressHudScale.Value, x, y + 162, .5f, 2.5f, v => { songProgressHudScale.Value = v; preferencesDirty = true; });
                 Number("Practice stats bar", practiceHudScale.Value, x, y + 202, .5f, 2.5f, v => { practiceHudScale.Value = v; preferencesDirty = true; });
                 Number("FPS display", fpsHudScale.Value, x, y + 242, .5f, 2.5f, v => { fpsHudScale.Value = v; preferencesDirty = true; });
-                GUI.Label(new Rect(x, y + 290, 632, 90), "More game HUD pieces can be added after checking their runtime hierarchy. Sizes are applied only when changed and are restored when disabled or the scene changes.");
+                resizeSelection = GUI.SelectionGrid(new Rect(x, y + 292, 632, 72), resizeSelection, ResizeTargetLabels, 4);
+                if (GUI.Button(new Rect(x, y + 376, 400, 34), "Edit selected HUD with corner handles")) BeginResizeTarget(resizeSelection);
+                GUI.Label(new Rect(x + 410, y + 376, 220, 56), "F8 returns here; Escape finishes.");
+                GUI.Label(new Rect(x, y + 422, 632, 60), "Drag any corner to resize proportionally. Drag inside a SlopHero HUD to move it. Native HUD positions keep their game controls.");
                 break;
             case 7:
                 DrawProfiles(x, y);
@@ -228,6 +237,7 @@ public sealed partial class Core
 
     private void BeginNativeHudMove(int target)
     {
+        resizeTarget = -1;
         nativeMoveTarget = target;
         nativeHudDragging = false;
         moveHud = true;
@@ -237,6 +247,178 @@ public sealed partial class Core
         UpdateCursor();
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
+    }
+
+    private void BeginResizeTarget(int target)
+    {
+        resizeTarget = Math.Clamp(target, 0, ResizeTargetLabels.Length - 1);
+        resizeHandle = -1;
+        resizeMoveDragging = false;
+        moveHud = false;
+        nativeMoveTarget = 0;
+        nativeHudDragging = hudDragging = false;
+        settingsOpen = false;
+        capture = null;
+        UpdateCursor();
+        restartHold.RequireRelease();
+        practiceHold.RequireRelease();
+    }
+
+    private float ResizeValue() => resizeTarget switch
+    {
+        0 => fontSize.Value,
+        1 => songFont.Value,
+        2 => scoreHudScale.Value,
+        3 => inputViewerScale.Value,
+        4 => starPowerHudScale.Value,
+        5 => songProgressHudScale.Value,
+        6 => practiceHudScale.Value,
+        7 => fpsHudScale.Value,
+        _ => 1f
+    };
+
+    private void SetResizeValue(float value)
+    {
+        switch (resizeTarget)
+        {
+            case 0: fontSize.Value = (int)Math.Clamp(Math.Round(value), 14, 48); break;
+            case 1: songFont.Value = (int)Math.Clamp(Math.Round(value), 14, 48); break;
+            case 2: scoreHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
+            case 3: inputViewerScale.Value = Math.Clamp(value, .5f, 2.5f); break;
+            case 4: starPowerHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
+            case 5: songProgressHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
+            case 6: practiceHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
+            case 7: fpsHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
+        }
+        preferencesDirty = true;
+    }
+
+    private bool TryGetResizeRect(out Rect rect)
+    {
+        if (resizeTarget == 0)
+        {
+            int size = Math.Clamp(fontSize.Value, 14, 48);
+            string text = string.IsNullOrEmpty(statsText) ? "Misses: 0\nHit: 100.00%\nGhosts: 0" : statsText;
+            int lines = 1;
+            for (int i = 0; i < text.Length; i++) if (text[i] == '\n') lines++;
+            int width = Math.Max(240, size * 12 + 24), height = (int)(size * 1.25f) * lines + 20;
+            var p = HudLayout.ClampPosition(hudX.Value, hudY.Value, width, height, Screen.width, Screen.height);
+            rect = new Rect(p.X, p.Y, width, height);
+            return true;
+        }
+        if (resizeTarget == 1)
+        {
+            string text = songText.Length == 0 ? "Chart title (100%)\nArtist: Artist\nCharter: Charter" : songText;
+            int size = Math.Clamp(songFont.Value, 14, 48), width = Math.Min(520, Screen.width);
+            int charsPerLine = Math.Max(8, (int)((width - 24) / (size * .6f)));
+            int lines = 0, lineLength = 0;
+            for (int i = 0; i <= text.Length; i++)
+            {
+                if (i == text.Length || text[i] == '\n')
+                {
+                    lines += Math.Max(1, (lineLength + charsPerLine - 1) / charsPerLine);
+                    lineLength = 0;
+                }
+                else lineLength++;
+            }
+            int height = (int)(size * 1.35f) * lines + 20;
+            var p = HudLayout.ClampPosition(songX.Value, songY.Value, width, height, Screen.width, Screen.height);
+            rect = new Rect(p.X, p.Y, width, height);
+            return true;
+        }
+        rect = default;
+        var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
+        return game != null && nativeHud.TryGetResizeScreenRect(game, resizeTarget, out rect);
+    }
+
+    private static Rect ResizeHandleRect(Rect rect, int corner)
+    {
+        const float size = 14;
+        float x = corner == 0 || corner == 3 ? rect.xMin : rect.xMax;
+        float y = corner < 2 ? rect.yMin : rect.yMax;
+        return new Rect(x - size * .5f, y - size * .5f, size, size);
+    }
+
+    private static Vector2 ResizeCorner(Rect rect, int corner) => corner switch
+    {
+        0 => new Vector2(rect.xMin, rect.yMin),
+        1 => new Vector2(rect.xMax, rect.yMin),
+        2 => new Vector2(rect.xMax, rect.yMax),
+        _ => new Vector2(rect.xMin, rect.yMax)
+    };
+
+    private void DrawResizeHandles()
+    {
+        if (!TryGetResizeRect(out var rect))
+        {
+            string hint = resizeTarget == 6
+                ? "Practice stats are visible only after entering Practice mode. F8 returns to settings."
+                : resizeTarget == 7
+                    ? "Turn on the game's FPS display first. F8 returns to settings."
+                    : "This HUD is not available in the current scene. F8 returns to settings.";
+            GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44), hint);
+            return;
+        }
+
+        Color previous = GUI.color;
+        try
+        {
+            GUI.color = MenuAccentColor(0);
+            const float line = 2;
+            GUI.DrawTexture(new Rect(rect.xMin, rect.yMin, rect.width, line), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.xMin, rect.yMax - line, rect.width, line), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.xMin, rect.yMin, line, rect.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.xMax - line, rect.yMin, line, rect.height), Texture2D.whiteTexture);
+            for (int i = 0; i < 4; i++) GUI.Box(ResizeHandleRect(rect, i), GUIContent.none);
+            string label = ResizeTargetLabels[resizeTarget] + (resizeTarget < 2
+                ? $" — {ResizeValue():0} px"
+                : $" — {ResizeValue():0.00}×");
+            GUI.Box(new Rect(rect.xMin, Math.Max(0, rect.yMin - 26), Math.Max(150, label.Length * 8), 22), label);
+            GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44),
+                "Drag a corner to resize proportionally; drag inside a SlopHero HUD to move. F8 returns; Escape finishes.");
+        }
+        finally { GUI.color = previous; }
+
+        var e = Event.current;
+        if (e.type == EventType.MouseDown && e.button == 0)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                if (!ResizeHandleRect(rect, i).Contains(e.mousePosition)) continue;
+                resizeHandle = i;
+                resizeStartValue = ResizeValue();
+                resizeStartRadius = Vector2.Distance(new Vector2(rect.center.x, rect.center.y), ResizeCorner(rect, i));
+                e.Use();
+                return;
+            }
+            if (resizeTarget < 2 && rect.Contains(e.mousePosition))
+            {
+                resizeMoveDragging = true;
+                resizeDragOffset = e.mousePosition - new Vector2(rect.x, rect.y);
+                e.Use();
+            }
+        }
+        if (e.type == EventType.MouseDrag && resizeHandle >= 0)
+        {
+            float radius = Vector2.Distance(new Vector2(rect.center.x, rect.center.y), e.mousePosition);
+            if (resizeStartRadius > 1) SetResizeValue(resizeStartValue * radius / resizeStartRadius);
+            e.Use();
+        }
+        if (e.type == EventType.MouseDrag && resizeMoveDragging && resizeTarget < 2)
+        {
+            var p = HudLayout.ClampPosition((int)(e.mousePosition.x - resizeDragOffset.x),
+                (int)(e.mousePosition.y - resizeDragOffset.y), (int)rect.width, (int)rect.height, Screen.width, Screen.height);
+            if (resizeTarget == 0) { hudX.Value = p.X; hudY.Value = p.Y; }
+            else { songX.Value = p.X; songY.Value = p.Y; }
+            preferencesDirty = true;
+            e.Use();
+        }
+        if (e.rawType == EventType.MouseUp && (resizeHandle >= 0 || resizeMoveDragging))
+        {
+            resizeHandle = -1;
+            resizeMoveDragging = false;
+            SavePreferences();
+        }
     }
 
     private void DrawProfiles(float x, float y)
@@ -608,7 +790,7 @@ public sealed partial class Core
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
         if (game == null || !game.songLoaded || !game.playersInit || game.globalVariables == null) return;
         double now = clock.Elapsed.TotalSeconds;
-        bool nativeHudRequested = nativeMoveTarget != 0 || practiceHudX.Value != 0 || practiceHudY.Value != 0
+        bool nativeHudRequested = nativeMoveTarget != 0 || resizeTarget >= 2 || practiceHudX.Value != 0 || practiceHudY.Value != 0
             || fpsHudX.Value != 0 || fpsHudY.Value != 0 || customizeFpsColor.Value
             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
             || songProgressHudScale.Value != 1 || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;

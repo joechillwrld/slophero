@@ -1,6 +1,5 @@
 using Il2Cpp;
 using SlopHero.Core;
-using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace SlopHero.Mod;
@@ -108,31 +107,14 @@ internal sealed class VisualOverrides
         foreach (var r in Sprites(c.gameObject)) Tint(r, enabled, color);
     }
 
-    private void TintProgress(Component? component, bool enabled, Color color, float fill)
+    private void TintProgress(Component? component, bool enabled, Color color)
     {
         if (component == null) return;
         foreach (var renderer in Sprites(component.gameObject))
         {
             if (renderer == null) continue;
-            if (!enabled) { Tint(renderer, false, color); continue; }
-            if (!colors.TryGetValue(renderer.Pointer, out var original))
-                colors[renderer.Pointer] = original = (renderer, renderer.color);
-            var target = Color.Lerp(original.Original, color, fill);
-            target.a = renderer.color.a;
-            if (renderer.color != target) renderer.color = target;
+            Tint(renderer, enabled, color);
         }
-    }
-
-    // In this Clone Hero build StarProgress stores the current fill fraction at
-    // 0x78. This offset is confirmed by the supplied v1.1.0.6142 native dump.
-    private static float StarFill(StarProgress star)
-    {
-        try
-        {
-            float fill = Marshal.PtrToStructure<float>(IntPtr.Add(star.Pointer, 0x78));
-            return float.IsFinite(fill) ? Math.Clamp(fill, 0, 1) : 0;
-        }
-        catch { return 0; }
     }
 
     // Remember the unmodified value; repeated frames never divide an already
@@ -294,10 +276,12 @@ internal sealed class VisualOverrides
             foreach (var star in starProgresses)
             {
                 if (star == null) continue;
-                float fill = StarFill(star);
                 foreach (var renderer in StarFaces(star)) Tint(renderer, score, stars);
-                TintProgress(star.progressBar, score, progress, fill);
-                TintProgress(star.progressBarEnd, score, progress, fill);
+                // The game resizes this SpriteRenderer to the filled portion.
+                // Color that sprite directly; the background and fixed end
+                // marker must keep their native colors or the empty span looks
+                // filled even when the score has not reached it.
+                TintProgress(star.progressBar, score, progress);
             }
         }
         finally { timings.End(5, graphicsTiming); }

@@ -9,6 +9,8 @@ namespace SlopHero.Mod;
 internal sealed class NativeHudLayout
 {
     private readonly Dictionary<IntPtr, (Transform Transform, Vector3 Original, int Kind)> resized = new();
+    private readonly Dictionary<IntPtr, Graphic[]> resizeGraphics = new();
+    private readonly Vector3[] resizeCorners = new Vector3[4];
     private InputViewer[]? inputViewers;
     private SPBar[]? spBars;
     private SongProgress[]? songProgress;
@@ -35,6 +37,7 @@ internal sealed class NativeHudLayout
         inputViewers = null;
         spBars = null;
         songProgress = null;
+        resizeGraphics.Clear();
         fpsGraphics = Array.Empty<Graphic>();
         fpsOriginalColors = Array.Empty<Color>();
         lastPracticeX = lastPracticeY = lastFpsX = lastFpsY = float.NaN;
@@ -184,6 +187,58 @@ internal sealed class NativeHudLayout
         float height = Math.Max(32, transform.rect.height * scale);
         rect = new Rect(screen.x - width / 2, Screen.height - screen.y - height / 2, width, height);
         return true;
+    }
+
+    /// <summary>Finds screen bounds for the HUD groups edited by corner handles.</summary>
+    public bool TryGetResizeScreenRect(GameManager game, int target, out Rect rect)
+    {
+        if (target == 6) return TryGetScreenRect(1, out rect);
+        if (target == 7) return TryGetScreenRect(2, out rect);
+
+        bool found = false;
+        float minX = float.PositiveInfinity, minY = float.PositiveInfinity;
+        float maxX = float.NegativeInfinity, maxY = float.NegativeInfinity;
+        void Add(Transform? transform)
+        {
+            if (transform == null || !transform.gameObject.activeInHierarchy) return;
+            if (!resizeGraphics.TryGetValue(transform.Pointer, out var graphics))
+                resizeGraphics.Add(transform.Pointer, graphics = transform.GetComponentsInChildren<Graphic>(true));
+            foreach (var graphic in graphics)
+            {
+                if (graphic == null || graphic.rectTransform == null || !graphic.gameObject.activeInHierarchy) continue;
+                var canvas = graphic.GetComponentInParent<Canvas>();
+                Camera? camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+                graphic.rectTransform.GetWorldCorners(resizeCorners);
+                for (int i = 0; i < resizeCorners.Length; i++)
+                {
+                    Vector2 point = RectTransformUtility.WorldToScreenPoint(camera, resizeCorners[i]);
+                    minX = Math.Min(minX, point.x); maxX = Math.Max(maxX, point.x);
+                    minY = Math.Min(minY, Screen.height - point.y); maxY = Math.Max(maxY, Screen.height - point.y);
+                    found = true;
+                }
+            }
+        }
+
+        switch (target)
+        {
+            case 2: Add(game.scoreManager?.transform); break;
+            case 3:
+                inputViewers ??= UnityEngine.Object.FindObjectsOfType<InputViewer>();
+                foreach (var viewer in inputViewers) if (viewer != null) Add(viewer.transform);
+                break;
+            case 4:
+                spBars ??= UnityEngine.Object.FindObjectsOfType<SPBar>();
+                foreach (var bar in spBars) if (bar != null) Add(bar.transform);
+                break;
+            case 5:
+                songProgress ??= UnityEngine.Object.FindObjectsOfType<SongProgress>();
+                foreach (var bar in songProgress) if (bar != null) Add(bar.transform);
+                break;
+            default: rect = default; return false;
+        }
+
+        rect = found ? Rect.MinMaxRect(minX, minY, maxX, maxY) : default;
+        return found && rect.width > 1 && rect.height > 1;
     }
 
     public Vector2 MoveByScreenDelta(int target, float deltaX, float deltaY)

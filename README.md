@@ -1,9 +1,8 @@
-# SlopHero 0.4.32 alpha
+# SlopHero 0.4.33 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.31 adds an opt-in Performance tab. All five switches are off by default, so they do not change game behavior until enabled.** The tab can stop note-hit particle objects, sustain particle objects, fret flames/sparks/lightning, drum MIDI polling, and Discord Rich Presence. Discord Rich Presence requires a game restart to restore after disabling. Online play, leaderboards, and SlopHero features remain available. Version 0.4.30 draws each custom HUD's text and background with one IMGUI control. Version 0.4.29 skips empty HUD repaints and avoids chart-stat scans when counters are hidden or their data isn't displayed. Version 0.4.28 extends the timing capture with Unity frame-time percentiles and active HUD positions. It also caches hotkey parsing and skips practice-speed scans outside practice. Version 0.4.27 reduces practice-speed compensation work to 20 clock samples and 10 renderer updates per second, and refreshes cosmetic score colors at 5 Hz. Version 0.4.26 limits playable speed to 10–5000%, because the removed sub-10% values desynchronize chart and audio playback. It batches typed digits, marks pending input with `*`, and applies the final value after a short pause. Version 0.4.25 added Escape cleanup; version 0.4.24 adds live digit display, Backspace, and Delete to Clone Hero's pre-song menu. The speed interval remains a separate Controls-page setting. The settings panel scales around the screen center. Version 0.4.23 moved speed editing into Clone Hero's own menu and removed the separate popup. Version 0.4.22 raised the speed limit to the game's 5000% ceiling. Version 0.4.20 added scaling controls for selected game HUD groups and star-progress coloring that follows the live fill fraction. Version 0.4.19 restores standard navigation buttons and gives the open profile list more breathing room. Version 0.4.18 added a profile dropdown with per-profile rename controls.
-**Version 0.4.32 limits native HUD and visual-override dispatch to 20 Hz**, matching the practice clock sampling rate while avoiding repeated deadline checks at Clone Hero's unlocked update rate. It also records the new Performance switch states in timing-capture settings. Version 0.4.31 adds an opt-in Performance tab. All five switches are off by default, so they do not change game behavior until enabled. The tab can stop note-hit particle objects, sustain particle objects, fret flames/sparks/lightning, drum MIDI polling, and Discord Rich Presence. Discord Rich Presence requires a game restart to restore after disabling. Online play, leaderboards, and SlopHero features remain available. Version 0.4.30 draws each custom HUD's text and background with one IMGUI control. Version 0.4.29 skips empty HUD repaints and avoids chart-stat scans when counters are hidden or their data isn't displayed. Version 0.4.28 extends the timing capture with Unity frame-time percentiles and active HUD positions. It also caches hotkey parsing and skips practice-speed scans outside practice. Version 0.4.27 reduces practice-speed compensation work to 20 clock samples and 10 renderer updates per second, and refreshes cosmetic score colors at 5 Hz. Version 0.4.26 limits playable speed to 10–5000%, because the removed sub-10% values desynchronize chart and audio playback. It batches typed digits, marks pending input with `*`, and applies the final value after a short pause. Version 0.4.25 added Escape cleanup; version 0.4.24 adds live digit display, Backspace, and Delete to Clone Hero's pre-song menu. The speed interval remains a separate Controls-page setting. The settings panel scales around the screen center. Version 0.4.23 moved speed editing into Clone Hero's own menu and removed the separate popup. Version 0.4.22 raised the speed limit to the game's 5000% ceiling. Version 0.4.20 added scaling controls for selected game HUD groups and star-progress coloring that follows the live fill fraction. Version 0.4.19 restores standard navigation buttons and gives the open profile list more breathing room. Version 0.4.18 added a profile dropdown with per-profile rename controls.
+**Version 0.4.33 fixes star-progress coloring so only the filled sprite receives the custom color.** The Sizing page now lets you choose a HUD and edit it in-game with a selection outline and corner handles; custom HUDs can also be moved by dragging inside them. Version 0.4.32 limits native HUD and visual-override dispatch to 20 Hz, matching practice clock sampling while avoiding repeated checks at Clone Hero's unlocked update rate. Timing reports record Performance switch states. Earlier changes and the five optional Performance switches are described below.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -19,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.32 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.32-alpha.zip?raw=true)
+[Download v0.4.33 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.33-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -263,6 +262,14 @@ effect objects to stop their simulation, rather than only hiding their drawing.
 MIDI restores when switched off. Discord Rich Presence shuts down for the
 current session; switch it off and restart the game to restore it. Online play,
 leaderboards, scoring, notes, timing, and all SlopHero features are preserved.
+
+## 0.4.33 HUD editing and star progress
+
+The star progress option colors only the filled sprite; the background and fixed
+end marker retain their game colors. The Sizing page has a target picker and an
+in-game editor with an outline and four drag handles. Custom counters and song
+info can be positioned by dragging inside the selection. Native game HUDs use
+their existing position controls and scale settings.
 
 ## 0.4.32 override dispatch
 

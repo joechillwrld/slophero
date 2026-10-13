@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.32", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.33", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -95,6 +95,9 @@ public sealed partial class Core : MelonMod
         visuals.Clear();
         performance.Clear();
         nativeHud.Clear();
+        resizeTarget = -1;
+        resizeHandle = -1;
+        resizeMoveDragging = false;
         nativeMoveTarget = 0;
         nativeHudDragging = false;
         nativeHudError = false;
@@ -122,6 +125,9 @@ public sealed partial class Core : MelonMod
         SongSpeedControl.ResetMenuCache();
         if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; }
         settingsOpen = moveHud = hudDragging = false;
+        resizeTarget = -1;
+        resizeHandle = -1;
+        resizeMoveDragging = false;
         nativeMoveTarget = 0;
         nativeHudDragging = false;
         capture = null;
@@ -150,7 +156,7 @@ public sealed partial class Core : MelonMod
             optionalServices.Apply(stopMidiInput.Value, disableDiscordPresence.Value, now);
             if (Input.GetKeyDown(KeyCode.F8))
             {
-                if (moveHud) { moveHud = false; settingsOpen = true; }
+                if (moveHud || resizeTarget >= 0) { moveHud = false; resizeTarget = -1; resizeHandle = -1; resizeMoveDragging = false; settingsOpen = true; }
                 else settingsOpen = !settingsOpen;
                 hudDragging = false;
                 nativeMoveTarget = 0;
@@ -162,10 +168,13 @@ public sealed partial class Core : MelonMod
                 restartHold.RequireRelease();
                 practiceHold.RequireRelease();
             }
-            if ((settingsOpen || moveHud) && editApply == null && Input.GetKeyDown(KeyCode.Escape))
+            if ((settingsOpen || moveHud || resizeTarget >= 0) && editApply == null && Input.GetKeyDown(KeyCode.Escape))
             {
                 settingsOpen = false;
                 moveHud = false;
+                resizeTarget = -1;
+                resizeHandle = -1;
+                resizeMoveDragging = false;
                 hudDragging = false;
                 nativeMoveTarget = 0;
                 nativeHudDragging = false;
@@ -178,9 +187,12 @@ public sealed partial class Core : MelonMod
                 hudDragging = false;
                 SavePreferences();
             }
-            if (!Application.isFocused && (settingsOpen || moveHud))
+            if (!Application.isFocused && (settingsOpen || moveHud || resizeTarget >= 0))
             {
                 settingsOpen = moveHud = hudDragging = false;
+                resizeTarget = -1;
+                resizeHandle = -1;
+                resizeMoveDragging = false;
                 nativeMoveTarget = 0;
                 nativeHudDragging = false;
                 capture = null;
@@ -212,7 +224,7 @@ public sealed partial class Core : MelonMod
             var game = gameplay && gameplayInitialized ? GameManager.field_Private_Static_GameManager_0 : null;
             bool ready = game != null && game.songLoaded && game.playersInit && game.globalVariables != null;
             if (ready) CompletePracticeTransition(game!);
-            bool allow = ready && !transition && !settingsOpen && !moveHud && Application.isFocused && !game!.isPaused
+            bool allow = ready && !transition && !settingsOpen && !moveHud && resizeTarget < 0 && Application.isFocused && !game!.isPaused
                 && !game.isSongOver && game.isSongPlaying && game.coroutinesRunning == 0
                 && game.actualPlayerCount == 1 && (int)game.globalVariables!.gameMode == 0
                 && !game.globalVariables.isPracticeEnabled && !game.globalVariables.isPlayingSetlist
@@ -407,17 +419,18 @@ public sealed partial class Core : MelonMod
     {
         // Passive HUDs need only the repaint event. Keep full event processing
         // while editing so sliders, typing, and dragging remain responsive.
-        if (!settingsOpen && !moveHud && Event.current.type != EventType.Repaint) return;
+        bool resizeEditing = resizeTarget >= 0;
+        if (!settingsOpen && !moveHud && !resizeEditing && Event.current.type != EventType.Repaint) return;
         bool noticeVisible = !compatible || (noticeUntil > 0 && clock.Elapsed.TotalSeconds < noticeUntil);
         bool counterHudVisible = showHud.Value && gameplay && !string.IsNullOrEmpty(statsText);
         bool songHudVisible = showSong.Value && gameplay && !string.IsNullOrEmpty(songText);
-        if (!settingsOpen && !moveHud && !noticeVisible && !counterHudVisible && !songHudVisible) return;
+        if (!settingsOpen && !moveHud && !resizeEditing && !noticeVisible && !counterHudVisible && !songHudVisible) return;
         long timingStart = timings.Begin();
         Color previousColor = GUI.color;
         GUI.color = Color.white;
         try
         {
-            if ((showHud.Value && gameplay && !string.IsNullOrEmpty(statsText)) || settingsOpen || moveHud)
+            if ((showHud.Value && gameplay && !string.IsNullOrEmpty(statsText)) || settingsOpen || moveHud || resizeTarget == 0)
             {
                 if (nativeMoveTarget != 0) DrawNativeHudMove();
                 else
@@ -442,7 +455,8 @@ public sealed partial class Core : MelonMod
                     }
                 }
             }
-            if (!(moveHud && (moveSong || nativeMoveTarget != 0)) && showSong.Value && gameplay && !string.IsNullOrEmpty(songText)) DrawSongHudSafely();
+            if (!(moveHud && (moveSong || nativeMoveTarget != 0)) && ((showSong.Value && gameplay && !string.IsNullOrEmpty(songText)) || resizeTarget == 1)) DrawSongHudSafely();
+            if (resizeEditing) DrawResizeHandles();
             if (noticeVisible)
                 GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44), status);
             if (moveHud && nativeMoveTarget == 0)
@@ -594,6 +608,9 @@ public sealed partial class Core : MelonMod
     private void CloseEditor()
     {
         settingsOpen = moveHud = hudDragging = false;
+        resizeTarget = -1;
+        resizeHandle = -1;
+        resizeMoveDragging = false;
         nativeMoveTarget = 0;
         nativeHudDragging = false;
         capture = null;
@@ -613,7 +630,7 @@ public sealed partial class Core : MelonMod
 
     private void UpdateCursor()
     {
-        if (settingsOpen || moveHud)
+        if (settingsOpen || moveHud || resizeTarget >= 0)
         {
             if (!cursorOverridden)
             {
@@ -638,6 +655,9 @@ public sealed partial class Core : MelonMod
         performance.Clear();
         optionalServices.Restore();
         settingsOpen = moveHud = hudDragging = false;
+        resizeTarget = -1;
+        resizeHandle = -1;
+        resizeMoveDragging = false;
         SavePreferences();
         UpdateCursor();
     }
