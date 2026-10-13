@@ -1,6 +1,9 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Il2CppInterop.Runtime;
+using Il2CppTMPro;
+using SlopHero.Core;
 using UnityEngine;
 
 namespace SlopHero.Mod;
@@ -10,7 +13,7 @@ internal static class SongSpeedControl
     private const int SongOptionsSelectionOffset = 0x19C;
     private const int SpeedValueOffset = 0x10;
     private const int MinimumSpeed = 1;
-    private const int MaximumSpeed = 5000;
+    private const int MaximumSpeed = SongSpeedEntry.MaximumSpeed;
     private const string SettingsClass = "ʹʺʽˁʽˁˀʼʶʷʼ";
     private const string SpeedSettingField = "ʳʷʴʺʳʹʷʾʲʷʾ";
     private const string UpdateValueMethod = "ʸʾʵʽʳʾʾʻʷʲʽ";
@@ -18,8 +21,21 @@ internal static class SongSpeedControl
     private static Il2Cpp.SongOptions? songOptions;
     private static bool trackingMenuSpeed;
     private static int lastMenuSpeed;
-    private static string typedSpeed = "";
+    private static readonly SongSpeedEntry speedEntry = new();
     private static double lastSpeedKeyTime;
+    private static bool editingSpeed;
+    private static TextMeshProUGUI? nativeSpeedLabel;
+    private static string speedLabelPrefix = "Speed: ", speedLabelSuffix = "%";
+    private static readonly KeyCode[] TopRowDigits =
+    {
+        KeyCode.Alpha0, KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3, KeyCode.Alpha4,
+        KeyCode.Alpha5, KeyCode.Alpha6, KeyCode.Alpha7, KeyCode.Alpha8, KeyCode.Alpha9
+    };
+    private static readonly KeyCode[] KeypadDigits =
+    {
+        KeyCode.Keypad0, KeyCode.Keypad1, KeyCode.Keypad2, KeyCode.Keypad3, KeyCode.Keypad4,
+        KeyCode.Keypad5, KeyCode.Keypad6, KeyCode.Keypad7, KeyCode.Keypad8, KeyCode.Keypad9
+    };
 
     public static bool IsSpeedOptionOpen()
     {
@@ -37,16 +53,22 @@ internal static class SongSpeedControl
     {
         songOptions = null;
         trackingMenuSpeed = false;
-        typedSpeed = "";
+        speedEntry.Clear();
         lastSpeedKeyTime = 0;
+        editingSpeed = false;
+        nativeSpeedLabel = null;
     }
 
     public static void ProcessSelectedSpeedInput(int step, double now)
     {
         if (!IsSpeedOptionOpen() || !TryRead(out int current))
         {
+            if (nativeSpeedLabel != null && TryRead(out int lastValidSpeed))
+                DrawNativeSpeedEntry(lastValidSpeed.ToString(CultureInfo.InvariantCulture));
+            nativeSpeedLabel = null;
             trackingMenuSpeed = false;
-            typedSpeed = "";
+            speedEntry.Clear();
+            editingSpeed = false;
             return;
         }
 
@@ -64,32 +86,91 @@ internal static class SongSpeedControl
                 if (TryWrite(adjusted)) current = adjusted;
             }
             lastMenuSpeed = current;
-            typedSpeed = "";
+            speedEntry.Clear();
+            editingSpeed = false;
         }
 
-        string input = Input.inputString;
-        bool backspace = Input.GetKeyDown(KeyCode.Backspace);
-        if (now - lastSpeedKeyTime > 1.25 && input.Length == 0 && !backspace) typedSpeed = "";
-        if (backspace && !input.Contains('\b') && typedSpeed.Length > 0)
-            typedSpeed = typedSpeed[..^1];
-
-        foreach (char key in input)
+        if (editingSpeed && now - lastSpeedKeyTime > 1.25)
         {
-            if (key == '\b')
+            editingSpeed = false;
+            speedEntry.Clear();
+        }
+
+        int typedDigit = -1;
+        for (int digit = 0; digit <= 9; digit++)
+        {
+            if (Input.GetKeyDown(TopRowDigits[digit]) || Input.GetKeyDown(KeypadDigits[digit]))
             {
-                if (typedSpeed.Length > 0) typedSpeed = typedSpeed[..^1];
-                continue;
+                typedDigit = digit;
+                break;
             }
-            if (key is < '0' or > '9' || typedSpeed.Length >= 4) continue;
-            typedSpeed += key;
         }
-        if (input.Length > 0 || backspace) lastSpeedKeyTime = now;
 
-        if (TryParsePercent(typedSpeed, out int typedValue) && typedValue != current && TryWrite(typedValue))
+        bool deleteLast = Input.GetKeyDown(KeyCode.Backspace);
+        bool clearAll = Input.GetKeyDown(KeyCode.Delete);
+        if (typedDigit >= 0 || deleteLast || clearAll)
         {
-            current = typedValue;
-            lastMenuSpeed = typedValue;
+            if (!editingSpeed) speedEntry.Clear();
+            editingSpeed = true;
+            lastSpeedKeyTime = now;
+            if (clearAll) speedEntry.Clear();
+            else if (deleteLast) speedEntry.Backspace();
+            else if (typedDigit >= 0) speedEntry.Append(typedDigit);
+
+            if (speedEntry.TryGetSpeed(out int typedValue) && typedValue != current && TryWrite(typedValue))
+            {
+                current = typedValue;
+                lastMenuSpeed = typedValue;
+            }
         }
+
+        if (editingSpeed) DrawNativeSpeedEntry(speedEntry.Text);
+        else DrawNativeSpeedEntry(current.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static void DrawNativeSpeedEntry(string digits)
+    {
+        if (songOptions == null) return;
+        try
+        {
+            if (nativeSpeedLabel == null || nativeSpeedLabel.Pointer == IntPtr.Zero)
+            {
+                var labels = songOptions.textObjects;
+                if (labels == null) return;
+                TextMeshProUGUI? percentFallback = null;
+                foreach (var label in labels)
+                {
+                    if (label == null || label.Pointer == IntPtr.Zero) continue;
+                    string text = label.text ?? "";
+                    if (!text.Contains("%", StringComparison.Ordinal)) continue;
+                    percentFallback ??= label;
+                    if (!text.Contains("speed", StringComparison.OrdinalIgnoreCase)) continue;
+                    nativeSpeedLabel = label;
+                    var match = Regex.Match(text, @"^(?<prefix>.*?)(?<number>\d+)(?<suffix>\s*%.*)$", RegexOptions.Singleline);
+                    if (match.Success)
+                    {
+                        speedLabelPrefix = match.Groups["prefix"].Value;
+                        speedLabelSuffix = match.Groups["suffix"].Value;
+                    }
+                    else { speedLabelPrefix = "Speed: "; speedLabelSuffix = "%"; }
+                    break;
+                }
+                if (nativeSpeedLabel == null && percentFallback != null)
+                {
+                    nativeSpeedLabel = percentFallback;
+                    var text = nativeSpeedLabel.text ?? "";
+                    var match = Regex.Match(text, @"^(?<prefix>.*?)(?<number>\d+)(?<suffix>\s*%.*)$", RegexOptions.Singleline);
+                    if (match.Success)
+                    {
+                        speedLabelPrefix = match.Groups["prefix"].Value;
+                        speedLabelSuffix = match.Groups["suffix"].Value;
+                    }
+                    else { speedLabelPrefix = "Speed: "; speedLabelSuffix = "%"; }
+                }
+            }
+            if (nativeSpeedLabel != null) nativeSpeedLabel.text = speedLabelPrefix + digits + speedLabelSuffix;
+        }
+        catch { nativeSpeedLabel = null; }
     }
 
     public static bool TryRead(out int speed)

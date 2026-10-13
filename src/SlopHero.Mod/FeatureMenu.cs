@@ -99,7 +99,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.23 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.24 — F8 / Escape to close");
         float tabWidth = 656f / SettingsPages.Length;
         for (int i = 0; i < SettingsPages.Length; i++)
         {
@@ -133,7 +133,7 @@ public sealed partial class Core
                     }
                     else Notice("Start a song before capturing mod timings.");
                 }
-                GUI.Label(new Rect(x, y + 348, 540, 42), "On the game's speed row, type 1–5000 to set it. Arrow changes use this step.");
+                GUI.Label(new Rect(x, y + 348, 540, 42), "On the game's speed row, type 1–5000. Backspace removes a digit; Delete clears it.");
                 GUI.Label(new Rect(x, y + 394, 540, 50), "Timings are written to Latest.log. Close this menu and play.");
                 break;
             case 1:

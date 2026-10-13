@@ -123,6 +123,23 @@ finally
     System.Runtime.InteropServices.Marshal.FreeHGlobal(dataBuffer);
 }
 Check(ChartSpeedLabel.Format(1.0000002f) == "100%", "Native floating-point noise does not show as chart speed drift");
+var speedEntry = new SongSpeedEntry();
+speedEntry.Append(1); speedEntry.Append(5); speedEntry.Append(0);
+Check(speedEntry.Text == "150" && speedEntry.TryGetSpeed(out int enteredSpeed) && enteredSpeed == 150,
+    "Speed entry shows and applies digits as they are typed");
+speedEntry.Backspace();
+Check(speedEntry.Text == "15" && speedEntry.TryGetSpeed(out enteredSpeed) && enteredSpeed == 15,
+    "Backspace edits the live speed entry");
+speedEntry.Backspace(); speedEntry.Backspace();
+Check(speedEntry.Text.Length == 0 && !speedEntry.TryGetSpeed(out _), "Speed entry can be cleared without forcing the minimum speed");
+speedEntry.Append(5); speedEntry.Append(0); speedEntry.Append(0); speedEntry.Append(0);
+Check(speedEntry.TryGetSpeed(out enteredSpeed) && enteredSpeed == 5000, "Speed entry accepts the game's 5000% limit");
+speedEntry.Append(1);
+Check(speedEntry.Text == "5000", "Speed entry remains bounded to four digits");
+speedEntry.Clear(); speedEntry.Append(0);
+Check(!speedEntry.TryGetSpeed(out _), "Zero is visible during entry but not applied as a speed");
+speedEntry.Clear(); speedEntry.Append(5); speedEntry.Append(0); speedEntry.Append(0); speedEntry.Append(1);
+Check(!speedEntry.TryGetSpeed(out _), "Speed entry does not apply values above 5000");
 Check(ChartSpeedLabel.Format(.75f) == "75%", "Slowed chart display");
 Check(ChartSpeedLabel.Format(1.5f) == "150%", "Sped-up chart display");
 Check(ChartSpeedLabel.Format(1.9500008f) == "195%", "Observed practice tempo display");
