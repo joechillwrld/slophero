@@ -8,7 +8,7 @@ namespace SlopHero.Mod;
 public sealed partial class Core
 {
     private static readonly string[] SettingsPages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Profiles" };
-    private static readonly string[] MenuThemeNames = { "Classic", "Ocean", "Plum", "Paper" };
+    private static readonly string[] MenuThemeNames = { "Classic", "Ocean", "Sage", "Amber" };
     private MelonPreferences_Entry<bool> showMisses = null!, showHit = null!, showGhosts = null!, showBest = null!;
     private MelonPreferences_Entry<bool> showSong = null!, showTitle = null!, showArtist = null!, showCharter = null!, showSpeed = null!;
     private MelonPreferences_Entry<int> songX = null!, songY = null!, songFont = null!;
@@ -74,37 +74,26 @@ public sealed partial class Core
     }
 
     private void DrawSettings()
-    {
-        Color oldBackground = GUI.backgroundColor, oldContent = GUI.contentColor;
-        try
-        {
-            ApplySettingsMenuTheme();
-            DrawSettingsPage();
-        }
-        finally { GUI.backgroundColor = oldBackground; GUI.contentColor = oldContent; }
-    }
-
-    private void ApplySettingsMenuTheme()
-    {
-        switch (Math.Clamp(settingsMenuTheme.Value, 0, MenuThemeNames.Length - 1))
-        {
-            case 1: GUI.backgroundColor = new Color(.48f, .62f, .86f); GUI.contentColor = Color.white; break;
-            case 2: GUI.backgroundColor = new Color(.74f, .56f, .84f); GUI.contentColor = Color.white; break;
-            case 3: GUI.backgroundColor = new Color(.93f, .95f, .98f); GUI.contentColor = new Color(.12f, .14f, .18f); break;
-            default: GUI.backgroundColor = Color.white; GUI.contentColor = Color.white; break;
-        }
-    }
+        => DrawSettingsPage();
 
     private void DrawSettingsPage()
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.18 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.19 — F8 / Escape to close");
         float tabWidth = 556f / SettingsPages.Length;
         for (int i = 0; i < SettingsPages.Length; i++)
-            if (GUI.Toggle(new Rect(x + 12 + i * tabWidth, y + 32, tabWidth - 4, 30), settingsPage == i, SettingsPages[i])) settingsPage = i;
+        {
+            Color oldBackground = GUI.backgroundColor;
+            try
+            {
+                if (settingsPage == i) GUI.backgroundColor = MenuAccentColor(settingsMenuTheme.Value);
+                if (GUI.Button(new Rect(x + 12 + i * tabWidth, y + 32, tabWidth - 4, 30), SettingsPages[i])) settingsPage = i;
+            }
+            finally { GUI.backgroundColor = oldBackground; }
+        }
         x += 20; y += 80;
-        GUI.Label(new Rect(x, y, 540, 25), "Pause to edit • click a value to type • Enter applies • Escape cancels.");
+        GUI.Label(new Rect(x, y, 540, 25), "Pause to edit. Click values to type. Enter applies; Escape cancels.");
         y += 34;
         switch (settingsPage)
         {
@@ -200,14 +189,14 @@ public sealed partial class Core
         if (GUI.Button(new Rect(x, y + 50, 540, 36), current + (profileDropdownOpen ? "  ▲" : "  ▼")))
         {
             profileDropdownOpen = !profileDropdownOpen;
-            profileListStart = Math.Max(0, profileIndex / 5 * 5);
+            profileListStart = Math.Max(0, profileIndex / 4 * 4);
         }
 
         float actionY = y + 132;
         if (profileDropdownOpen)
         {
             DrawProfileDropdown(x, y + 88);
-            actionY = y + 270;
+            actionY = y + 240;
         }
         if (GUI.Button(new Rect(x, actionY, 260, 36), "Save full profile as…"))
             Edit("Save full profile (name)", "", SaveFullProfile);
@@ -221,11 +210,7 @@ public sealed partial class Core
             preferencesDirty = true;
             SavePreferences();
         }
-        Color themePreview = MenuThemeColor(settingsMenuTheme.Value);
-        Color oldBackground = GUI.backgroundColor;
-        GUI.backgroundColor = themePreview;
-        GUI.Box(new Rect(x + 502, actionY + 91, 30, 24), "");
-        GUI.backgroundColor = oldBackground;
+        Preview(new Rect(x + 502, actionY + 91, 30, 24), MenuAccentColor(settingsMenuTheme.Value));
         GUI.Label(new Rect(x, actionY + 128, 540, profileDropdownOpen ? 42 : 66), settingsProfiles == null
             ? "Profile folder unavailable; see Latest.log."
             : "Drop or edit .json files in:\n" + settingsProfiles.DirectoryPath);
@@ -234,16 +219,16 @@ public sealed partial class Core
 
     private void DrawProfileDropdown(float x, float y)
     {
-        float height = 32 + Math.Min(5, profileNames.Length) * 28;
+        float height = 32 + Math.Min(4, profileNames.Length) * 28;
         GUI.Box(new Rect(x, y, 540, height), "");
         if (profileNames.Length == 0)
         { GUI.Label(new Rect(x + 10, y + 7, 520, 24), "No profile files found. Save one or add a .json file."); return; }
-        if (profileNames.Length > 5)
+        if (profileNames.Length > 4)
         {
-            if (GUI.Button(new Rect(x + 8, y + 3, 70, 26), "‹ More")) profileListStart = (profileListStart - 5 + profileNames.Length) % profileNames.Length;
-            if (GUI.Button(new Rect(x + 462, y + 3, 70, 26), "More ›")) profileListStart = (profileListStart + 5) % profileNames.Length;
+            if (GUI.Button(new Rect(x + 8, y + 3, 70, 26), "‹ More")) profileListStart = (profileListStart - 4 + profileNames.Length) % profileNames.Length;
+            if (GUI.Button(new Rect(x + 462, y + 3, 70, 26), "More ›")) profileListStart = (profileListStart + 4) % profileNames.Length;
         }
-        int shown = Math.Min(5, profileNames.Length);
+        int shown = Math.Min(4, profileNames.Length);
         for (int row = 0; row < shown; row++)
         {
             int index = (profileListStart + row) % profileNames.Length;
@@ -269,7 +254,7 @@ public sealed partial class Core
         profileNames = settingsProfiles.List();
         int found = Array.FindIndex(profileNames, n => string.Equals(n, selected, StringComparison.OrdinalIgnoreCase));
         profileIndex = found >= 0 ? found : 0;
-        profileListStart = Math.Max(0, profileIndex / 5 * 5);
+        profileListStart = Math.Max(0, profileIndex / 4 * 4);
     }
 
     private void ApplyProfileIndex(int index)
@@ -318,12 +303,12 @@ public sealed partial class Core
         }
     }
 
-    private static Color MenuThemeColor(int theme) => theme switch
+    private static Color MenuAccentColor(int theme) => theme switch
     {
-        1 => new Color(.48f, .62f, .86f),
-        2 => new Color(.74f, .56f, .84f),
-        3 => new Color(.93f, .95f, .98f),
-        _ => Color.white
+        1 => new Color(.76f, .86f, .98f),
+        2 => new Color(.80f, .91f, .83f),
+        3 => new Color(.98f, .88f, .68f),
+        _ => new Color(.78f, .85f, .94f)
     };
 
     private void SaveProfile(string name, bool colorsOnly)

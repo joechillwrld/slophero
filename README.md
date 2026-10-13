@@ -1,8 +1,9 @@
-# SlopHero 0.4.18 alpha
+# SlopHero 0.4.19 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.18 adds a profile dropdown with per-profile rename controls, menu theme previews, and a clearer selected-page state. Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
+**Version 0.4.19 restores standard navigation buttons, applies menu themes only as subtle tab accents, and gives the open profile list more breathing room. Version 0.4.18 added a profile dropdown with per-profile rename controls.
+Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
 practice stats and FPS HUDs, optional FPS text coloring,
@@ -17,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.18 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.18-alpha.zip?raw=true)
+[Download v0.4.19 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.19-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -60,8 +61,8 @@ F8 has seven pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Col
   full settings or color-only themes, or edit JSON files. Files live in `UserData/SlopHero/Profiles`; refresh the page after
   adding or editing files there. A theme contains only color-related options, so
   applying one leaves your layout and gameplay options intact.
-  The settings menu can use Classic, Ocean, Plum, or Paper; its preview swatch
-  shows the selected palette.
+  The menu accent can use Classic, Ocean, Sage, or Amber; it only colors the
+  active page tab, and its preview swatch shows the selected accent.
 - The counter and song HUDs have **Move this HUD**: drag and release to save. F8 returns to
   settings; Escape finishes. Coordinates can also be entered directly.
 - Highway: optionally hide sides, fret strings, or beatlines. These options
@@ -210,6 +211,13 @@ Profile selection is now a dropdown with an inline rename control beside each
 profile. The menu shows a preview for its four built-in themes, and the active
 settings page is visibly selected. Spacing and instructions were tightened while
 keeping the existing page structure.
+
+## 0.4.19 menu layout and theme polish
+
+Restored standard page buttons so tabs do not inherit checkbox styling. Menu
+themes now tint only the active tab, using restrained Ocean, Sage, and Amber
+accents. The profile dropdown shows four rows per page to leave more room for
+the controls and status below it.
 
 ## 0.3.9 profiling and renderer update
 
