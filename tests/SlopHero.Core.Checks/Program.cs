@@ -146,6 +146,13 @@ try
     Check(profiles.List().SequenceEqual(new[] { "Warm Theme" }), "Profile list returns saved file names");
     Check(profiles.TryLoad("Warm Theme", out var loaded) && loaded.Count == 2
         && loaded["FcColor"] == "FF8800" && loaded["ShowHud"] == "true", "Profile JSON round trips settings");
+    Check(profiles.Rename("Warm Theme", "Autumn Colors") == "Autumn Colors"
+        && profiles.List().SequenceEqual(new[] { "Autumn Colors" }), "Profile rename updates the on-disk file name");
+    Check(profiles.TryLoad("Autumn Colors", out loaded) && loaded["FcColor"] == "FF8800", "Renamed profile keeps its settings");
+    profiles.Save("Existing", settings);
+    bool duplicateRejected = false;
+    try { profiles.Rename("Autumn Colors", "Existing"); } catch (IOException) { duplicateRejected = true; }
+    Check(duplicateRejected && profiles.List().Length == 2, "Rename does not overwrite an existing profile");
     bool rejected = false;
     try { profiles.Save("../outside", settings); } catch (FormatException) { rejected = true; }
     Check(rejected && !File.Exists(Path.Combine(profileRoot, "outside.json")), "Profile names cannot escape the profile folder");

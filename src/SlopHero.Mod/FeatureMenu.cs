@@ -72,7 +72,7 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.16 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.17 — F8 / Escape to close");
         float tabWidth = 556f / SettingsPages.Length;
         for (int i = 0; i < SettingsPages.Length; i++)
             if (GUI.Button(new Rect(x + 12 + i * tabWidth, y + 32, tabWidth - 4, 30), SettingsPages[i])) settingsPage = i;
@@ -177,7 +177,12 @@ public sealed partial class Core
             Edit("Save full profile (name)", "", SaveFullProfile);
         if (GUI.Button(new Rect(x + 280, y + 132, 260, 36), "Save color theme as…"))
             Edit("Save color theme (name)", "", SaveColorTheme);
-        if (GUI.Button(new Rect(x, y + 178, 540, 32), "Refresh profile folder")) RefreshProfiles();
+        if (GUI.Button(new Rect(x, y + 178, 260, 34), "Rename selected…"))
+        {
+            if (profileNames.Length == 0) profileNotice = "Save or add a profile before renaming one.";
+            else Edit("Rename profile", profileNames[profileIndex], RenameSelectedProfile);
+        }
+        if (GUI.Button(new Rect(x + 280, y + 178, 260, 34), "Refresh profile folder")) RefreshProfiles();
         GUI.Label(new Rect(x, y + 218, 540, 66), settingsProfiles == null
             ? "Profile folder unavailable; see Latest.log."
             : "Drop or edit .json files in:\n" + settingsProfiles.DirectoryPath);
@@ -219,6 +224,27 @@ public sealed partial class Core
 
     private void SaveFullProfile(string name) => SaveProfile(name, false);
     private void SaveColorTheme(string name) => SaveProfile(name, true);
+
+    private void RenameSelectedProfile(string newName)
+    {
+        if (settingsProfiles == null || profileNames.Length == 0)
+        { profileNotice = "No profile is selected."; return; }
+        string oldName = profileNames[profileIndex];
+        try
+        {
+            string renamed = settingsProfiles.Rename(oldName, newName);
+            RefreshProfiles();
+            int found = Array.FindIndex(profileNames, n => string.Equals(n, renamed, StringComparison.OrdinalIgnoreCase));
+            if (found >= 0) profileIndex = found;
+            profileNotice = $"Renamed '{oldName}' to '{renamed}'.";
+            LoggerInstance.Msg(profileNotice);
+        }
+        catch (Exception ex)
+        {
+            profileNotice = $"Could not rename profile: {ex.Message}";
+            LoggerInstance.Warning(profileNotice);
+        }
+    }
 
     private void SaveProfile(string name, bool colorsOnly)
     {

@@ -40,6 +40,29 @@ internal sealed class SettingsProfiles
         File.Move(temp, path, true);
     }
 
+    public string Rename(string oldName, string newName)
+    {
+        string oldPath = GetPath(oldName);
+        string validNewName = ValidateName(newName);
+        string newPath = GetPath(validNewName);
+        if (!File.Exists(oldPath)) throw new FileNotFoundException("The selected profile file no longer exists.", oldPath);
+        if (string.Equals(oldName, validNewName, StringComparison.Ordinal)) return validNewName;
+        if (!string.Equals(oldName, validNewName, StringComparison.OrdinalIgnoreCase) && File.Exists(newPath))
+            throw new IOException($"A profile named '{validNewName}' already exists.");
+
+        // Move through a unique temporary name so case-only renames work on
+        // Windows, where the source and destination otherwise alias.
+        string temporaryPath = Path.Combine(directory, ".rename-" + Guid.NewGuid().ToString("N") + ".tmp");
+        File.Move(oldPath, temporaryPath);
+        try { File.Move(temporaryPath, newPath); }
+        catch
+        {
+            if (File.Exists(temporaryPath)) File.Move(temporaryPath, oldPath, true);
+            throw;
+        }
+        return validNewName;
+    }
+
     public bool TryLoad(string name, out Dictionary<string, string> settings)
     {
         settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
