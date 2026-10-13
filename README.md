@@ -1,8 +1,8 @@
-# SlopHero 0.4.24 alpha
+# SlopHero 0.4.25 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.24 makes speed entry visible as you type in Clone Hero's pre-song menu.** Digits update the existing speed row immediately; Backspace removes a digit and Delete clears the entry. The speed interval remains a separate setting on SlopHero's Controls page. The settings panel scales around the screen center. Version 0.4.23 moved speed editing into Clone Hero's own menu and removed the separate popup. Version 0.4.22 raised the speed limit to the game's 5000% ceiling. Version 0.4.20 added scaling controls for selected game HUD groups and star-progress coloring that follows the live fill fraction. Version 0.4.19 restores standard navigation buttons and gives the open profile list more breathing room. Version 0.4.18 added a profile dropdown with per-profile rename controls.
+**Version 0.4.25 supports 1–5000% song speed entry, including the game's removed sub-10% range, and clears the entry cleanly on Escape.** Version 0.4.24 adds live digit display, Backspace, and Delete to Clone Hero's pre-song menu. The speed interval remains a separate Controls-page setting. The settings panel scales around the screen center. Version 0.4.23 moved speed editing into Clone Hero's own menu and removed the separate popup. Version 0.4.22 raised the speed limit to the game's 5000% ceiling. Version 0.4.20 added scaling controls for selected game HUD groups and star-progress coloring that follows the live fill fraction. Version 0.4.19 restores standard navigation buttons and gives the open profile list more breathing room. Version 0.4.18 added a profile dropdown with per-profile rename controls.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.24 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.24-alpha.zip?raw=true)
+[Download v0.4.25 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.25-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -43,9 +43,9 @@ Pause the game before editing settings. Press **F8** for the settings panel.
 
 On the game's pre-song menu, highlight **Song Speed** and type a whole percentage
 from 1 to 5000. Each digit appears on the game's speed row as you type. Backspace
-removes the last digit; Delete clears the entry. Use the game's normal left/right
-controls to change the value by the configured step (5% by default). Set that
-step on the SlopHero **Controls** page.
+removes the last digit; Delete clears the entry; Escape exits normally. Use the
+game's normal left/right controls to change the value by the configured step (5%
+by default). Set that step on the SlopHero **Controls** page.
 
 F8 has seven pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, and **Profiles**.
 
@@ -242,6 +242,13 @@ Typing on the selected native Song Speed row now shows each digit in that row as
 it is entered. Backspace removes the last digit and Delete clears the entry; the
 last valid speed remains applied until a valid number is typed. The increment
 size remains a separate Controls-page setting.
+
+## 0.4.25 legacy low speeds and menu exit
+
+Clone Hero's setting setter clamps values below 10%, so the mod uses the setter
+normally and falls back to updating the runtime speed value directly for 1–9%.
+Escape clears the edit state and returns control to Clone Hero's normal menu
+navigation.
 
 ## 0.4.21 pre-song speed editing
 

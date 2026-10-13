@@ -12,7 +12,7 @@ internal static class SongSpeedControl
 {
     private const int SongOptionsSelectionOffset = 0x19C;
     private const int SpeedValueOffset = 0x10;
-    private const int MinimumSpeed = 1;
+    private const int MinimumSpeed = SongSpeedEntry.MinimumSpeed;
     private const int MaximumSpeed = SongSpeedEntry.MaximumSpeed;
     private const string SettingsClass = "ʹʺʽˁʽˁˀʼʶʷʼ";
     private const string SpeedSettingField = "ʳʷʴʺʳʹʷʾʲʷʾ";
@@ -61,14 +61,26 @@ internal static class SongSpeedControl
 
     public static void ProcessSelectedSpeedInput(int step, double now)
     {
+        // Handle Escape before validating the selected row. Once Clone Hero
+        // changes selection or closes SongOptions, the normal validation path
+        // can run first and leave our temporary display state behind.
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            if (TryRead(out int escapedSpeed))
+                DrawNativeSpeedEntry(escapedSpeed.ToString(CultureInfo.InvariantCulture));
+            ClearEntryState();
+            trackingMenuSpeed = false;
+            nativeSpeedLabel = null;
+            return;
+        }
+
         if (!IsSpeedOptionOpen() || !TryRead(out int current))
         {
             if (nativeSpeedLabel != null && TryRead(out int lastValidSpeed))
                 DrawNativeSpeedEntry(lastValidSpeed.ToString(CultureInfo.InvariantCulture));
             nativeSpeedLabel = null;
             trackingMenuSpeed = false;
-            speedEntry.Clear();
-            editingSpeed = false;
+            ClearEntryState();
             return;
         }
 
@@ -128,6 +140,13 @@ internal static class SongSpeedControl
         else DrawNativeSpeedEntry(current.ToString(CultureInfo.InvariantCulture));
     }
 
+    private static void ClearEntryState()
+    {
+        speedEntry.Clear();
+        editingSpeed = false;
+        lastSpeedKeyTime = 0;
+    }
+
     private static void DrawNativeSpeedEntry(string digits)
     {
         if (songOptions == null) return;
@@ -168,7 +187,12 @@ internal static class SongSpeedControl
                     else { speedLabelPrefix = "Speed: "; speedLabelSuffix = "%"; }
                 }
             }
-            if (nativeSpeedLabel != null) nativeSpeedLabel.text = speedLabelPrefix + digits + speedLabelSuffix;
+            if (nativeSpeedLabel != null)
+            {
+                string display = speedLabelPrefix + digits + speedLabelSuffix;
+                if (!string.Equals(nativeSpeedLabel.text, display, StringComparison.Ordinal))
+                    nativeSpeedLabel.text = display;
+            }
         }
         catch { nativeSpeedLabel = null; }
     }
@@ -201,7 +225,18 @@ internal static class SongSpeedControl
         args[0] = valuePointer;
         IntPtr exception = IntPtr.Zero;
         IL2CPP.il2cpp_runtime_invoke(setter, setting, args, ref exception);
-        return exception == IntPtr.Zero && Marshal.ReadInt32(setting, SpeedValueOffset) == speed;
+        if (exception == IntPtr.Zero && Marshal.ReadInt32(setting, SpeedValueOffset) == speed)
+            return true;
+
+        // The current menu setter may clamp the removed 1–9% range to 10%.
+        // Preserve its normal side effects for accepted values, but bypass its
+        // minimum clamp for these legacy values so the runtime can still use them.
+        if (speed >= MinimumSpeed && speed < 10)
+        {
+            Marshal.WriteInt32(setting, SpeedValueOffset, speed);
+            return Marshal.ReadInt32(setting, SpeedValueOffset) == speed;
+        }
+        return false;
     }
 
     private static unsafe IntPtr GetSettingPointer()
