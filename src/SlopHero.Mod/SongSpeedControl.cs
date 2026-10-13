@@ -12,6 +12,7 @@ internal static class SongSpeedControl
 {
     private const int SongOptionsSelectionOffset = 0x19C;
     private const int SpeedValueOffset = 0x10;
+    private const double SpeedEntryCommitDelay = .4;
     private const int MinimumSpeed = SongSpeedEntry.MinimumSpeed;
     private const int MaximumSpeed = SongSpeedEntry.MaximumSpeed;
     private const string SettingsClass = "ʹʺʽˁʽˁˀʼʶʷʼ";
@@ -20,11 +21,16 @@ internal static class SongSpeedControl
     private static IntPtr speedSettingField;
     private static Il2Cpp.SongOptions? songOptions;
     private static bool trackingMenuSpeed;
+    private static bool checkedLowSpeedRecovery;
+    private static double nextLowSpeedRecoveryAttempt;
     private static int lastMenuSpeed;
     private static readonly SongSpeedEntry speedEntry = new();
     private static double lastSpeedKeyTime;
     private static bool editingSpeed;
     private static TextMeshProUGUI? nativeSpeedLabel;
+    private static string? nativeDisplayedDigits;
+    private static bool nativeDisplayedPending;
+    private static float nextNativeLabelCheck;
     private static string speedLabelPrefix = "Speed: ", speedLabelSuffix = "%";
     private static readonly KeyCode[] TopRowDigits =
     {
@@ -53,14 +59,26 @@ internal static class SongSpeedControl
     {
         songOptions = null;
         trackingMenuSpeed = false;
+        checkedLowSpeedRecovery = false;
+        nextLowSpeedRecoveryAttempt = 0;
         speedEntry.Clear();
         lastSpeedKeyTime = 0;
         editingSpeed = false;
         nativeSpeedLabel = null;
+        nativeDisplayedDigits = null;
+        nativeDisplayedPending = false;
+        nextNativeLabelCheck = 0;
     }
 
     public static void ProcessSelectedSpeedInput(int step, double now)
     {
+        if (!checkedLowSpeedRecovery && now >= nextLowSpeedRecoveryAttempt)
+        {
+            nextLowSpeedRecoveryAttempt = now + 1;
+            if (TryRead(out int storedSpeed))
+                checkedLowSpeedRecovery = storedSpeed >= MinimumSpeed || TryWrite(MinimumSpeed);
+        }
+
         // Handle Escape before validating the selected row. Once Clone Hero
         // changes selection or closes SongOptions, the normal validation path
         // can run first and leave our temporary display state behind.
@@ -76,9 +94,12 @@ internal static class SongSpeedControl
 
         if (!IsSpeedOptionOpen() || !TryRead(out int current))
         {
+            if (editingSpeed && speedEntry.TryGetSpeed(out int pendingSpeed))
+                TryWrite(pendingSpeed);
             if (nativeSpeedLabel != null && TryRead(out int lastValidSpeed))
                 DrawNativeSpeedEntry(lastValidSpeed.ToString(CultureInfo.InvariantCulture));
             nativeSpeedLabel = null;
+            nativeDisplayedDigits = null;
             trackingMenuSpeed = false;
             ClearEntryState();
             return;
@@ -102,12 +123,6 @@ internal static class SongSpeedControl
             editingSpeed = false;
         }
 
-        if (editingSpeed && now - lastSpeedKeyTime > 1.25)
-        {
-            editingSpeed = false;
-            speedEntry.Clear();
-        }
-
         int typedDigit = -1;
         for (int digit = 0; digit <= 9; digit++)
         {
@@ -128,15 +143,26 @@ internal static class SongSpeedControl
             if (clearAll) speedEntry.Clear();
             else if (deleteLast) speedEntry.Backspace();
             else if (typedDigit >= 0) speedEntry.Append(typedDigit);
+        }
 
+        // Keep the game's setting untouched while the user types. Applying
+        // each prefix (for example 1 -> 13 -> 137) causes needless speed
+        // recalculations and can expose unsupported intermediate values.
+        bool confirmEntry = Input.GetKeyDown(KeyCode.Return)
+            || Input.GetKeyDown(KeyCode.KeypadEnter)
+            || Input.GetKeyDown(KeyCode.Space);
+        if (editingSpeed && (confirmEntry || now - lastSpeedKeyTime >= SpeedEntryCommitDelay))
+        {
             if (speedEntry.TryGetSpeed(out int typedValue) && typedValue != current && TryWrite(typedValue))
             {
                 current = typedValue;
                 lastMenuSpeed = typedValue;
             }
+            editingSpeed = false;
+            speedEntry.Clear();
         }
 
-        if (editingSpeed) DrawNativeSpeedEntry(speedEntry.Text);
+        if (editingSpeed) DrawNativeSpeedEntry(speedEntry.Text, pending: true);
         else DrawNativeSpeedEntry(current.ToString(CultureInfo.InvariantCulture));
     }
 
@@ -147,7 +173,7 @@ internal static class SongSpeedControl
         lastSpeedKeyTime = 0;
     }
 
-    private static void DrawNativeSpeedEntry(string digits)
+    private static void DrawNativeSpeedEntry(string digits, bool pending = false)
     {
         if (songOptions == null) return;
         try
@@ -186,15 +212,27 @@ internal static class SongSpeedControl
                     }
                     else { speedLabelPrefix = "Speed: "; speedLabelSuffix = "%"; }
                 }
+                nativeDisplayedDigits = null;
+                nativeDisplayedPending = false;
             }
             if (nativeSpeedLabel != null)
             {
-                string display = speedLabelPrefix + digits + speedLabelSuffix;
+                // Avoid repeated IL2CPP string reads and TMP rebuilds when the
+                // desired value is unchanged. Recheck occasionally in case the
+                // game's own menu refresh overwrites the temporary edit text.
+                if (string.Equals(nativeDisplayedDigits, digits, StringComparison.Ordinal)
+                    && nativeDisplayedPending == pending
+                    && Time.unscaledTime < nextNativeLabelCheck)
+                    return;
+                string display = speedLabelPrefix + digits + speedLabelSuffix + (pending ? "*" : "");
                 if (!string.Equals(nativeSpeedLabel.text, display, StringComparison.Ordinal))
                     nativeSpeedLabel.text = display;
+                nativeDisplayedDigits = digits;
+                nativeDisplayedPending = pending;
+                nextNativeLabelCheck = Time.unscaledTime + .15f;
             }
         }
-        catch { nativeSpeedLabel = null; }
+        catch { nativeSpeedLabel = null; nativeDisplayedDigits = null; nativeDisplayedPending = false; }
     }
 
     public static bool TryRead(out int speed)
@@ -206,7 +244,7 @@ internal static class SongSpeedControl
             return false;
         }
         speed = Marshal.ReadInt32(setting, SpeedValueOffset);
-        return speed >= MinimumSpeed && speed <= MaximumSpeed;
+        return speed >= 1 && speed <= MaximumSpeed;
     }
 
     public static unsafe bool TryWrite(int speed)
@@ -228,14 +266,6 @@ internal static class SongSpeedControl
         if (exception == IntPtr.Zero && Marshal.ReadInt32(setting, SpeedValueOffset) == speed)
             return true;
 
-        // The current menu setter may clamp the removed 1–9% range to 10%.
-        // Preserve its normal side effects for accepted values, but bypass its
-        // minimum clamp for these legacy values so the runtime can still use them.
-        if (speed >= MinimumSpeed && speed < 10)
-        {
-            Marshal.WriteInt32(setting, SpeedValueOffset, speed);
-            return Marshal.ReadInt32(setting, SpeedValueOffset) == speed;
-        }
         return false;
     }
 

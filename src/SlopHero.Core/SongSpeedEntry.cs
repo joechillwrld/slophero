@@ -5,7 +5,7 @@ namespace SlopHero.Core;
 public sealed class SongSpeedEntry
 {
     public const int MaximumDigits = 4;
-    public const int MinimumSpeed = 1;
+    public const int MinimumSpeed = 10;
     public const int MaximumSpeed = 5000;
     public string Text { get; private set; } = "";
 

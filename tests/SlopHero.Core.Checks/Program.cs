@@ -139,11 +139,11 @@ Check(speedEntry.Text == "5000", "Speed entry remains bounded to four digits");
 speedEntry.Clear(); speedEntry.Append(0);
 Check(!speedEntry.TryGetSpeed(out _), "Zero is visible during entry but not applied as a speed");
 speedEntry.Clear(); speedEntry.Append(1);
-Check(speedEntry.Text == "1" && speedEntry.TryGetSpeed(out enteredSpeed) && enteredSpeed == 1,
-    "Legacy sub-10% speeds remain valid while typing");
+Check(speedEntry.Text == "1" && !speedEntry.TryGetSpeed(out _),
+    "Unsupported sub-10% entry remains visible while typing but is not applied");
 speedEntry.Append(0);
 Check(speedEntry.Text == "10" && speedEntry.TryGetSpeed(out enteredSpeed) && enteredSpeed == 10,
-    "Typing the zero advances from 1% to 10%");
+    "Typing the zero commits the supported 10% minimum");
 speedEntry.Clear(); speedEntry.Append(5); speedEntry.Append(0); speedEntry.Append(0); speedEntry.Append(1);
 Check(!speedEntry.TryGetSpeed(out _), "Speed entry does not apply values above 5000");
 Check(ChartSpeedLabel.Format(.75f) == "75%", "Slowed chart display");
