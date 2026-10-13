@@ -1,8 +1,8 @@
-# SlopHero 0.4.17 alpha
+# SlopHero 0.4.18 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
+**Version 0.4.18 adds a profile dropdown with per-profile rename controls, menu theme previews, and a clearer selected-page state. Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
 practice stats and FPS HUDs, optional FPS text coloring,
@@ -17,7 +17,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.17 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.17-alpha.zip?raw=true)
+[Download v0.4.18 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.18-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -56,10 +56,12 @@ F8 has seven pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Col
 - Game HUD: move the game's practice stats bar while practice mode is active. Move the
   game's FPS display and optionally set its text color. FPS must first be enabled in
   Clone Hero's own settings. Both positions can also be adjusted with numeric offsets.
-- Profiles: save and instantly switch between full settings profiles or color-only
-  themes, rename selected profiles in-game, or edit JSON files. Files live in `UserData/SlopHero/Profiles`; refresh the page after
+- Profiles: use the dropdown to switch profiles or rename one from its row, save
+  full settings or color-only themes, or edit JSON files. Files live in `UserData/SlopHero/Profiles`; refresh the page after
   adding or editing files there. A theme contains only color-related options, so
   applying one leaves your layout and gameplay options intact.
+  The settings menu can use Classic, Ocean, Plum, or Paper; its preview swatch
+  shows the selected palette.
 - The counter and song HUDs have **Move this HUD**: drag and release to save. F8 returns to
   settings; Escape finishes. Coordinates can also be entered directly.
 - Highway: optionally hide sides, fret strings, or beatlines. These options
@@ -201,6 +203,13 @@ temporary arrays during every repaint.
 
 Added an in-game rename action for the selected full profile or color theme.
 Renaming preserves its settings and refuses to overwrite another profile.
+
+## 0.4.18 settings menu cleanup
+
+Profile selection is now a dropdown with an inline rename control beside each
+profile. The menu shows a preview for its four built-in themes, and the active
+settings page is visibly selected. Spacing and instructions were tightened while
+keeping the existing page structure.
 
 ## 0.3.9 profiling and renderer update
 
