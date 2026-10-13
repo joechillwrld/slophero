@@ -99,7 +99,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.29 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.30 — F8 / Escape to close");
         float tabWidth = 656f / SettingsPages.Length;
         for (int i = 0; i < SettingsPages.Length; i++)
         {
@@ -535,7 +535,7 @@ public sealed partial class Core
     private void DrawSongHud(bool moving = false)
     {
         string text = songText.Length == 0 ? "Chart title (100%)\nArtist: Artist\nCharter: Charter" : songText;
-        songStyle ??= new GUIStyle(GUI.skin.label) { wordWrap = true };
+        songStyle ??= CreateHudStyle(wordWrap: true);
         int size = Math.Clamp(songFont.Value, 14, 48);
         if (styledSongFont != size) { songStyle.fontSize = size; styledSongFont = size; }
         if (styledSongHex != songColor.Value)
@@ -559,11 +559,9 @@ public sealed partial class Core
         int height = (int)(size * 1.35f) * lineCount + 20;
         var p = HudLayout.ClampPosition(songX.Value, songY.Value, width, height, Screen.width, Screen.height);
         var rect = new Rect(p.X, p.Y, width, height);
-        EnsureHudBackground();
         var old = GUI.backgroundColor;
-        try { GUI.backgroundColor = new Color(0, 0, 0, HudLayout.Unit(songOpacity.Value, .65f)); GUI.Box(rect, "", hudBackgroundStyle); }
+        try { GUI.backgroundColor = new Color(0, 0, 0, HudLayout.Unit(songOpacity.Value, .65f)); GUI.Box(rect, text, songStyle); }
         finally { GUI.backgroundColor = old; }
-        GUI.Label(new Rect(rect.x + 12, rect.y + 8, width - 24, height - 16), text, songStyle);
         if (!moving) return;
         var e = Event.current;
         if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))

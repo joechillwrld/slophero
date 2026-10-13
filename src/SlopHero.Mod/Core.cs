@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.29", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.30", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -47,7 +47,6 @@ public sealed partial class Core : MelonMod
     private GUIStyle? hudStyle;
     private int styledHudFont = -1;
     private Color styledHudColor;
-    private GUIStyle? hudBackgroundStyle;
     private bool hudRenderFailed, hudRenderErrorLogged, settingsRenderErrorLogged, guiErrorLogged;
 
     public override void OnInitializeMelon()
@@ -479,7 +478,7 @@ public sealed partial class Core : MelonMod
     private void DrawHud(string text)
     {
         if (moveHud && moveSong) { DrawSongHud(true); return; }
-        hudStyle ??= new GUIStyle(GUI.skin.label);
+        hudStyle ??= CreateHudStyle();
         int size = Math.Clamp(fontSize.Value, 14, 48);
         Color color = new(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1);
         if (styledHudFont != size) { hudStyle.fontSize = size; styledHudFont = size; }
@@ -490,17 +489,13 @@ public sealed partial class Core : MelonMod
         int height = (int)(size * 1.25f) * lines + 20;
         var position = HudLayout.ClampPosition(hudX.Value, hudY.Value, width, height, Screen.width, Screen.height);
         Rect rect = new(position.X, position.Y, width, height);
-        // DrawTexture's final overload is an unstripping-failed stub in the
-        // supplied game assemblies. GUI.Box invokes the available native API.
-        EnsureHudBackground();
         Color previousBackground = GUI.backgroundColor;
         try
         {
             GUI.backgroundColor = new Color(0, 0, 0, HudLayout.Unit(backgroundOpacity.Value, .65f));
-            GUI.Box(rect, "", hudBackgroundStyle);
+            GUI.Box(rect, text, hudStyle);
         }
         finally { GUI.backgroundColor = previousBackground; }
-        GUI.Label(new Rect(rect.x + 12, rect.y + 8, width - 24, height - 8), text, hudStyle);
         if (!moveHud) return;
         var evt = Event.current;
         if (evt.type == EventType.MouseDown && evt.button == 0 && rect.Contains(evt.mousePosition))
@@ -526,15 +521,18 @@ public sealed partial class Core : MelonMod
         }
     }
 
-    private void EnsureHudBackground()
+    private static GUIStyle CreateHudStyle(bool wordWrap = false)
     {
-        if (hudBackgroundStyle != null) return;
-        hudBackgroundStyle = new GUIStyle(GUI.skin.label);
+        var style = new GUIStyle(GUI.skin.label) { wordWrap = wordWrap };
+        var padding = style.padding;
+        padding.left = 12; padding.right = 12; padding.top = 8; padding.bottom = 8;
+        style.padding = padding;
         var texture = Texture2D.whiteTexture;
-        hudBackgroundStyle.normal.background = texture;
-        hudBackgroundStyle.hover.background = texture;
-        hudBackgroundStyle.active.background = texture;
-        hudBackgroundStyle.focused.background = texture;
+        style.normal.background = texture;
+        style.hover.background = texture;
+        style.active.background = texture;
+        style.focused.background = texture;
+        return style;
     }
 
     private void DrawBasicHud(string text)

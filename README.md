@@ -1,8 +1,8 @@
-# SlopHero 0.4.29 alpha
+# SlopHero 0.4.30 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.29 skips empty HUD repaints and avoids chart-stat scans when counters are hidden or their data isn't displayed.** Version 0.4.28 extends the timing capture with Unity frame-time percentiles and active HUD positions. It also caches hotkey parsing and skips practice-speed scans outside practice. Version 0.4.27 reduces practice-speed compensation work to 20 clock samples and 10 renderer updates per second, and refreshes cosmetic score colors at 5 Hz. Version 0.4.26 limits playable speed to 10–5000%, because the removed sub-10% values desynchronize chart and audio playback. It batches typed digits, marks pending input with `*`, and applies the final value after a short pause. Version 0.4.25 added Escape cleanup; version 0.4.24 adds live digit display, Backspace, and Delete to Clone Hero's pre-song menu. The speed interval remains a separate Controls-page setting. The settings panel scales around the screen center. Version 0.4.23 moved speed editing into Clone Hero's own menu and removed the separate popup. Version 0.4.22 raised the speed limit to the game's 5000% ceiling. Version 0.4.20 added scaling controls for selected game HUD groups and star-progress coloring that follows the live fill fraction. Version 0.4.19 restores standard navigation buttons and gives the open profile list more breathing room. Version 0.4.18 added a profile dropdown with per-profile rename controls.
+**Version 0.4.30 draws each custom HUD's text and background with one IMGUI control.** Version 0.4.29 skips empty HUD repaints and avoids chart-stat scans when counters are hidden or their data isn't displayed. Version 0.4.28 extends the timing capture with Unity frame-time percentiles and active HUD positions. It also caches hotkey parsing and skips practice-speed scans outside practice. Version 0.4.27 reduces practice-speed compensation work to 20 clock samples and 10 renderer updates per second, and refreshes cosmetic score colors at 5 Hz. Version 0.4.26 limits playable speed to 10–5000%, because the removed sub-10% values desynchronize chart and audio playback. It batches typed digits, marks pending input with `*`, and applies the final value after a short pause. Version 0.4.25 added Escape cleanup; version 0.4.24 adds live digit display, Backspace, and Delete to Clone Hero's pre-song menu. The speed interval remains a separate Controls-page setting. The settings panel scales around the screen center. Version 0.4.23 moved speed editing into Clone Hero's own menu and removed the separate popup. Version 0.4.22 raised the speed limit to the game's 5000% ceiling. Version 0.4.20 added scaling controls for selected game HUD groups and star-progress coloring that follows the live fill fraction. Version 0.4.19 restores standard navigation buttons and gives the open profile list more breathing room. Version 0.4.18 added a profile dropdown with per-profile rename controls.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.29 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.29-alpha.zip?raw=true)
+[Download v0.4.30 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.30-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -252,6 +252,12 @@ persisted sub-10% value to 10% and prevents those values from being applied.
 Typed digits stay visible while being entered, then the mod applies the completed
 speed once after a brief pause or on Enter. This avoids recalculating speed for
 every partial number.
+
+## 0.4.30 HUD rendering
+
+The custom counters and song-info HUD now combine their background and text in
+one IMGUI control, removing a separate GUI control and label layout pass from
+each visible HUD repaint.
 
 ## 0.4.29 idle HUD update
 
