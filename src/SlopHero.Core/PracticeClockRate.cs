@@ -7,6 +7,7 @@ public sealed class PracticeClockRate
     private double windowSongTime, windowRealtime;
     private bool sampled;
     private float rate = float.NaN;
+    public float CurrentRate => rate;
 
     public float Update(double songTime, double realtime, bool active)
     {

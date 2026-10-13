@@ -22,12 +22,14 @@ internal sealed class VisualOverrides
     private double nextScoreColorRefresh;
     private double nextPlayerPass;
     private readonly Dictionary<IntPtr, (double Window, float Speed)> visibility = new();
-    private bool oldSides, oldStrings, oldBeats, oldScore, oldPractice;
+    private bool oldSides, oldStrings, oldBeats, oldScore, oldPractice, oldConstantSpeed;
+    private bool practiceClockSampling;
+    private double nextPracticeClockSample;
     private readonly HashSet<IntPtr> hiddenPlayers = new();
     private bool fullSongSpeedSyncPending = true;
     public bool HasOverrides => hidden.Count != 0 || colors.Count != 0 || speeds.Count != 0 || texts.Count != 0;
     public bool NeedsUpdate => fullSongSpeedSyncPending || HasOverrides;
-    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); starFaceSprites.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = false; nextScoreColorRefresh = nextPlayerPass = 0; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
+    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); starFaceSprites.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = oldConstantSpeed = false; practiceClockSampling = false; nextPracticeClockSample = 0; nextScoreColorRefresh = nextPlayerPass = 0; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
     private SpriteRenderer[] Sprites(GameObject go)
     {
         if (!spriteChildren.TryGetValue(go.Pointer, out var result))
@@ -161,17 +163,32 @@ internal sealed class VisualOverrides
         oldScore = score;
         bool scorePassNeeded = score || restoreScore;
         bool refreshScoreColors = scorePassNeeded && realtime >= nextScoreColorRefresh;
-        // These colors are static; 10 Hz is more than enough for live edits and
-        // avoids repeatedly walking score/star graphics at unlocked FPS rates.
-        if (refreshScoreColors) nextScoreColorRefresh = realtime + .1;
+        // Score colors and star fill are cosmetic; 5 Hz limits traversal and
+        // renderer writes while keeping the progress fill visually responsive.
+        if (refreshScoreColors) nextScoreColorRefresh = realtime + .2;
         bool practiceNow = game.globalVariables != null && game.globalVariables.isPracticeEnabled;
-        // The playback-clock sample is only needed by the optional compensation
-        // feature. Avoid a clock read and stopwatch bookkeeping on the default path.
-        float clockRate = constantSpeed
-            ? practiceClockRate.Update(game.songTimeVideoTime, realtime,
-                practiceNow && game.isSongPlaying && !game.isPaused)
-            : float.NaN;
-        if (!constantSpeed) practiceClockRate.Reset();
+        bool speedCompensationActive = constantSpeed && practiceNow;
+        bool clockSampleActive = speedCompensationActive && game.isSongPlaying && !game.isPaused;
+        float clockRate = float.NaN;
+        if (clockSampleActive)
+        {
+            // The measured rate is aggregated over 200 ms. Sampling it at 20 Hz
+            // is enough; reading the IL2CPP song clock at every unlocked frame
+            // only adds work without improving the compensation estimate.
+            if (!practiceClockSampling || realtime >= nextPracticeClockSample)
+            {
+                practiceClockSampling = true;
+                nextPracticeClockSample = realtime + .05;
+                clockRate = practiceClockRate.Update(game.songTimeVideoTime, realtime, true);
+            }
+            else clockRate = practiceClockRate.CurrentRate;
+        }
+        else if (practiceClockSampling)
+        {
+            practiceClockRate.Reset();
+            practiceClockSampling = false;
+            nextPracticeClockSample = 0;
+        }
         bool practiceChanged = practiceNow != oldPractice;
         if (practiceNow && !oldPractice)
         {
@@ -184,9 +201,8 @@ internal sealed class VisualOverrides
         if (!practiceNow && fullSongSpeedSyncPending)
             fullSongSpeedSyncPending = !SyncFullSongSpeed(game);
         if (!sides && !strings && !beats && !score && !constantSpeed && hidden.Count == 0 && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
-        bool speedCompensationActive = constantSpeed && practiceNow;
         bool playerPassNeeded = sides != oldSides || strings != oldStrings || beats != oldBeats
-            || practiceChanged || refreshScoreColors || speeds.Count > 0 || speedCompensationActive;
+            || practiceChanged || constantSpeed != oldConstantSpeed || refreshScoreColors;
         if (playerPassNeeded || realtime >= nextPlayerPass)
         {
             nextPlayerPass = realtime + .1;
@@ -252,7 +268,7 @@ internal sealed class VisualOverrides
             finally { timings.End(4, playerTiming); }
         }
         oldSides = sides; oldStrings = strings; oldBeats = beats;
-        oldPractice = practiceNow;
+        oldPractice = practiceNow; oldConstantSpeed = constantSpeed;
         if (!score && !restoreScore) return;
         if (!refreshScoreColors) return;
         long graphicsTiming = timings.Begin();
