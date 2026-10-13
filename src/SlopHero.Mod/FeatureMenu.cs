@@ -7,7 +7,7 @@ namespace SlopHero.Mod;
 
 public sealed partial class Core
 {
-    private static readonly string[] SettingsPages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Sizing", "Profiles" };
+    private static readonly string[] SettingsPages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Sizing", "Profiles", "Performance" };
     private MelonPreferences_Entry<bool> showMisses = null!, showHit = null!, showGhosts = null!, showBest = null!;
     private MelonPreferences_Entry<bool> showSong = null!, showTitle = null!, showArtist = null!, showCharter = null!, showSpeed = null!;
     private MelonPreferences_Entry<int> songX = null!, songY = null!, songFont = null!;
@@ -16,10 +16,14 @@ public sealed partial class Core
     private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!;
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
     private MelonPreferences_Entry<bool> customizeFpsColor = null!;
+    private MelonPreferences_Entry<bool> disableHitParticles = null!, disableSustainParticles = null!, disableFretEffects = null!;
+    private MelonPreferences_Entry<bool> stopMidiInput = null!, disableDiscordPresence = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, songProgressHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
     private readonly VisualOverrides visuals = new();
     private readonly RingColors rings = new();
+    private readonly PerformanceOverrides performance = new();
+    private readonly OptionalServiceOverrides optionalServices = new();
     private readonly RuntimeTimings timings = new();
     private string songText = "", editText = "", editLabel = "", editError = "";
     private Action<string>? editApply;
@@ -70,6 +74,11 @@ public sealed partial class Core
         tintFc = preferences.CreateEntry("CustomizeFcRings", false);
         tintScore = preferences.CreateEntry("CustomizeScoreColors", false);
         lockSpeed = preferences.CreateEntry("ConstantPracticeNoteSpeed", false);
+        disableHitParticles = preferences.CreateEntry("PerformanceDisableHitParticles", false);
+        disableSustainParticles = preferences.CreateEntry("PerformanceDisableSustainParticles", false);
+        disableFretEffects = preferences.CreateEntry("PerformanceDisableFretEffects", false);
+        stopMidiInput = preferences.CreateEntry("PerformanceStopMidiInput", false);
+        disableDiscordPresence = preferences.CreateEntry("PerformanceDisableDiscordPresence", false);
         fcColor = preferences.CreateEntry("FcColor", "FFD700");
         pfcColor = preferences.CreateEntry("PerfectFcColor", "00FFFF");
         songProgressColor = preferences.CreateEntry("SongProgressColor", "00FFFF");
@@ -99,7 +108,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.30 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.31 — F8 / Escape to close");
         float tabWidth = 656f / SettingsPages.Length;
         for (int i = 0; i < SettingsPages.Length; i++)
         {
@@ -194,6 +203,18 @@ public sealed partial class Core
                 break;
             case 7:
                 DrawProfiles(x, y);
+                break;
+            case 8:
+                Toggle(disableHitParticles, "Stop note-hit particle simulation", x, y);
+                Toggle(disableSustainParticles, "Stop sustain particle simulation", x, y + 42);
+                Toggle(disableFretEffects, "Stop fret flames, sparks, and lightning", x, y + 84);
+                Toggle(stopMidiInput, "Pause drum MIDI input polling", x, y + 126);
+                Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to re-enable)", x, y + 168);
+                GUI.Label(new Rect(x, y + 222, 632, 120),
+                    "Independent, optional switches. Effect switches stop their components, not just their drawing. " +
+                    "They do not change notes, scoring, or timing. MIDI restores immediately when switched off. " +
+                    "Discord presence is disabled for the rest of this session; switch it off and restart the game to restore it. " +
+                    "Online play and leaderboards remain enabled.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -619,9 +640,13 @@ public sealed partial class Core
         // the IL2CPP callback entirely when every optional override is idle.
         bool visualRequested = hideSides.Value || hideStrings.Value || hideBeats.Value || tintScore.Value;
         bool practiceSpeedRequested = lockSpeed.Value && game.globalVariables.isPracticeEnabled;
-        if (!visualRequested && !practiceSpeedRequested && !visuals.NeedsUpdate && !tintFc.Value && !rings.NeedsUpdate) return;
+        bool performanceRequested = disableHitParticles.Value || disableSustainParticles.Value || disableFretEffects.Value;
+        if (!visualRequested && !practiceSpeedRequested && !visuals.NeedsUpdate && !tintFc.Value && !rings.NeedsUpdate
+            && !performanceRequested && !performance.NeedsUpdate) return;
         try
         {
+            performance.Apply(game, disableHitParticles.Value, disableSustainParticles.Value,
+                disableFretEffects.Value, clock.Elapsed.TotalSeconds);
             Color Read(MelonPreferences_Entry<string> e)
             {
                 if (parsedColors.TryGetValue(e.Value, out var cached)) return cached;

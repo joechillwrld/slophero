@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.30", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.31", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -43,7 +43,6 @@ public sealed partial class Core : MelonMod
     private int? pendingSection;
     private IntPtr pendingSong;
     private IntPtr sourceManager;
-    private IntPtr statsEngine;
     private GUIStyle? hudStyle;
     private int styledHudFont = -1;
     private Color styledHudColor;
@@ -94,6 +93,7 @@ public sealed partial class Core : MelonMod
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
         visuals.Clear();
+        performance.Clear();
         nativeHud.Clear();
         nativeMoveTarget = 0;
         nativeHudDragging = false;
@@ -101,7 +101,6 @@ public sealed partial class Core : MelonMod
         nativeHudActive = false;
         rings.Clear();
         visualError = false;
-        statsEngine = IntPtr.Zero;
         nextStats = 0;
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
@@ -134,18 +133,20 @@ public sealed partial class Core : MelonMod
         nativeHudActive = false;
         rings.Clear();
         visualError = false;
-        statsEngine = IntPtr.Zero;
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
     }
 
     public override void OnUpdate()
     {
-        timings.SampleFrame(Time.unscaledDeltaTime * 1000f);
+        // Frame timing is diagnostic only. Avoid reading Unity's frame clock
+        // and sampling it on every update when no capture is running.
+        if (timings.Active) timings.SampleFrame(Time.unscaledDeltaTime * 1000f);
         long timingStart = timings.Begin();
         try
         {
             double now = clock.Elapsed.TotalSeconds;
+            optionalServices.Apply(stopMidiInput.Value, disableDiscordPresence.Value, now);
             if (Input.GetKeyDown(KeyCode.F8))
             {
                 if (moveHud) { moveHud = false; settingsOpen = true; }
@@ -254,7 +255,6 @@ public sealed partial class Core : MelonMod
                         statsText = "";
                     else
                     {
-                        if (player.engine.Pointer != statsEngine) statsEngine = player.engine.Pointer;
                         LiveStats stats = detailedCounters ? statsReader.Read(player.engine, game) : default;
                         var lines = new List<string>();
                         if (showMisses.Value) lines.Add($"Misses: {stats.Misses}");
@@ -634,6 +634,8 @@ public sealed partial class Core : MelonMod
     public override void OnDeinitializeMelon()
     {
         timings.Finish();
+        performance.Clear();
+        optionalServices.Restore();
         settingsOpen = moveHud = hudDragging = false;
         SavePreferences();
         UpdateCursor();
