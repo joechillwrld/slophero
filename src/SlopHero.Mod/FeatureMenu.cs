@@ -89,15 +89,17 @@ public sealed partial class Core
         Matrix4x4 previousMatrix = GUI.matrix;
         float centerX = Screen.width * .5f, centerY = Screen.height * .5f;
         scale = Math.Min(scale, Math.Min(Math.Max(.5f, (Screen.width - 20f) / 680f), Math.Max(.5f, (Screen.height - 20f) / 660f)));
-        GUI.matrix = previousMatrix * Matrix4x4.TRS(new Vector3(centerX * (1 - scale), centerY * (1 - scale), 0), Quaternion.identity, new Vector3(scale, scale, 1));
+        GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), new Vector2(centerX, centerY));
         try { DrawScaledSettingsPage(scale); }
         finally { GUI.matrix = previousMatrix; }
     }
 
     private void DrawScaledSettingsPage(float scale)
     {
-        float x = Math.Max(10, (Screen.width / scale - 680) / 2f), y = Math.Max(10, (Screen.height / scale - 660) / 2f);
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.22 — F8 / Escape to close");
+        // Keep the unscaled panel centered in screen coordinates; the GUI matrix
+        // scales around the screen center, so its visible bounds remain centered.
+        float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.23 — F8 / Escape to close");
         float tabWidth = 656f / SettingsPages.Length;
         for (int i = 0; i < SettingsPages.Length; i++)
         {
@@ -120,7 +122,8 @@ public sealed partial class Core
                 Number("Hold duration (seconds)", (float)Duration, x, y + 94, .25f, 3, v => holdSeconds.Value = v);
                 Number("Settings menu size", settingsMenuScale.Value, x, y + 146, .85f, 1.4f, v => { settingsMenuScale.Value = v; preferencesDirty = true; });
                 GUI.Label(new Rect(x, y + 194, 632, 70), capture == null ? "Song actions apply to solo Quickplay.\nPractice begins at the start of your current named section." : $"Press a key or controller button for {capture}.");
-                if (GUI.Button(new Rect(x, y + 290, 540, 32), timings.Active ? "Finish timing report" : "Capture mod timings for 30 seconds"))
+                Number("Song speed step (%)", songSpeedStep.Value, x, y + 266, 1, 500, v => songSpeedStep.Value = SongSpeedControl.ClampStep((int)Math.Round(v)));
+                if (GUI.Button(new Rect(x, y + 310, 540, 32), timings.Active ? "Finish timing report" : "Capture mod timings for 30 seconds"))
                 {
                     if (timings.Active) timings.Finish();
                     else if (gameplayInitialized)
@@ -130,7 +133,8 @@ public sealed partial class Core
                     }
                     else Notice("Start a song before capturing mod timings.");
                 }
-                GUI.Label(new Rect(x, y + 338, 540, 70), "Timings are written to Latest.log. Close this menu and play.");
+                GUI.Label(new Rect(x, y + 348, 540, 42), "On the game's speed row, type 1–5000 to set it. Arrow changes use this step.");
+                GUI.Label(new Rect(x, y + 394, 540, 50), "Timings are written to Latest.log. Close this menu and play.");
                 break;
             case 1:
                 Toggle(showHud, "Counter HUD", x, y); Toggle(showMisses, "Misses", x, y + 40);

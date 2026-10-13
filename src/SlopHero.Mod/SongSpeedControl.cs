@@ -16,6 +16,10 @@ internal static class SongSpeedControl
     private const string UpdateValueMethod = "ʸʾʵʽʳʾʾʻʷʲʽ";
     private static IntPtr speedSettingField;
     private static Il2Cpp.SongOptions? songOptions;
+    private static bool trackingMenuSpeed;
+    private static int lastMenuSpeed;
+    private static string typedSpeed = "";
+    private static double lastSpeedKeyTime;
 
     public static bool IsSpeedOptionOpen()
     {
@@ -29,7 +33,64 @@ internal static class SongSpeedControl
             && Marshal.ReadInt32(songOptions.Pointer, SongOptionsSelectionOffset) == 0;
     }
 
-    public static void ResetMenuCache() => songOptions = null;
+    public static void ResetMenuCache()
+    {
+        songOptions = null;
+        trackingMenuSpeed = false;
+        typedSpeed = "";
+        lastSpeedKeyTime = 0;
+    }
+
+    public static void ProcessSelectedSpeedInput(int step, double now)
+    {
+        if (!IsSpeedOptionOpen() || !TryRead(out int current))
+        {
+            trackingMenuSpeed = false;
+            typedSpeed = "";
+            return;
+        }
+
+        if (!trackingMenuSpeed)
+        {
+            lastMenuSpeed = current;
+            trackingMenuSpeed = true;
+        }
+        else if (current != lastMenuSpeed)
+        {
+            int delta = current - lastMenuSpeed;
+            if (delta != 0 && delta % 5 == 0)
+            {
+                int adjusted = Math.Clamp(lastMenuSpeed + Math.Sign(delta) * ClampStep(step) * (Math.Abs(delta) / 5), MinimumSpeed, MaximumSpeed);
+                if (TryWrite(adjusted)) current = adjusted;
+            }
+            lastMenuSpeed = current;
+            typedSpeed = "";
+        }
+
+        string input = Input.inputString;
+        bool backspace = Input.GetKeyDown(KeyCode.Backspace);
+        if (now - lastSpeedKeyTime > 1.25 && input.Length == 0 && !backspace) typedSpeed = "";
+        if (backspace && !input.Contains('\b') && typedSpeed.Length > 0)
+            typedSpeed = typedSpeed[..^1];
+
+        foreach (char key in input)
+        {
+            if (key == '\b')
+            {
+                if (typedSpeed.Length > 0) typedSpeed = typedSpeed[..^1];
+                continue;
+            }
+            if (key is < '0' or > '9' || typedSpeed.Length >= 4) continue;
+            typedSpeed += key;
+        }
+        if (input.Length > 0 || backspace) lastSpeedKeyTime = now;
+
+        if (TryParsePercent(typedSpeed, out int typedValue) && typedValue != current && TryWrite(typedValue))
+        {
+            current = typedValue;
+            lastMenuSpeed = typedValue;
+        }
+    }
 
     public static bool TryRead(out int speed)
     {
