@@ -2,10 +2,11 @@ using System.Diagnostics;
 using System.Globalization;
 using Il2Cpp;
 using MelonLoader;
+using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.15", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.16", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -16,6 +17,10 @@ public sealed partial class Core : MelonMod
     private readonly HoldTrigger practiceHold = new();
     private readonly ChartStats statsReader = new();
     private readonly NativeHudLayout nativeHud = new();
+    private SettingsProfiles? settingsProfiles;
+    private string[] profileNames = Array.Empty<string>();
+    private int profileIndex;
+    private string profileNotice = "";
     private readonly Stopwatch clock = Stopwatch.StartNew();
     private MelonPreferences_Category preferences = null!;
     private MelonPreferences_Entry<string> restartButton = null!, practiceButton = null!;
@@ -66,6 +71,12 @@ public sealed partial class Core : MelonMod
             preferences.SaveToFile();
         }
         InitializeFeatures();
+        try
+        {
+            settingsProfiles = new SettingsProfiles(MelonEnvironment.UserDataDirectory);
+            RefreshProfiles();
+        }
+        catch (Exception ex) { LoggerInstance.Warning($"Settings profiles unavailable: {ex.Message}"); }
         compatible = BuildGuard.Matches(out status);
         if (compatible)
         {
@@ -449,7 +460,9 @@ public sealed partial class Core : MelonMod
         if (styledHudFont != size) { hudStyle.fontSize = size; styledHudFont = size; }
         if (styledHudColor != color) { hudStyle.normal.textColor = color; styledHudColor = color; }
         int width = Math.Max(240, size * 12 + 24);
-        int height = (int)(size * 1.25f) * (1 + text.Count(c => c == '\n')) + 20;
+        int lines = 1;
+        for (int i = 0; i < text.Length; i++) if (text[i] == '\n') lines++;
+        int height = (int)(size * 1.25f) * lines + 20;
         var position = HudLayout.ClampPosition(hudX.Value, hudY.Value, width, height, Screen.width, Screen.height);
         Rect rect = new(position.X, position.Y, width, height);
         // DrawTexture's final overload is an unstripping-failed stub in the

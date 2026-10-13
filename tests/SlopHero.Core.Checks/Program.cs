@@ -1,4 +1,5 @@
 using SlopHero.Core;
+using SlopHero.Mod;
 
 int checks = 0;
 void Check(bool condition, string name)
@@ -136,4 +137,18 @@ Check(NativeRingState.IsPerfectFc(.00001f), "Native perfect FC hue tolerates flo
 Check(!NativeRingState.IsPerfectFc(1f / 6f), "Native regular FC hue selects regular ring color");
 Check(!NativeRingState.IsPerfectFc(.35f), "Unrelated native ring hue is not classified as perfect FC");
 Check(!NativeRingState.IsPerfectFc(float.NaN), "Invalid native ring hue is not perfect FC");
+string profileRoot = Path.Combine(Path.GetTempPath(), "SlopHero-profile-check-" + Guid.NewGuid().ToString("N"));
+try
+{
+    var profiles = new SettingsProfiles(profileRoot);
+    var settings = new Dictionary<string, string> { ["FcColor"] = "FF8800", ["ShowHud"] = "true" };
+    profiles.Save("Warm Theme", settings);
+    Check(profiles.List().SequenceEqual(new[] { "Warm Theme" }), "Profile list returns saved file names");
+    Check(profiles.TryLoad("Warm Theme", out var loaded) && loaded.Count == 2
+        && loaded["FcColor"] == "FF8800" && loaded["ShowHud"] == "true", "Profile JSON round trips settings");
+    bool rejected = false;
+    try { profiles.Save("../outside", settings); } catch (FormatException) { rejected = true; }
+    Check(rejected && !File.Exists(Path.Combine(profileRoot, "outside.json")), "Profile names cannot escape the profile folder");
+}
+finally { if (Directory.Exists(profileRoot)) Directory.Delete(profileRoot, true); }
 Console.WriteLine($"Passed {checks} checks.");

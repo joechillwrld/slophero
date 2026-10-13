@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/SlopHero.Core/SlopHero.Core.csproj" />
+    <Compile Include="../../src/SlopHero.Mod/SettingsProfiles.cs" Link="Mod/SettingsProfiles.cs" />
   </ItemGroup>
 </Project>

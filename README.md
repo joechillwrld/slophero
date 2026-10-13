@@ -1,8 +1,9 @@
-# SlopHero 0.4.15 alpha
+# SlopHero 0.4.16 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
+**Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
+It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
 practice stats and FPS HUDs, optional FPS text coloring,
 and skips inactive native HUD polling. It also skips counter sampling when both
@@ -16,7 +17,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.15 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.15-alpha.zip?raw=true)
+[Download v0.4.16 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.16-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -39,7 +40,7 @@ are needed. Remove `Mods/SlopHero.dll` to uninstall. Preferences can remain.
 
 Pause the game before editing settings. Press **F8** for the settings panel.
 
-F8 has six pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colors**, and **Game HUD**.
+F8 has seven pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, and **Profiles**.
 
 - Click a numeric or color value and type a replacement. Enter or **Apply** saves;
   Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.
@@ -55,7 +56,11 @@ F8 has six pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Color
 - Game HUD: move the game's practice stats bar while practice mode is active. Move the
   game's FPS display and optionally set its text color. FPS must first be enabled in
   Clone Hero's own settings. Both positions can also be adjusted with numeric offsets.
-- Both HUDs have **Move this HUD**: drag and release to save. F8 returns to
+- Profiles: save and instantly switch between full settings profiles or color-only
+  themes. JSON files live in `UserData/SlopHero/Profiles`; refresh the page after
+  adding or editing files there. A theme contains only color-related options, so
+  applying one leaves your layout and gameplay options intact.
+- The counter and song HUDs have **Move this HUD**: drag and release to save. F8 returns to
   settings; Escape finishes. Coordinates can also be entered directly.
 - Highway: optionally hide sides, fret strings, or beatlines. These options
   affect renderers, preserving gameplay objects and practice initialization.
@@ -184,6 +189,13 @@ Fixed a missed score-color restore that could keep visual overrides active after
 turning custom colors off. Static player and score graphics are refreshed at 10 Hz;
 practice speed compensation remains on the live gameplay path. FPS text color and
 position now target its shared row, including the two numeric FPS readouts.
+
+## 0.4.16 profiles and HUD repaint work
+
+Added JSON full-profile and color-theme save/load controls to F8 → Profiles.
+Profiles apply immediately, and can also be edited or added in
+`UserData/SlopHero/Profiles`. HUD line-height calculation no longer allocates
+temporary arrays during every repaint.
 
 ## 0.3.9 profiling and renderer update
 

@@ -7,6 +7,7 @@ namespace SlopHero.Mod;
 
 public sealed partial class Core
 {
+    private static readonly string[] SettingsPages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Profiles" };
     private MelonPreferences_Entry<bool> showMisses = null!, showHit = null!, showGhosts = null!, showBest = null!;
     private MelonPreferences_Entry<bool> showSong = null!, showTitle = null!, showArtist = null!, showCharter = null!, showSpeed = null!;
     private MelonPreferences_Entry<int> songX = null!, songY = null!, songFont = null!;
@@ -71,11 +72,10 @@ public sealed partial class Core
     {
         if (editApply != null) { DrawValueEditor(); return; }
         float x = Math.Max(10, (Screen.width - 580) / 2f), y = Math.Max(10, (Screen.height - 600) / 2f);
-        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.15 — F8 / Escape to close");
-        string[] pages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Game HUD" };
-        float tabWidth = 556f / pages.Length;
-        for (int i = 0; i < pages.Length; i++)
-            if (GUI.Button(new Rect(x + 12 + i * tabWidth, y + 32, tabWidth - 4, 30), pages[i])) settingsPage = i;
+        GUI.Box(new Rect(x, y, 580, 600), "SlopHero 0.4.16 — F8 / Escape to close");
+        float tabWidth = 556f / SettingsPages.Length;
+        for (int i = 0; i < SettingsPages.Length; i++)
+            if (GUI.Button(new Rect(x + 12 + i * tabWidth, y + 32, tabWidth - 4, 30), SettingsPages[i])) settingsPage = i;
         x += 20; y += 80;
         GUI.Label(new Rect(x, y, 540, 25), "Pause before editing. Click a value to type; Enter applies, Escape cancels.");
         y += 34;
@@ -140,6 +140,9 @@ public sealed partial class Core
                 Hex(fpsTextColor, "FPS text color", x, y + 314);
                 GUI.Label(new Rect(x, y + 356, 540, 60), "Move the practice bar while in practice. The game's FPS display must be enabled before you move or recolor it.");
                 break;
+            case 6:
+                DrawProfiles(x, y);
+                break;
         }
         if (editApply != null) DrawValueEditor();
     }
@@ -161,6 +164,147 @@ public sealed partial class Core
         UpdateCursor();
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
+    }
+
+    private void DrawProfiles(float x, float y)
+    {
+        GUI.Label(new Rect(x, y, 540, 44), "Profiles and color themes are JSON files. Switching applies immediately; save the current settings first if needed.");
+        string current = profileNames.Length == 0 ? "No profiles found" : $"Selected: {profileNames[profileIndex]} ({profileIndex + 1}/{profileNames.Length})";
+        if (GUI.Button(new Rect(x, y + 50, 260, 34), "‹ Apply previous")) ApplyProfile(-1);
+        if (GUI.Button(new Rect(x + 280, y + 50, 260, 34), "Apply next ›")) ApplyProfile(1);
+        GUI.Box(new Rect(x, y + 91, 540, 32), current);
+        if (GUI.Button(new Rect(x, y + 132, 260, 36), "Save full profile as…"))
+            Edit("Save full profile (name)", "", SaveFullProfile);
+        if (GUI.Button(new Rect(x + 280, y + 132, 260, 36), "Save color theme as…"))
+            Edit("Save color theme (name)", "", SaveColorTheme);
+        if (GUI.Button(new Rect(x, y + 178, 540, 32), "Refresh profile folder")) RefreshProfiles();
+        GUI.Label(new Rect(x, y + 218, 540, 66), settingsProfiles == null
+            ? "Profile folder unavailable; see Latest.log."
+            : "Drop or edit .json files in:\n" + settingsProfiles.DirectoryPath);
+        if (profileNotice.Length > 0) GUI.Label(new Rect(x, y + 294, 540, 60), profileNotice);
+    }
+
+    private void RefreshProfiles()
+    {
+        if (settingsProfiles == null) return;
+        string selected = profileNames.Length == 0 ? "" : profileNames[Math.Clamp(profileIndex, 0, profileNames.Length - 1)];
+        profileNames = settingsProfiles.List();
+        int found = Array.FindIndex(profileNames, n => string.Equals(n, selected, StringComparison.OrdinalIgnoreCase));
+        profileIndex = found >= 0 ? found : 0;
+    }
+
+    private void ApplyProfile(int direction)
+    {
+        if (settingsProfiles == null || profileNames.Length == 0)
+        { profileNotice = "No profile files found. Save one here or add a .json file to the folder."; return; }
+        profileIndex = (profileIndex + direction + profileNames.Length) % profileNames.Length;
+        string name = profileNames[profileIndex];
+        try
+        {
+            if (!settingsProfiles.TryLoad(name, out var values))
+            { profileNotice = $"Could not read '{name}.json'. Check its JSON format."; return; }
+            int invalid = ApplyProfileValues(values);
+            nextStats = 0;
+            preferencesDirty = true;
+            SavePreferences();
+            profileNotice = invalid == 0 ? $"Applied '{name}'." : $"Applied '{name}'; skipped {invalid} invalid value(s).";
+            LoggerInstance.Msg(profileNotice);
+        }
+        catch (Exception ex)
+        {
+            profileNotice = $"Could not apply '{name}': {ex.Message}";
+            LoggerInstance.Warning(profileNotice);
+        }
+    }
+
+    private void SaveFullProfile(string name) => SaveProfile(name, false);
+    private void SaveColorTheme(string name) => SaveProfile(name, true);
+
+    private void SaveProfile(string name, bool colorsOnly)
+    {
+        if (settingsProfiles == null) { profileNotice = "Profile folder is unavailable."; return; }
+        try
+        {
+            settingsProfiles.Save(name, CaptureProfileValues(colorsOnly));
+            RefreshProfiles();
+            int found = Array.FindIndex(profileNames, n => string.Equals(n, name.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (found >= 0) profileIndex = found;
+            profileNotice = $"Saved {(colorsOnly ? "color theme" : "profile")} '{name.Trim()}'.";
+            LoggerInstance.Msg(profileNotice);
+        }
+        catch (Exception ex)
+        {
+            profileNotice = $"Could not save profile: {ex.Message}";
+            LoggerInstance.Warning(profileNotice);
+        }
+    }
+
+    private Dictionary<string, string> CaptureProfileValues(bool colorsOnly)
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        void Add(string key, object value) => values[key] = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
+        void Bool(string key, MelonPreferences_Entry<bool> value) => Add(key, value.Value);
+        void Int(string key, MelonPreferences_Entry<int> value) => Add(key, value.Value);
+        void Float(string key, MelonPreferences_Entry<float> value) => Add(key, value.Value.ToString("R", CultureInfo.InvariantCulture));
+        void Text(string key, MelonPreferences_Entry<string> value) => Add(key, value.Value);
+
+        if (!colorsOnly)
+        {
+            Text("RestartButton", restartButton); Text("PracticeButton", practiceButton); Float("HoldSeconds", holdSeconds);
+            Int("HudX", hudX); Int("HudY", hudY); Int("FontSize", fontSize); Bool("ShowHud", showHud);
+            Float("BackgroundOpacity", backgroundOpacity); Float("TextRed", textRed); Float("TextGreen", textGreen); Float("TextBlue", textBlue);
+            Bool("ShowMisses", showMisses); Bool("ShowHitPercentage", showHit); Bool("ShowGhosts", showGhosts); Bool("ShowBestStreak", showBest);
+            Bool("ShowSongHud", showSong); Bool("ShowSongTitle", showTitle); Bool("ShowArtist", showArtist); Bool("ShowCharter", showCharter); Bool("ShowChartSpeed", showSpeed);
+            Int("SongHudX", songX); Int("SongHudY", songY); Int("SongFontSize", songFont); Float("SongBackgroundOpacity", songOpacity);
+            Float("PracticeHudOffsetX", practiceHudX); Float("PracticeHudOffsetY", practiceHudY); Float("FpsHudOffsetX", fpsHudX); Float("FpsHudOffsetY", fpsHudY);
+            Bool("HideHighwaySides", hideSides); Bool("HideFretStrings", hideStrings); Bool("HideBeatlines", hideBeats); Bool("ConstantPracticeNoteSpeed", lockSpeed);
+        }
+        Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
+        Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
+        Text("ProgressColor", progressColor); Text("ScoreTextColor", scoreColor); Text("SongProgressColor", songProgressColor); Text("FpsTextColor", fpsTextColor);
+        if (colorsOnly)
+        {
+            Float("TextRed", textRed); Float("TextGreen", textGreen); Float("TextBlue", textBlue); Float("BackgroundOpacity", backgroundOpacity); Float("SongBackgroundOpacity", songOpacity);
+        }
+        return values;
+    }
+
+    private int ApplyProfileValues(Dictionary<string, string> values)
+    {
+        int invalid = 0;
+        void Bool(string key, MelonPreferences_Entry<bool> entry)
+        { if (!values.TryGetValue(key, out var s)) return; if (bool.TryParse(s, out bool v)) entry.Value = v; else invalid++; }
+        void Int(string key, MelonPreferences_Entry<int> entry, int min, int max)
+        { if (!values.TryGetValue(key, out var s)) return; if (int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out int v)) entry.Value = Math.Clamp(v, min, max); else invalid++; }
+        void Float(string key, MelonPreferences_Entry<float> entry, float min, float max)
+        { if (!values.TryGetValue(key, out var s)) return; if (float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out float v) && float.IsFinite(v)) entry.Value = Math.Clamp(v, min, max); else invalid++; }
+        void Hex(string key, MelonPreferences_Entry<string> entry)
+        { if (!values.TryGetValue(key, out var s)) return; try { entry.Value = ColorHex(ParseColor(s)); } catch (FormatException) { invalid++; } }
+        void Binding(string key, MelonPreferences_Entry<string> entry)
+        { if (!values.TryGetValue(key, out var s)) return; if (ValidBinding(s)) entry.Value = s; else invalid++; }
+
+        Binding("RestartButton", restartButton); Binding("PracticeButton", practiceButton); Float("HoldSeconds", holdSeconds, .25f, 3f);
+        Int("HudX", hudX, 0, Math.Max(0, Screen.width)); Int("HudY", hudY, 0, Math.Max(0, Screen.height)); Int("FontSize", fontSize, 14, 48); Bool("ShowHud", showHud);
+        Float("BackgroundOpacity", backgroundOpacity, 0, 1); Float("TextRed", textRed, 0, 1); Float("TextGreen", textGreen, 0, 1); Float("TextBlue", textBlue, 0, 1);
+        Bool("ShowMisses", showMisses); Bool("ShowHitPercentage", showHit); Bool("ShowGhosts", showGhosts); Bool("ShowBestStreak", showBest);
+        Bool("ShowSongHud", showSong); Bool("ShowSongTitle", showTitle); Bool("ShowArtist", showArtist); Bool("ShowCharter", showCharter); Bool("ShowChartSpeed", showSpeed);
+        Int("SongHudX", songX, 0, Math.Max(0, Screen.width)); Int("SongHudY", songY, 0, Math.Max(0, Screen.height)); Int("SongFontSize", songFont, 14, 48); Float("SongBackgroundOpacity", songOpacity, 0, 1);
+        Float("PracticeHudOffsetX", practiceHudX, -1500, 1500); Float("PracticeHudOffsetY", practiceHudY, -1500, 1500); Float("FpsHudOffsetX", fpsHudX, -1500, 1500); Float("FpsHudOffsetY", fpsHudY, -1500, 1500);
+        Bool("HideHighwaySides", hideSides); Bool("HideFretStrings", hideStrings); Bool("HideBeatlines", hideBeats); Bool("ConstantPracticeNoteSpeed", lockSpeed);
+        Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
+        Hex("SongTextColor", songColor); Hex("FcColor", fcColor); Hex("PerfectFcColor", pfcColor); Hex("StarColor", starColor);
+        Hex("ProgressColor", progressColor); Hex("ScoreTextColor", scoreColor); Hex("SongProgressColor", songProgressColor); Hex("FpsTextColor", fpsTextColor);
+        return invalid;
+    }
+
+    private static bool ValidBinding(string value)
+    {
+        var parts = value.Split(':');
+        if (parts.Length == 2 && parts[0] == "Key" && Enum.TryParse(parts[1], out KeyCode key))
+            return Enum.IsDefined(typeof(KeyCode), key) && key != KeyCode.None && key != KeyCode.Escape && key != KeyCode.F8;
+        return parts.Length == 3 && parts[0] == "Joy"
+            && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out _)
+            && int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out int button) && button >= 0;
     }
 
     private void Appearance(float x, float y, bool song)
@@ -287,7 +431,16 @@ public sealed partial class Core
         }
         int width = Math.Min(520, Screen.width);
         int charsPerLine = Math.Max(8, (int)((width - 24) / (size * .6f)));
-        int lineCount = text.Split('\n').Sum(line => Math.Max(1, (line.Length + charsPerLine - 1) / charsPerLine));
+        int lineCount = 0, currentLineLength = 0;
+        for (int i = 0; i <= text.Length; i++)
+        {
+            if (i == text.Length || text[i] == '\n')
+            {
+                lineCount += Math.Max(1, (currentLineLength + charsPerLine - 1) / charsPerLine);
+                currentLineLength = 0;
+            }
+            else currentLineLength++;
+        }
         int height = (int)(size * 1.35f) * lineCount + 20;
         var p = HudLayout.ClampPosition(songX.Value, songY.Value, width, height, Screen.width, Screen.height);
         var rect = new Rect(p.X, p.Y, width, height);
