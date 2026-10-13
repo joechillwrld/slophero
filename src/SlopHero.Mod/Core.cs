@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.27", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.28", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -24,6 +24,7 @@ public sealed partial class Core : MelonMod
     private readonly Stopwatch clock = Stopwatch.StartNew();
     private MelonPreferences_Category preferences = null!;
     private MelonPreferences_Entry<string> restartButton = null!, practiceButton = null!;
+    private InputBinding.Cache restartBinding, practiceBinding;
     private MelonPreferences_Entry<float> holdSeconds = null!;
     private MelonPreferences_Entry<float> backgroundOpacity = null!, textRed = null!, textGreen = null!, textBlue = null!;
     private MelonPreferences_Entry<int> hudX = null!, hudY = null!, fontSize = null!;
@@ -141,6 +142,7 @@ public sealed partial class Core : MelonMod
 
     public override void OnUpdate()
     {
+        timings.SampleFrame(Time.unscaledDeltaTime * 1000f);
         long timingStart = timings.Begin();
         try
         {
@@ -214,12 +216,13 @@ public sealed partial class Core : MelonMod
                 && game.actualPlayerCount == 1 && (int)game.globalVariables!.gameMode == 0
                 && !game.globalVariables.isPracticeEnabled && !game.globalVariables.isPlayingSetlist
                 && (CHNetManager.instance == null || (int)CHNetManager.instance.field_Private_ConnectionState_0 == 0);
-            if (restartHold.Update(InputBinding.Pressed(restartButton.Value), allow, now, Duration))
+            if (restartHold.Update(allow && InputBinding.Pressed(restartButton.Value, ref restartBinding), allow, now, Duration))
             {
                 BeginRestart(game!);
                 return;
             }
-            if (practiceHold.Update(InputBinding.Pressed(practiceButton.Value), allow && !practiceFailed, now, Duration))
+            bool practiceAllowed = allow && !practiceFailed;
+            if (practiceHold.Update(practiceAllowed && InputBinding.Pressed(practiceButton.Value, ref practiceBinding), practiceAllowed, now, Duration))
             {
                 BeginPractice(game!);
                 return;

@@ -1,8 +1,8 @@
-# SlopHero 0.4.27 alpha
+# SlopHero 0.4.28 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.27 reduces practice-speed compensation work to 20 clock samples and 10 renderer updates per second, and refreshes cosmetic score colors at 5 Hz.** Version 0.4.26 limits playable speed to 10–5000%, because the removed sub-10% values desynchronize chart and audio playback. It batches typed digits, marks pending input with `*`, and applies the final value after a short pause. Version 0.4.25 added Escape cleanup; version 0.4.24 adds live digit display, Backspace, and Delete to Clone Hero's pre-song menu. The speed interval remains a separate Controls-page setting. The settings panel scales around the screen center. Version 0.4.23 moved speed editing into Clone Hero's own menu and removed the separate popup. Version 0.4.22 raised the speed limit to the game's 5000% ceiling. Version 0.4.20 added scaling controls for selected game HUD groups and star-progress coloring that follows the live fill fraction. Version 0.4.19 restores standard navigation buttons and gives the open profile list more breathing room. Version 0.4.18 added a profile dropdown with per-profile rename controls.
+**Version 0.4.28 extends the timing capture with Unity frame-time percentiles and active HUD positions. It also avoids parsing key bindings on every frame and skips practice-speed scans outside practice.** Version 0.4.27 reduces practice-speed compensation work to 20 clock samples and 10 renderer updates per second, and refreshes cosmetic score colors at 5 Hz. Version 0.4.26 limits playable speed to 10–5000%, because the removed sub-10% values desynchronize chart and audio playback. It batches typed digits, marks pending input with `*`, and applies the final value after a short pause. Version 0.4.25 added Escape cleanup; version 0.4.24 adds live digit display, Backspace, and Delete to Clone Hero's pre-song menu. The speed interval remains a separate Controls-page setting. The settings panel scales around the screen center. Version 0.4.23 moved speed editing into Clone Hero's own menu and removed the separate popup. Version 0.4.22 raised the speed limit to the game's 5000% ceiling. Version 0.4.20 added scaling controls for selected game HUD groups and star-progress coloring that follows the live fill fraction. Version 0.4.19 restores standard navigation buttons and gives the open profile list more breathing room. Version 0.4.18 added a profile dropdown with per-profile rename controls.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.27 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.27-alpha.zip?raw=true)
+[Download v0.4.28 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.28-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -253,6 +253,15 @@ Typed digits stay visible while being entered, then the mod applies the complete
 speed once after a brief pause or on Enter. This avoids recalculating speed for
 every partial number.
 
+## 0.4.28 runtime and diagnostic update
+
+The 30-second capture now includes Unity's unscaled frame-time p50/p95/p99/max
+and logs both SlopHero HUD positions and native HUD offsets. This helps separate
+game-wide frame pacing from the time spent inside SlopHero callbacks. The
+gameplay loop also caches parsed hotkey bindings instead of splitting and
+validating their strings every frame, and only requests practice-speed
+compensation passes while practice is active (plus cleanup after it ends).
+
 ## 0.4.27 gameplay update load
 
 Practice note-speed compensation samples the playback clock at 20 Hz and updates
@@ -416,13 +425,14 @@ frame. This reduces mod work; it does not disable game systems or existing
 vanilla effects.
 
 **F8 → Controls → Capture mod timings for 30 seconds** writes callback averages,
-maximums, call counts, and observed update rate to `Latest.log`. Start during a
-song, close F8, and play the same passage. For comparison, capture once with low
-overhead HUD off and once with it on. Keep chart, tempo, visual settings, and
-other mods constant. Timing capture ends automatically or with **Finish timing
+maximums, call counts, observed update rate, Unity unscaled frame-time
+percentiles, and HUD positions to `Latest.log`. Start during a song, close F8,
+and play the same passage. Keep chart, tempo, visual settings, and other mods
+constant; the capture records the HUD positions so placement comparisons can be
+checked directly. Timing capture ends automatically or with **Finish timing
 report**. It is off normally and does not log every frame. Callback timings
-exclude most of the game's CPU/GPU workload; a broader performance mode still
-needs profiling to choose niche removable work beyond existing settings.
+exclude most of the game's CPU/GPU workload; Unity frame times add frame-pacing
+context but are not a substitute for an external CPU/GPU frame-time capture.
 
 ## 0.3.1 speed and ring repairs
 
