@@ -39,7 +39,7 @@ public sealed partial class Core
     private int resizeTarget = -1, resizeHandle = -1;
     private bool resizeMoveDragging;
     private float resizeStartValue, resizeStartRadius;
-    private Vector2 resizeDragCenter;
+    private Vector2 resizeDragCenter, resizeStartMouse;
     private Vector2 resizeDragOffset;
     private Rect cachedResizeRect;
     private int cachedResizeRectTarget = -1;
@@ -120,7 +120,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.35 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.36 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
         // nine narrow tabs that clipped labels such as "Performance".
         const int tabColumns = 5;
@@ -210,7 +210,7 @@ public sealed partial class Core
                 GUI.Label(new Rect(x, y + 356, 540, 60), "Move the practice bar while in practice. The game's FPS display must be enabled before you move or recolor it.");
                 break;
             case 6:
-                GUI.Label(new Rect(x, y, 632, 32), "Resize with sliders or select a HUD and drag its corner handles in-game.");
+                GUI.Label(new Rect(x, y, 632, 32), "Resize with sliders, corners, or drag inside native HUDs.");
                 Number("Score and combo HUD", scoreHudScale.Value, x, y + 42, .5f, 2.5f, v => { scoreHudScale.Value = v; preferencesDirty = true; });
                 Number("Input viewer", inputViewerScale.Value, x, y + 82, .5f, 2.5f, v => { inputViewerScale.Value = v; preferencesDirty = true; });
                 Number("Star power bar", starPowerHudScale.Value, x, y + 122, .5f, 2.5f, v => { starPowerHudScale.Value = v; preferencesDirty = true; });
@@ -366,9 +366,17 @@ public sealed partial class Core
         double now = clock.Elapsed.TotalSeconds;
         if (cachedResizeRectTarget != resizeTarget || now >= nextResizeRectProbe)
         {
+            bool targetChanged = cachedResizeRectTarget != resizeTarget;
             cachedResizeRectValid = TryGetResizeRect(out cachedResizeRect);
             cachedResizeRectTarget = resizeTarget;
             nextResizeRectProbe = now + .05;
+            if (targetChanged)
+            {
+                if (cachedResizeRectValid)
+                    LoggerInstance.Msg($"Resize editor bounds: {ResizeTargetLabels[resizeTarget]} at {cachedResizeRect.x:0},{cachedResizeRect.y:0} size {cachedResizeRect.width:0}x{cachedResizeRect.height:0}.");
+                else
+                    LoggerInstance.Warning($"Resize editor could not find visible bounds for {ResizeTargetLabels[resizeTarget]}.");
+            }
         }
         rect = cachedResizeRect;
         return cachedResizeRectValid;
@@ -376,7 +384,7 @@ public sealed partial class Core
 
     private static Rect ResizeHandleRect(Rect rect, int corner)
     {
-        const float size = 14;
+        const float size = 22;
         float x = corner == 0 || corner == 3 ? rect.xMin : rect.xMax;
         float y = corner < 2 ? rect.yMin : rect.yMax;
         return new Rect(x - size * .5f, y - size * .5f, size, size);
@@ -403,37 +411,6 @@ public sealed partial class Core
             return;
         }
 
-        Color previous = GUI.color;
-        Color previousBackground = GUI.backgroundColor;
-        try
-        {
-            // GUI.DrawTexture is missing its IL2CPP unstripped wrapper in this
-            // Clone Hero build. Calling it throws from OnGUI and closes the
-            // editor before resize handles can be used. GUI.Box(Rect, string)
-            // is already supported by the game's runtime and gives us the same
-            // simple filled rectangles for the outline and handles.
-            GUI.color = Color.white;
-            GUI.backgroundColor = MenuAccentColor(0);
-            const float line = 2;
-            GUI.Box(new Rect(rect.xMin, rect.yMin, rect.width, line), "");
-            GUI.Box(new Rect(rect.xMin, rect.yMax - line, rect.width, line), "");
-            GUI.Box(new Rect(rect.xMin, rect.yMin, line, rect.height), "");
-            GUI.Box(new Rect(rect.xMax - line, rect.yMin, line, rect.height), "");
-            for (int i = 0; i < 4; i++) GUI.Box(ResizeHandleRect(rect, i), "");
-            GUI.backgroundColor = previousBackground;
-            string label = ResizeTargetLabels[resizeTarget] + (resizeTarget < 2
-                ? $" — {ResizeValue():0} px"
-                : $" — {ResizeValue():0.00}×");
-            GUI.Box(new Rect(rect.xMin, Math.Max(0, rect.yMin - 26), Math.Max(150, label.Length * 8), 22), label);
-            GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44),
-                "Drag a corner to resize proportionally; drag inside a SlopHero HUD to move. F8 returns; Escape finishes.");
-        }
-        finally
-        {
-            GUI.color = previous;
-            GUI.backgroundColor = previousBackground;
-        }
-
         var e = Event.current;
         if (e.type == EventType.MouseDown && e.button == 0)
         {
@@ -444,24 +421,41 @@ public sealed partial class Core
                 resizeStartValue = ResizeValue();
                 resizeDragCenter = rect.center;
                 resizeStartRadius = Vector2.Distance(resizeDragCenter, ResizeCorner(rect, i));
+                resizeStartMouse = e.mousePosition;
                 e.Use();
                 return;
             }
-            if (resizeTarget < 2 && rect.Contains(e.mousePosition))
+            if (!rect.Contains(e.mousePosition)) return;
+            resizeStartValue = ResizeValue();
+            if (resizeTarget < 2)
             {
                 resizeMoveDragging = true;
                 resizeDragOffset = e.mousePosition - new Vector2(rect.x, rect.y);
-                e.Use();
             }
+            else
+            {
+                // Native HUDs have small or hard-to-see corners. Dragging
+                // anywhere inside their outline now resizes them horizontally;
+                // the visible corner handles remain available for radial resize.
+                resizeHandle = 4;
+                resizeStartMouse = e.mousePosition;
+            }
+            e.Use();
         }
         if (e.type == EventType.MouseDrag && resizeHandle >= 0)
         {
-            // Keep the drag origin fixed for the entire gesture. The displayed
-            // bounds are refreshed at 20 Hz and may shift slightly as a game's
-            // transform scales; following that moving center made the handle
-            // ratio wobble during a drag.
-            float radius = Vector2.Distance(resizeDragCenter, e.mousePosition);
-            if (resizeStartRadius > 1) SetResizeValue(resizeStartValue * radius / resizeStartRadius);
+            if (resizeHandle == 4)
+            {
+                float factor = MathF.Exp((e.mousePosition.x - resizeStartMouse.x) / 220f);
+                SetResizeValue(resizeStartValue * factor);
+            }
+            else
+            {
+                // Keep the drag origin fixed for the entire gesture. The
+                // displayed bounds refresh at 20 Hz and must not shift the ratio.
+                float radius = Vector2.Distance(resizeDragCenter, e.mousePosition);
+                if (resizeStartRadius > 1) SetResizeValue(resizeStartValue * radius / resizeStartRadius);
+            }
             e.Use();
         }
         if (e.type == EventType.MouseDrag && resizeMoveDragging && resizeTarget < 2)
@@ -478,7 +472,42 @@ public sealed partial class Core
             resizeHandle = -1;
             resizeMoveDragging = false;
             SavePreferences();
+            LoggerInstance.Msg($"Resize editor saved {ResizeTargetLabels[resizeTarget]} at {ResizeValue():0.##}{(resizeTarget < 2 ? " px" : "×")}.");
         }
+
+        Color previous = GUI.color;
+        Color previousBackground = GUI.backgroundColor;
+        try
+        {
+            // GUI.DrawTexture is missing its IL2CPP unstripped wrapper in this
+            // Clone Hero build. Calling it throws from OnGUI and closes the
+            // editor before resize handles can be used. GUI.Box(Rect, string)
+            // is already supported by the game's runtime and gives us the same
+            // simple filled rectangles for the outline and handles.
+            GUI.color = Color.white;
+            GUI.backgroundColor = MenuAccentColor(0);
+            const float line = 5;
+            GUI.Box(new Rect(rect.xMin, rect.yMin, rect.width, line), "");
+            GUI.Box(new Rect(rect.xMin, rect.yMax - line, rect.width, line), "");
+            GUI.Box(new Rect(rect.xMin, rect.yMin, line, rect.height), "");
+            GUI.Box(new Rect(rect.xMax - line, rect.yMin, line, rect.height), "");
+            for (int i = 0; i < 4; i++) GUI.Box(ResizeHandleRect(rect, i), "+");
+            GUI.backgroundColor = previousBackground;
+            string label = ResizeTargetLabels[resizeTarget] + (resizeTarget < 2
+                ? $" — {ResizeValue():0} px"
+                : $" — {ResizeValue():0.00}×");
+            GUI.Box(new Rect(rect.xMin, Math.Max(0, rect.yMin - 26), Math.Max(150, label.Length * 8), 22), label);
+            GUI.Box(new Rect(20, 16, Math.Max(300, Screen.width - 40), 34),
+                $"Resize mode: {label}. Drag a corner; drag inside to resize native HUDs.");
+            GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44),
+                "Corners resize all targets. Drag inside counters/song info to move; drag inside native HUDs to resize. F8 returns; Escape finishes.");
+        }
+        finally
+        {
+            GUI.color = previous;
+            GUI.backgroundColor = previousBackground;
+        }
+
     }
 
     private void DrawProfiles(float x, float y)

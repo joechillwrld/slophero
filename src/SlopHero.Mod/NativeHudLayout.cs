@@ -117,29 +117,33 @@ internal sealed class NativeHudLayout
             || songProgressScale != 1 || practiceScale != 1 || fpsScale != 1;
         if (!changed && (!enabled || realtime < nextScaleProbe)) return;
         nextScaleProbe = realtime + .5;
-        if (changed && (!enabled || scoreScale == 1)) RestoreKind(game.scoreManager?.transform);
-        if (scoreScale != 1) Scale(game.scoreManager?.transform, scoreScale, 1);
+        if (scoreScale != 1) ApplyScoreHudScale(game, scoreScale);
+        else RestoreKind(1);
         if (inputScale != 1)
         {
-            inputViewers ??= UnityEngine.Object.FindObjectsOfType<InputViewer>();
+            if (inputViewers == null || inputViewers.Length == 0)
+                inputViewers = UnityEngine.Object.FindObjectsOfType<InputViewer>();
             foreach (var viewer in inputViewers) if (viewer != null) Scale(viewer.transform, inputScale, 2);
         }
         else RestoreKind(typeof(InputViewer));
         if (spScale != 1)
         {
-            spBars ??= UnityEngine.Object.FindObjectsOfType<SPBar>();
+            if (spBars == null || spBars.Length == 0)
+                spBars = UnityEngine.Object.FindObjectsOfType<SPBar>();
             foreach (var bar in spBars) if (bar != null) Scale(bar.transform, spScale, 3);
         }
         else RestoreKind(typeof(SPBar));
         if (starProgressScale != 1)
         {
-            starProgresses ??= UnityEngine.Object.FindObjectsOfType<StarProgress>();
+            if (starProgresses == null || starProgresses.Length == 0)
+                starProgresses = UnityEngine.Object.FindObjectsOfType<StarProgress>();
             foreach (var progress in starProgresses) if (progress != null) Scale(progress.transform, starProgressScale, 7);
         }
         else RestoreKind(typeof(StarProgress));
         if (songProgressScale != 1)
         {
-            songProgress ??= UnityEngine.Object.FindObjectsOfType<SongProgress>();
+            if (songProgress == null || songProgress.Length == 0)
+                songProgress = UnityEngine.Object.FindObjectsOfType<SongProgress>();
             foreach (var bar in songProgress) if (bar != null) Scale(bar.transform, songProgressScale, 4);
         }
         else RestoreKind(typeof(SongProgress));
@@ -159,10 +163,49 @@ internal sealed class NativeHudLayout
         if (transform.localScale != target) transform.localScale = target;
     }
 
+    private void ApplyScoreHudScale(GameManager game, float factor)
+    {
+        var manager = game.scoreManager;
+        var root = manager?.transform;
+        if (root != null) Scale(root, factor, 1);
+        if (manager != null)
+        {
+            ScaleIfOutside(manager.scoreFont?.transform, root, factor);
+            ScaleIfOutside(manager.comboFont?.transform, root, factor);
+        }
+        if (game.playerObjects == null) return;
+        foreach (var player in game.playerObjects)
+            if (player != null) ScaleIfOutside(player.AccuracyText?.transform, root, factor);
+    }
+
+    private void ScaleIfOutside(Transform? candidate, Transform? groupRoot, float factor)
+    {
+        if (candidate == null || (groupRoot != null && IsWithin(candidate, groupRoot))) return;
+        Scale(candidate, factor, 1);
+    }
+
+    private static bool IsWithin(Transform candidate, Transform root)
+    {
+        for (Transform? current = candidate; current != null; current = current.parent)
+            if (current.Pointer == root.Pointer) return true;
+        return false;
+    }
+
     private void RestoreKind(Transform? transform)
     {
         if (transform == null) return;
         if (resized.Remove(transform.Pointer, out var state) && state.Transform != null) state.Transform.localScale = state.Original;
+    }
+
+    private void RestoreKind(int kind)
+    {
+        foreach (var pair in resized.ToArray())
+        {
+            if (pair.Value.Transform == null) { resized.Remove(pair.Key); continue; }
+            if (pair.Value.Kind != kind) continue;
+            pair.Value.Transform.localScale = pair.Value.Original;
+            resized.Remove(pair.Key);
+        }
     }
 
     private void RestoreKind(Type componentType)
@@ -216,21 +259,36 @@ internal sealed class NativeHudLayout
 
         switch (target)
         {
-            case 2: AddResizeBounds(game.scoreManager?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY); break;
+            case 2:
+                var scoreManager = game.scoreManager;
+                AddResizeBounds(scoreManager?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                if (scoreManager != null)
+                {
+                    AddResizeBounds(scoreManager.scoreFont?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                    AddResizeBounds(scoreManager.comboFont?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                }
+                if (game.playerObjects != null)
+                    foreach (var player in game.playerObjects)
+                        if (player != null) AddResizeBounds(player.AccuracyText?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                break;
             case 3:
-                inputViewers ??= UnityEngine.Object.FindObjectsOfType<InputViewer>();
+                if (inputViewers == null || inputViewers.Length == 0)
+                    inputViewers = UnityEngine.Object.FindObjectsOfType<InputViewer>();
                 foreach (var viewer in inputViewers) if (viewer != null) AddResizeBounds(viewer.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 break;
             case 4:
-                spBars ??= UnityEngine.Object.FindObjectsOfType<SPBar>();
+                if (spBars == null || spBars.Length == 0)
+                    spBars = UnityEngine.Object.FindObjectsOfType<SPBar>();
                 foreach (var bar in spBars) if (bar != null) AddResizeBounds(bar.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 break;
             case 5:
-                starProgresses ??= UnityEngine.Object.FindObjectsOfType<StarProgress>();
+                if (starProgresses == null || starProgresses.Length == 0)
+                    starProgresses = UnityEngine.Object.FindObjectsOfType<StarProgress>();
                 foreach (var progress in starProgresses) if (progress != null) AddResizeBounds(progress.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 break;
             case 6:
-                songProgress ??= UnityEngine.Object.FindObjectsOfType<SongProgress>();
+                if (songProgress == null || songProgress.Length == 0)
+                    songProgress = UnityEngine.Object.FindObjectsOfType<SongProgress>();
                 foreach (var bar in songProgress) if (bar != null) AddResizeBounds(bar.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 break;
             default: rect = default; return false;
@@ -244,10 +302,10 @@ internal sealed class NativeHudLayout
         ref bool found, ref float minX, ref float minY, ref float maxX, ref float maxY)
     {
         if (transform == null || !transform.gameObject.activeInHierarchy) return;
-        if (!resizeGraphics.TryGetValue(transform.Pointer, out var graphics))
-            resizeGraphics.Add(transform.Pointer, graphics = transform.GetComponentsInChildren<Graphic>(true));
-        if (!resizeRenderers.TryGetValue(transform.Pointer, out var renderers))
-            resizeRenderers.Add(transform.Pointer, renderers = transform.GetComponentsInChildren<Renderer>(true));
+        if (!resizeGraphics.TryGetValue(transform.Pointer, out var graphics) || graphics.Length == 0)
+            resizeGraphics[transform.Pointer] = graphics = transform.GetComponentsInChildren<Graphic>(true);
+        if (!resizeRenderers.TryGetValue(transform.Pointer, out var renderers) || renderers.Length == 0)
+            resizeRenderers[transform.Pointer] = renderers = transform.GetComponentsInChildren<Renderer>(true);
 
         foreach (var graphic in graphics)
         {
