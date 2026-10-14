@@ -19,7 +19,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> disableHitParticles = null!, disableSustainParticles = null!, disableFretEffects = null!;
     private MelonPreferences_Entry<bool> stopMidiInput = null!, disableDiscordPresence = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
-    private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, songProgressHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
+    private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
     private readonly VisualOverrides visuals = new();
     private readonly RingColors rings = new();
     private readonly PerformanceOverrides performance = new();
@@ -34,7 +34,7 @@ public sealed partial class Core
     private bool profileDropdownOpen;
     private int profileListStart;
     private readonly Dictionary<string, Color> parsedColors = new();
-    private static readonly string[] ResizeTargetLabels = { "Counters", "Song HUD", "Score box", "Input viewer", "Star power", "Song progress", "Practice stats", "FPS display" };
+    private static readonly string[] ResizeTargetLabels = { "Counters", "Song HUD", "Score box", "Input viewer", "Star power", "Practice stats", "FPS display" };
     private int resizeSelection;
     private int resizeTarget = -1, resizeHandle = -1;
     private bool resizeMoveDragging;
@@ -77,14 +77,16 @@ public sealed partial class Core
         inputViewerScale = preferences.CreateEntry("InputViewerScale", 1f);
         starPowerHudScale = preferences.CreateEntry("StarPowerHudScale", 1f);
         var legacyStarProgressHudScale = preferences.CreateEntry("StarProgressHudScale", 1f);
-        if (scoreHudScale.Value == 1f && legacyStarProgressHudScale.Value != 1f)
-            scoreHudScale.Value = legacyStarProgressHudScale.Value;
-        if (legacyStarProgressHudScale.Value != 1f)
+        var legacySongProgressHudScale = preferences.CreateEntry("SongProgressHudScale", 1f);
+        if (scoreHudScale.Value == 1f)
+            scoreHudScale.Value = legacyStarProgressHudScale.Value != 1f
+                ? legacyStarProgressHudScale.Value : legacySongProgressHudScale.Value;
+        if (legacyStarProgressHudScale.Value != 1f || legacySongProgressHudScale.Value != 1f)
         {
             legacyStarProgressHudScale.Value = 1f;
+            legacySongProgressHudScale.Value = 1f;
             preferences.SaveToFile();
         }
-        songProgressHudScale = preferences.CreateEntry("SongProgressHudScale", 1f);
         practiceHudScale = preferences.CreateEntry("PracticeHudScale", 1f);
         fpsHudScale = preferences.CreateEntry("FpsHudScale", 1f);
         hideSides = preferences.CreateEntry("HideHighwaySides", false);
@@ -127,7 +129,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.37 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.38 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
         // nine narrow tabs that clipped labels such as "Performance".
         const int tabColumns = 5;
@@ -164,9 +166,9 @@ public sealed partial class Core
                     {
                         bool nativeHudTweaks = practiceHudX.Value != 0 || practiceHudY.Value != 0 || fpsHudX.Value != 0 || fpsHudY.Value != 0 || customizeFpsColor.Value
                             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
-                            || songProgressHudScale.Value != 1 || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
+                            || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                         SongSpeedControl.TryRead(out int speedSetting);
-                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/song/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{songProgressHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                         timings.Start();
                     }
                     else Notice("Start a song before capturing mod timings.");
@@ -207,28 +209,29 @@ public sealed partial class Core
                 { practiceHudX.Value = practiceHudY.Value = 0; preferencesDirty = true; }
                 Number("Practice stats horizontal offset", practiceHudX.Value, x, y + 74, -1500, 1500, v => practiceHudX.Value = v);
                 Number("Practice stats vertical offset", practiceHudY.Value, x, y + 112, -1500, 1500, v => practiceHudY.Value = v);
-                if (GUI.Button(new Rect(x, y + 158, 390, 32), "Move FPS display")) BeginNativeHudMove(2);
-                if (GUI.Button(new Rect(x + 400, y + 158, 140, 32), "Reset"))
+                if (GUI.Button(new Rect(x, y + 158, 218, 32), "Move FPS display")) BeginNativeHudMove(2);
+                if (GUI.Button(new Rect(x + 226, y + 158, 250, 32), "Resize FPS display")) BeginResizeTarget(6);
+                if (GUI.Button(new Rect(x + 484, y + 158, 140, 32), "Reset"))
                 { fpsHudX.Value = fpsHudY.Value = 0; preferencesDirty = true; }
                 Number("FPS horizontal offset", fpsHudX.Value, x, y + 196, -1500, 1500, v => fpsHudX.Value = v);
                 Number("FPS vertical offset", fpsHudY.Value, x, y + 234, -1500, 1500, v => fpsHudY.Value = v);
-                Toggle(customizeFpsColor, "Customize FPS text color", x, y + 276);
-                Hex(fpsTextColor, "FPS text color", x, y + 314);
-                GUI.Label(new Rect(x, y + 356, 540, 60), "Move the practice bar while in practice. The game's FPS display must be enabled before you move or recolor it.");
+                Toggle(customizeFpsColor, "Customize FPS number color", x, y + 276);
+                Hex(fpsTextColor, "FPS number color", x, y + 314);
+                Number("FPS readout size", fpsHudScale.Value, x, y + 356, .5f, 2.5f, v => { fpsHudScale.Value = v; preferencesDirty = true; });
+                GUI.Label(new Rect(x, y + 400, 600, 60), "Color and size target the numeric FPS readout, not its separator. Position moves the full FPS row. The game's FPS display must be enabled first.");
                 break;
             case 6:
-                GUI.Label(new Rect(x, y, 632, 32), "Score box includes score, combo, accuracy, and star progress.");
+                GUI.Label(new Rect(x, y, 632, 32), "Score box includes score, combo, accuracy, star progress, and song progress.");
                 Number("Score box", scoreHudScale.Value, x, y + 42, .5f, 2.5f, v => { scoreHudScale.Value = v; preferencesDirty = true; });
                 Number("Input viewer", inputViewerScale.Value, x, y + 82, .5f, 2.5f, v => { inputViewerScale.Value = v; preferencesDirty = true; });
                 Number("Star power bar", starPowerHudScale.Value, x, y + 122, .5f, 2.5f, v => { starPowerHudScale.Value = v; preferencesDirty = true; });
-                Number("Song progress bar", songProgressHudScale.Value, x, y + 162, .5f, 2.5f, v => { songProgressHudScale.Value = v; preferencesDirty = true; });
-                Number("Practice stats bar", practiceHudScale.Value, x, y + 202, .5f, 2.5f, v => { practiceHudScale.Value = v; preferencesDirty = true; });
-                Number("FPS display", fpsHudScale.Value, x, y + 242, .5f, 2.5f, v => { fpsHudScale.Value = v; preferencesDirty = true; });
-                for (int i = 0; i < ResizeTargetLabels.Length; i++)
+                Number("Practice stats bar", practiceHudScale.Value, x, y + 162, .5f, 2.5f, v => { practiceHudScale.Value = v; preferencesDirty = true; });
+                int sizingTargetCount = ResizeTargetLabels.Length - 1;
+                for (int i = 0; i < sizingTargetCount; i++)
                 {
                     int column = i % 4, row = i / 4;
                     float buttonWidth = 632f / 4 - 4;
-                    int columnsInRow = Math.Min(4, ResizeTargetLabels.Length - row * 4);
+                    int columnsInRow = Math.Min(4, sizingTargetCount - row * 4);
                     float rowOffset = (632f - columnsInRow * buttonWidth - (columnsInRow - 1) * 4) * .5f;
                     var oldBackground = GUI.backgroundColor;
                     try
@@ -240,7 +243,7 @@ public sealed partial class Core
                 }
                 if (GUI.Button(new Rect(x, y + 416, 400, 34), "Edit selected HUD with corner handles")) BeginResizeTarget(resizeSelection);
                 GUI.Label(new Rect(x + 410, y + 416, 220, 56), "F8 returns here; Escape finishes.");
-                GUI.Label(new Rect(x, y + 462, 632, 48), "Drag a corner to resize. Drag inside counters or song info to move them.");
+                GUI.Label(new Rect(x, y + 462, 632, 48), "Drag a corner to resize. Drag inside counters or song info to move them. FPS resizing is under Game HUD.");
                 break;
             case 7:
                 DrawProfiles(x, y);
@@ -305,9 +308,8 @@ public sealed partial class Core
         2 => scoreHudScale.Value,
         3 => inputViewerScale.Value,
         4 => starPowerHudScale.Value,
-        5 => songProgressHudScale.Value,
-        6 => practiceHudScale.Value,
-        7 => fpsHudScale.Value,
+        5 => practiceHudScale.Value,
+        6 => fpsHudScale.Value,
         _ => 1f
     };
 
@@ -320,9 +322,8 @@ public sealed partial class Core
             case 2: scoreHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
             case 3: inputViewerScale.Value = Math.Clamp(value, .5f, 2.5f); break;
             case 4: starPowerHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
-            case 5: songProgressHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
-            case 6: practiceHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
-            case 7: fpsHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
+            case 5: practiceHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
+            case 6: fpsHudScale.Value = Math.Clamp(value, .5f, 2.5f); break;
         }
         preferencesDirty = true;
     }
@@ -406,9 +407,9 @@ public sealed partial class Core
     {
         if (!TryGetCachedResizeRect(out var rect))
         {
-            string hint = resizeTarget == 6
+            string hint = resizeTarget == 5
                 ? "Practice stats are visible only after entering Practice mode. F8 returns to settings."
-                : resizeTarget == 7
+                : resizeTarget == 6
                     ? "Turn on the game's FPS display first. F8 returns to settings."
                     : "This HUD is not available in the current scene. F8 returns to settings.";
             GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44), hint);
@@ -666,7 +667,7 @@ public sealed partial class Core
             Bool("ShowSongHud", showSong); Bool("ShowSongTitle", showTitle); Bool("ShowArtist", showArtist); Bool("ShowCharter", showCharter); Bool("ShowChartSpeed", showSpeed);
             Int("SongHudX", songX); Int("SongHudY", songY); Int("SongFontSize", songFont); Float("SongBackgroundOpacity", songOpacity);
             Float("PracticeHudOffsetX", practiceHudX); Float("PracticeHudOffsetY", practiceHudY); Float("FpsHudOffsetX", fpsHudX); Float("FpsHudOffsetY", fpsHudY);
-            Float("SettingsMenuScale", settingsMenuScale); Float("ScoreHudScale", scoreHudScale); Float("InputViewerScale", inputViewerScale); Float("StarPowerHudScale", starPowerHudScale); Float("SongProgressHudScale", songProgressHudScale); Float("PracticeHudScale", practiceHudScale); Float("FpsHudScale", fpsHudScale);
+            Float("SettingsMenuScale", settingsMenuScale); Float("ScoreHudScale", scoreHudScale); Float("InputViewerScale", inputViewerScale); Float("StarPowerHudScale", starPowerHudScale); Float("PracticeHudScale", practiceHudScale); Float("FpsHudScale", fpsHudScale);
             Bool("HideHighwaySides", hideSides); Bool("HideFretStrings", hideStrings); Bool("HideBeatlines", hideBeats); Bool("ConstantPracticeNoteSpeed", lockSpeed);
         }
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
@@ -702,8 +703,12 @@ public sealed partial class Core
         Float("PracticeHudOffsetX", practiceHudX, -1500, 1500); Float("PracticeHudOffsetY", practiceHudY, -1500, 1500); Float("FpsHudOffsetX", fpsHudX, -1500, 1500); Float("FpsHudOffsetY", fpsHudY, -1500, 1500);
         Bool("HideHighwaySides", hideSides); Bool("HideFretStrings", hideStrings); Bool("HideBeatlines", hideBeats); Bool("ConstantPracticeNoteSpeed", lockSpeed);
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
-        Float("SettingsMenuScale", settingsMenuScale, .85f, 1.4f); Float("ScoreHudScale", scoreHudScale, .5f, 2.5f); Float("InputViewerScale", inputViewerScale, .5f, 2.5f); Float("StarPowerHudScale", starPowerHudScale, .5f, 2.5f); Float("SongProgressHudScale", songProgressHudScale, .5f, 2.5f); Float("PracticeHudScale", practiceHudScale, .5f, 2.5f); Float("FpsHudScale", fpsHudScale, .5f, 2.5f);
-        if (!values.ContainsKey("ScoreHudScale")) Float("StarProgressHudScale", scoreHudScale, .5f, 2.5f);
+        Float("SettingsMenuScale", settingsMenuScale, .85f, 1.4f); Float("ScoreHudScale", scoreHudScale, .5f, 2.5f); Float("InputViewerScale", inputViewerScale, .5f, 2.5f); Float("StarPowerHudScale", starPowerHudScale, .5f, 2.5f); Float("PracticeHudScale", practiceHudScale, .5f, 2.5f); Float("FpsHudScale", fpsHudScale, .5f, 2.5f);
+        if (!values.ContainsKey("ScoreHudScale"))
+        {
+            if (values.ContainsKey("StarProgressHudScale")) Float("StarProgressHudScale", scoreHudScale, .5f, 2.5f);
+            else Float("SongProgressHudScale", scoreHudScale, .5f, 2.5f);
+        }
         Hex("SongTextColor", songColor); Hex("FcColor", fcColor); Hex("PerfectFcColor", pfcColor); Hex("StarColor", starColor);
         Hex("ProgressColor", progressColor); Hex("ScoreTextColor", scoreColor); Hex("SongProgressColor", songProgressColor); Hex("FpsTextColor", fpsTextColor);
         return invalid;
@@ -891,7 +896,7 @@ public sealed partial class Core
         bool nativeHudRequested = nativeMoveTarget != 0 || resizeTarget >= 2 || practiceHudX.Value != 0 || practiceHudY.Value != 0
             || fpsHudX.Value != 0 || fpsHudY.Value != 0 || customizeFpsColor.Value
             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
-            || songProgressHudScale.Value != 1 || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
+            || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
         bool nativeHudPending = !nativeHudError && (nativeHudRequested || nativeHudActive);
         bool visualRequested = hideSides.Value || hideStrings.Value || hideBeats.Value || tintScore.Value;
         bool practiceSpeedRequested = lockSpeed.Value && practiceModeActive;
@@ -915,7 +920,7 @@ public sealed partial class Core
                 nativeHud.Apply(game, game.globalVariables.isPracticeEnabled,
                     practiceHudX.Value, practiceHudY.Value, fpsHudX.Value, fpsHudY.Value,
                 customizeFpsColor.Value, fpsTint, scoreHudScale.Value, inputViewerScale.Value,
-                    starPowerHudScale.Value, songProgressHudScale.Value, practiceHudScale.Value,
+                    starPowerHudScale.Value, practiceHudScale.Value,
                     fpsHudScale.Value, now);
                 nativeHudActive = nativeHudRequested;
             }
