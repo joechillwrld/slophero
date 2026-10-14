@@ -1,8 +1,8 @@
-# SlopHero 0.4.36 alpha
+# SlopHero 0.4.37 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.36 improves Sizing handles and resize interaction.** The outline uses larger, high-contrast corner grips; native HUDs can also be resized by dragging inside their bounds. Score, combo, and accuracy are treated as one score-box target, including when their visual components are siblings outside the manager transform. Empty HUD component scans retry while sizing, so objects created late in gameplay can still be found. Resize-mode logs record the selected target, detected bounds, and final size. Version 0.4.35 replaced `GUI.DrawTexture`, whose IL2CPP wrapper failed, with the already-supported `GUI.Box` path. The outline is drawn only while a resize target is actively being edited. Version 0.4.34 fixed the Sizing page crash and clipped menu titles: the HUD picker now uses individually drawn buttons instead of the failing `SelectionGrid(string[])` wrapper, and navigation uses two rows so page names fit. Star tint excludes the empty-track renderer (`StarProgress.starCountBG`), and star-rating progress has its own size control. Version 0.4.34 also moves the 20 Hz gate ahead of the `OnLateUpdate` settings and Unity-object checks. Version 0.4.32 limits visual-override dispatch to 20 Hz; timing reports record Performance switch states. Earlier changes and the five optional Performance switches are described below.
+**Version 0.4.37 fixes the resize bounds that put the outline far off-screen.** The latest log showed bounds spanning over 100,000 screen pixels because off-camera renderers were included. Resize bounds now ignore renderers outside the active camera and clip valid points to the screen. The score box is one target containing score, combo, accuracy, and star progress, with one size control and one selection outline. The previous star-progress scale setting is folded into the score-box scale. Version 0.4.36 added larger resize handles and drag-to-resize for native HUDs. Version 0.4.35 replaced `GUI.DrawTexture`, whose IL2CPP wrapper failed, with the supported `GUI.Box` path. The outline is drawn only while a resize target is actively being edited. Version 0.4.34 fixed the Sizing page crash and clipped menu titles: the HUD picker uses individual buttons instead of the failing `SelectionGrid(string[])` wrapper, and navigation uses two rows so page names fit. Star tint excludes the empty-track renderer (`StarProgress.starCountBG`). Version 0.4.34 also moved the 20 Hz gate ahead of `OnLateUpdate` settings and Unity-object checks. Version 0.4.32 limits visual-override dispatch to 20 Hz; timing reports record Performance switch states. Earlier changes and the five optional Performance switches are described below.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.36 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.36-alpha.zip?raw=true)
+[Download v0.4.37 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.37-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -267,11 +267,11 @@ leaderboards, scoring, notes, timing, and all SlopHero features are preserved.
 
 The HUD picker uses individual buttons instead of Unity's array-based selection
 grid, whose IL2CPP wrapper throws `Method unstripping failed` in v1.1.0.6142.
-Two navigation rows keep all page titles visible. The page can resize
-score/combo, input, star-power, star-progress, song-progress, practice stats,
-and FPS HUDs. Its target outline uses screen-projected UI and sprite bounds,
-cached at 20 Hz while the editor is open. Corner scaling keeps a fixed drag
-origin so refreshed bounds do not shift the resize ratio mid-gesture. Star graphics exclude the
+Two navigation rows keep all page titles visible. The page can resize the
+score box, input, star-power, song-progress, practice stats, and FPS HUDs. Its
+target outline uses screen-projected UI and sprite bounds, cached at 20 Hz while
+the editor is open. Corner scaling keeps a fixed drag origin so refreshed
+bounds do not shift the resize ratio mid-gesture. Star graphics exclude the
 `starCountBG` renderer, so the empty progress track keeps its original color.
 The 20 Hz visual-dispatch gate now runs before preference and `GameManager`
 reads, removing those repeated checks from unlocked update frames.
@@ -292,6 +292,14 @@ Score, combo, and accuracy text share one sizing control and one combined
 selection outline. Empty native-component scans retry during sizing to catch
 HUD objects created after gameplay initialization. The log records one bounds
 result per selected target and the saved size at the end of a drag.
+
+## 0.4.37 resize bounds and score-box grouping
+
+The v0.4.36 log exposed invalid bounds from off-camera renderers, producing
+resize rectangles tens of thousands of pixels off-screen. Bounds now discard
+behind-camera and off-screen points and only include visible renderers. Score,
+combo, accuracy, and star progress share one target and one scale setting; old
+star-progress scaling is folded into the score-box scale during upgrade.
 
 ## 0.4.32 override dispatch
 

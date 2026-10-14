@@ -28,7 +28,7 @@ internal sealed class NativeHudLayout
     private Color lastFpsColor;
     private double nextProbe;
     private double nextScaleProbe;
-    private float oldScoreScale = float.NaN, oldInputScale = float.NaN, oldSpScale = float.NaN, oldStarProgressScale = float.NaN, oldSongProgressScale = float.NaN, oldPracticeScale = float.NaN, oldFpsScale = float.NaN;
+    private float oldScoreScale = float.NaN, oldInputScale = float.NaN, oldSpScale = float.NaN, oldSongProgressScale = float.NaN, oldPracticeScale = float.NaN, oldFpsScale = float.NaN;
 
     public void Clear()
     {
@@ -54,13 +54,13 @@ internal sealed class NativeHudLayout
     public void Apply(GameManager game, bool practiceEnabled,
         float practiceX, float practiceY, float fpsX, float fpsY,
         bool tintFps, Color fpsColor, float scoreScale, float inputScale, float spScale,
-        float starProgressScale, float songProgressScale, float practiceScale, float fpsScale, double realtime)
+        float songProgressScale, float practiceScale, float fpsScale, double realtime)
     {
         bool changed = practiceEnabled != lastPracticeEnabled
             || practiceX != lastPracticeX || practiceY != lastPracticeY
             || fpsX != lastFpsX || fpsY != lastFpsY
             || tintFps != lastFpsTint || fpsColor != lastFpsColor;
-        bool scaleChanged = scoreScale != oldScoreScale || inputScale != oldInputScale || spScale != oldSpScale || starProgressScale != oldStarProgressScale
+        bool scaleChanged = scoreScale != oldScoreScale || inputScale != oldInputScale || spScale != oldSpScale
             || songProgressScale != oldSongProgressScale || practiceScale != oldPracticeScale || fpsScale != oldFpsScale;
         if (!changed && !scaleChanged && realtime < nextProbe && realtime < nextScaleProbe) return;
         nextProbe = realtime + .25;
@@ -95,7 +95,7 @@ internal sealed class NativeHudLayout
         else RestorePractice();
 
         ApplyPosition(fpsRect, fpsOriginal, fpsX, fpsY, ref lastFpsX, ref lastFpsY);
-        ApplyHudScales(game, scoreScale, inputScale, spScale, starProgressScale, songProgressScale, practiceScale, fpsScale, realtime, scaleChanged);
+        ApplyHudScales(game, scoreScale, inputScale, spScale, songProgressScale, practiceScale, fpsScale, realtime, scaleChanged);
         if (tintFps != lastFpsTint || fpsColor != lastFpsColor || nextFps?.Pointer != fpsPointer)
         {
             ApplyFpsColor(tintFps, fpsColor);
@@ -111,9 +111,9 @@ internal sealed class NativeHudLayout
     }
 
     private void ApplyHudScales(GameManager game, float scoreScale, float inputScale, float spScale,
-        float starProgressScale, float songProgressScale, float practiceScale, float fpsScale, double realtime, bool changed)
+        float songProgressScale, float practiceScale, float fpsScale, double realtime, bool changed)
     {
-        bool enabled = scoreScale != 1 || inputScale != 1 || spScale != 1 || starProgressScale != 1
+        bool enabled = scoreScale != 1 || inputScale != 1 || spScale != 1
             || songProgressScale != 1 || practiceScale != 1 || fpsScale != 1;
         if (!changed && (!enabled || realtime < nextScaleProbe)) return;
         nextScaleProbe = realtime + .5;
@@ -133,13 +133,6 @@ internal sealed class NativeHudLayout
             foreach (var bar in spBars) if (bar != null) Scale(bar.transform, spScale, 3);
         }
         else RestoreKind(typeof(SPBar));
-        if (starProgressScale != 1)
-        {
-            if (starProgresses == null || starProgresses.Length == 0)
-                starProgresses = UnityEngine.Object.FindObjectsOfType<StarProgress>();
-            foreach (var progress in starProgresses) if (progress != null) Scale(progress.transform, starProgressScale, 7);
-        }
-        else RestoreKind(typeof(StarProgress));
         if (songProgressScale != 1)
         {
             if (songProgress == null || songProgress.Length == 0)
@@ -150,7 +143,7 @@ internal sealed class NativeHudLayout
         if (practiceScale != 1) Scale(practiceRect, practiceScale, 5); else RestoreKind(practiceRect);
         if (fpsScale != 1) Scale(fpsRect, fpsScale, 6); else RestoreKind(fpsRect);
         oldScoreScale = scoreScale; oldInputScale = inputScale; oldSpScale = spScale;
-        oldStarProgressScale = starProgressScale; oldSongProgressScale = songProgressScale;
+        oldSongProgressScale = songProgressScale;
         oldPracticeScale = practiceScale; oldFpsScale = fpsScale;
     }
 
@@ -173,9 +166,13 @@ internal sealed class NativeHudLayout
             ScaleIfOutside(manager.scoreFont?.transform, root, factor);
             ScaleIfOutside(manager.comboFont?.transform, root, factor);
         }
-        if (game.playerObjects == null) return;
-        foreach (var player in game.playerObjects)
-            if (player != null) ScaleIfOutside(player.AccuracyText?.transform, root, factor);
+        if (game.playerObjects != null)
+            foreach (var player in game.playerObjects)
+                if (player != null) ScaleIfOutside(player.AccuracyText?.transform, root, factor);
+        if (starProgresses == null || starProgresses.Length == 0)
+            starProgresses = UnityEngine.Object.FindObjectsOfType<StarProgress>();
+        foreach (var progress in starProgresses)
+            if (progress != null) ScaleIfOutside(progress.transform, root, factor);
     }
 
     private void ScaleIfOutside(Transform? candidate, Transform? groupRoot, float factor)
@@ -214,7 +211,7 @@ internal sealed class NativeHudLayout
         {
             if (pair.Value.Transform == null) { resized.Remove(pair.Key); continue; }
             int kind = componentType == typeof(InputViewer) ? 2 : componentType == typeof(SPBar) ? 3
-                : componentType == typeof(StarProgress) ? 7 : componentType == typeof(SongProgress) ? 4 : 0;
+                : componentType == typeof(SongProgress) ? 4 : 0;
             if (pair.Value.Kind != kind) continue;
             pair.Value.Transform.localScale = pair.Value.Original;
             resized.Remove(pair.Key);
@@ -225,7 +222,7 @@ internal sealed class NativeHudLayout
     {
         foreach (var pair in resized.Values) if (pair.Transform != null) pair.Transform.localScale = pair.Original;
         resized.Clear();
-        oldScoreScale = oldInputScale = oldSpScale = oldStarProgressScale = oldSongProgressScale = oldPracticeScale = oldFpsScale = float.NaN;
+        oldScoreScale = oldInputScale = oldSpScale = oldSongProgressScale = oldPracticeScale = oldFpsScale = float.NaN;
     }
 
     public bool TryGetScreenRect(int target, out Rect rect)
@@ -249,8 +246,8 @@ internal sealed class NativeHudLayout
     /// <summary>Finds screen bounds for the HUD groups edited by corner handles.</summary>
     public bool TryGetResizeScreenRect(GameManager game, int target, out Rect rect)
     {
-        if (target == 7) return TryGetScreenRect(1, out rect);
-        if (target == 8) return TryGetScreenRect(2, out rect);
+        if (target == 6) return TryGetScreenRect(1, out rect);
+        if (target == 7) return TryGetScreenRect(2, out rect);
 
         bool found = false;
         float minX = float.PositiveInfinity, minY = float.PositiveInfinity;
@@ -261,7 +258,6 @@ internal sealed class NativeHudLayout
         {
             case 2:
                 var scoreManager = game.scoreManager;
-                AddResizeBounds(scoreManager?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 if (scoreManager != null)
                 {
                     AddResizeBounds(scoreManager.scoreFont?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
@@ -270,6 +266,10 @@ internal sealed class NativeHudLayout
                 if (game.playerObjects != null)
                     foreach (var player in game.playerObjects)
                         if (player != null) AddResizeBounds(player.AccuracyText?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                if (starProgresses == null || starProgresses.Length == 0)
+                    starProgresses = UnityEngine.Object.FindObjectsOfType<StarProgress>();
+                foreach (var progress in starProgresses)
+                    if (progress != null) AddResizeBounds(progress.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 break;
             case 3:
                 if (inputViewers == null || inputViewers.Length == 0)
@@ -282,11 +282,6 @@ internal sealed class NativeHudLayout
                 foreach (var bar in spBars) if (bar != null) AddResizeBounds(bar.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 break;
             case 5:
-                if (starProgresses == null || starProgresses.Length == 0)
-                    starProgresses = UnityEngine.Object.FindObjectsOfType<StarProgress>();
-                foreach (var progress in starProgresses) if (progress != null) AddResizeBounds(progress.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                break;
-            case 6:
                 if (songProgress == null || songProgress.Length == 0)
                     songProgress = UnityEngine.Object.FindObjectsOfType<SongProgress>();
                 foreach (var bar in songProgress) if (bar != null) AddResizeBounds(bar.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
@@ -323,7 +318,7 @@ internal sealed class NativeHudLayout
         // so score, star, and song-progress controls get a selectable outline.
         foreach (var renderer in renderers)
         {
-            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy || !renderer.isVisible || worldCamera == null) continue;
             var bounds = renderer.bounds;
             var center = bounds.center;
             var extents = bounds.extents;
@@ -344,8 +339,15 @@ internal sealed class NativeHudLayout
         ref bool found, ref float minX, ref float minY, ref float maxX, ref float maxY)
     {
         Vector3 point = camera != null ? camera.WorldToScreenPoint(world) : world;
-        minX = Math.Min(minX, point.x); maxX = Math.Max(maxX, point.x);
-        minY = Math.Min(minY, Screen.height - point.y); maxY = Math.Max(maxY, Screen.height - point.y);
+        if (!float.IsFinite(point.x) || !float.IsFinite(point.y) || !float.IsFinite(point.z)) return;
+        if (camera != null && point.z < camera.nearClipPlane) return;
+        float x = point.x, y = Screen.height - point.y;
+        float marginX = Math.Max(64, Screen.width * .15f), marginY = Math.Max(64, Screen.height * .15f);
+        if (x < -marginX || x > Screen.width + marginX || y < -marginY || y > Screen.height + marginY) return;
+        x = Math.Clamp(x, 0, Screen.width);
+        y = Math.Clamp(y, 0, Screen.height);
+        minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
+        minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
         found = true;
     }
 
