@@ -120,7 +120,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.34 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.35 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
         // nine narrow tabs that clipped labels such as "Performance".
         const int tabColumns = 5;
@@ -404,15 +404,23 @@ public sealed partial class Core
         }
 
         Color previous = GUI.color;
+        Color previousBackground = GUI.backgroundColor;
         try
         {
-            GUI.color = MenuAccentColor(0);
+            // GUI.DrawTexture is missing its IL2CPP unstripped wrapper in this
+            // Clone Hero build. Calling it throws from OnGUI and closes the
+            // editor before resize handles can be used. GUI.Box(Rect, string)
+            // is already supported by the game's runtime and gives us the same
+            // simple filled rectangles for the outline and handles.
+            GUI.color = Color.white;
+            GUI.backgroundColor = MenuAccentColor(0);
             const float line = 2;
-            GUI.DrawTexture(new Rect(rect.xMin, rect.yMin, rect.width, line), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(rect.xMin, rect.yMax - line, rect.width, line), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(rect.xMin, rect.yMin, line, rect.height), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(rect.xMax - line, rect.yMin, line, rect.height), Texture2D.whiteTexture);
-            for (int i = 0; i < 4; i++) GUI.Box(ResizeHandleRect(rect, i), GUIContent.none);
+            GUI.Box(new Rect(rect.xMin, rect.yMin, rect.width, line), "");
+            GUI.Box(new Rect(rect.xMin, rect.yMax - line, rect.width, line), "");
+            GUI.Box(new Rect(rect.xMin, rect.yMin, line, rect.height), "");
+            GUI.Box(new Rect(rect.xMax - line, rect.yMin, line, rect.height), "");
+            for (int i = 0; i < 4; i++) GUI.Box(ResizeHandleRect(rect, i), "");
+            GUI.backgroundColor = previousBackground;
             string label = ResizeTargetLabels[resizeTarget] + (resizeTarget < 2
                 ? $" — {ResizeValue():0} px"
                 : $" — {ResizeValue():0.00}×");
@@ -420,7 +428,11 @@ public sealed partial class Core
             GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44),
                 "Drag a corner to resize proportionally; drag inside a SlopHero HUD to move. F8 returns; Escape finishes.");
         }
-        finally { GUI.color = previous; }
+        finally
+        {
+            GUI.color = previous;
+            GUI.backgroundColor = previousBackground;
+        }
 
         var e = Event.current;
         if (e.type == EventType.MouseDown && e.button == 0)

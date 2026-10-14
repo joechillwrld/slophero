@@ -1,8 +1,8 @@
-# SlopHero 0.4.34 alpha
+# SlopHero 0.4.35 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.34 fixes the Sizing page crash and clipped menu titles.** The crash was the IL2CPP `SelectionGrid(string[])` wrapper failing on this game build; the HUD picker now uses individually drawn buttons. Navigation uses two rows so page names fit. The star tint excludes the actual empty-track renderer (`StarProgress.starCountBG`), which had been mistaken for a star graphic. Resize outlines now include the game's SpriteRenderer-based HUD, and star-rating progress has its own size control, separate from the star-power meter. The in-game selection outline and resize handles are available from Sizing. Version 0.4.34 also moves the 20 Hz gate ahead of the `OnLateUpdate` settings and Unity-object checks. Version 0.4.32 limits visual-override dispatch to 20 Hz; timing reports record Performance switch states. Earlier changes and the five optional Performance switches are described below.
+**Version 0.4.35 fixes the Sizing editor closing when resize handles are drawn.** The latest log traced this to `GUI.DrawTexture` failing IL2CPP method unstripping. The outline now uses the already-supported `GUI.Box` path and is drawn only while a resize target is actively being edited. Version 0.4.34 fixed the Sizing page crash and clipped menu titles: the HUD picker now uses individually drawn buttons instead of the failing `SelectionGrid(string[])` wrapper, and navigation uses two rows so page names fit. Star tint excludes the empty-track renderer (`StarProgress.starCountBG`), and star-rating progress has its own size control. Version 0.4.34 also moves the 20 Hz gate ahead of the `OnLateUpdate` settings and Unity-object checks. Version 0.4.32 limits visual-override dispatch to 20 Hz; timing reports record Performance switch states. Earlier changes and the five optional Performance switches are described below.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.34 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.34-alpha.zip?raw=true)
+[Download v0.4.35 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.35-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -275,6 +275,14 @@ origin so refreshed bounds do not shift the resize ratio mid-gesture. Star graph
 `starCountBG` renderer, so the empty progress track keeps its original color.
 The 20 Hz visual-dispatch gate now runs before preference and `GameManager`
 reads, removing those repeated checks from unlocked update frames.
+
+## 0.4.35 resize editor rendering
+
+The latest log showed `NotSupportedException: Method unstripping failed` from
+`DrawResizeHandles`. `GUI.DrawTexture` is not available through this game's
+IL2CPP wrapper, so the selection outline and corner handles now use the
+supported `GUI.Box(Rect, string)` call. They are rendered only while a resize
+target is actively being edited.
 
 ## 0.4.32 override dispatch
 
