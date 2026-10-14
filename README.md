@@ -1,8 +1,8 @@
-# SlopHero 0.4.39 alpha
+# SlopHero 0.4.40 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.39 corrects the gameplay-scene targets used by resizing and FPS customization.** Score and input-viewer outlines project through the scene's `HUDCam`; the scene has no camera tagged as `MainCamera`. Score sizing uses the shared `HUD` parent, input-viewer sizing uses its shared root, and FPS customization uses the `FrameRate` component and text on the actual `FPS` object. FPS color styles the first number inside the readout, leaving the slash and simulated FPS at their normal color. Version 0.4.38 attempted these fixes using the wrong objects, which is why its resize handles and FPS controls failed in game. Earlier changes and the five optional Performance switches are described below.
+**Version 0.4.40 tightens the score-box resize outline and repairs practice-stats editing.** The outline follows the visible score, combo, star, and song-progress graphics, and no longer includes the separate leaderboard accuracy row. Only the corner handles resize. Dragging inside counters, song info, practice stats, or FPS moves them. Practice-stats controls locate the serialized panel directly even while Clone Hero's practice or song-loaded flags are transitioning; a zero-height layout falls back to the panel's visible children. Game HUD now places Move and Resize for practice stats side by side. Version 0.4.39 corrected the HUD camera and FPS targets. Earlier changes and the five optional Performance switches are described below.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.39 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.39-alpha.zip?raw=true)
+[Download v0.4.40 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.40-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -61,8 +61,8 @@ F8 has nine pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colo
   best streak. **Best streak** uses the game's highest streak for the current attempt.
 - Song HUD: chart title, artist, charter, and live chart speed are separate toggleable lines.
   It has independent position, text size, color, and background opacity.
-- Game HUD: move the game's practice stats bar while practice mode is active. Move
-  and resize the FPS row, and recolor its actual FPS number. FPS must first be enabled
+- Game HUD: move and resize the game's practice stats bar. Move and resize the FPS
+  row, and recolor its actual FPS number. FPS must first be enabled
   in Clone Hero's own settings. Both positions can also be adjusted with numeric offsets.
 - Profiles: use the dropdown to switch profiles or rename one from its row, save
   full settings or color-only themes, or edit JSON files. Files live in `UserData/SlopHero/Profiles`; refresh the page after
@@ -300,6 +300,16 @@ resize rectangles tens of thousands of pixels off-screen. Bounds now discard
 behind-camera and off-screen points and include only bounds projected near the viewport. Score,
 combo, accuracy, and star progress share one target and one scale setting; old
 star-progress scaling is folded into the score-box scale during upgrade.
+
+## 0.4.40 resize editor and practice panel
+
+The score-box outline uses the backgrounds of the score, combo, star-progress,
+and song-progress graphics plus the star face. Leaderboard accuracy text is a
+different HUD element and no longer stretches the score outline or scales with
+the score box. Dragging the interior never resizes; corners resize, and the
+interior moves counters, song info, practice stats, and FPS. Practice stats can
+be moved and resized even when the panel is present before `songLoaded` becomes
+true. Practice Move and Resize controls are together on Game HUD.
 
 ## 0.4.39 native HUD target correction
 

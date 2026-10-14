@@ -20,6 +20,7 @@ internal sealed class NativeHudLayout
     private StarProgress[]? starProgresses;
     private SongProgress[]? songProgress;
     private RectTransform? practiceRect, fpsRect;
+    private PracticeUI? cachedPracticeUi;
     private FrameRate? fpsFrameRate;
     private IntPtr practicePointer, fpsPointer;
     private Vector2 practiceOriginal, fpsOriginal;
@@ -30,12 +31,13 @@ internal sealed class NativeHudLayout
     private string fpsPlainText = "", fpsStyledText = "";
     private float lastPracticeX = float.NaN, lastPracticeY = float.NaN;
     private float lastFpsX = float.NaN, lastFpsY = float.NaN;
-    private bool lastPracticeEnabled, lastFpsTint;
+    private bool lastFpsTint;
     private Color lastFpsColor;
     private double nextProbe;
     private double nextScaleProbe;
     private double nextFpsProbe;
     private double nextFpsTintProbe;
+    private long nextPracticeLookupTick;
     private float oldScoreScale = float.NaN, oldInputScale = float.NaN, oldSpScale = float.NaN, oldPracticeScale = float.NaN, oldFpsScale = float.NaN;
 
     public void Clear()
@@ -44,6 +46,7 @@ internal sealed class NativeHudLayout
         RestorePractice();
         RestoreFps();
         practiceRect = fpsRect = null;
+        cachedPracticeUi = null;
         fpsFrameRate = null;
         practicePointer = fpsPointer = IntPtr.Zero;
         inputViewers = null;
@@ -57,20 +60,20 @@ internal sealed class NativeHudLayout
         fpsTmpOriginalColors = Array.Empty<Color>();
         fpsLegacyOriginalColors = Array.Empty<Color>();
         lastPracticeX = lastPracticeY = lastFpsX = lastFpsY = float.NaN;
-        lastPracticeEnabled = lastFpsTint = false;
+        lastFpsTint = false;
         nextProbe = 0;
         nextScaleProbe = 0;
         nextFpsProbe = 0;
         nextFpsTintProbe = 0;
+        nextPracticeLookupTick = 0;
     }
 
-    public void Apply(GameManager game, bool practiceEnabled,
+    public void Apply(GameManager game,
         float practiceX, float practiceY, float fpsX, float fpsY,
         bool tintFps, Color fpsColor, float scoreScale, float inputScale, float spScale,
         float practiceScale, float fpsScale, double realtime)
     {
-        bool changed = practiceEnabled != lastPracticeEnabled
-            || practiceX != lastPracticeX || practiceY != lastPracticeY
+        bool changed = practiceX != lastPracticeX || practiceY != lastPracticeY
             || fpsX != lastFpsX || fpsY != lastFpsY
             || tintFps != lastFpsTint || fpsColor != lastFpsColor;
         bool scaleChanged = scoreScale != oldScoreScale || inputScale != oldInputScale || spScale != oldSpScale
@@ -115,20 +118,8 @@ internal sealed class NativeHudLayout
             lastFpsTint = false;
         }
 
-        if (practiceEnabled)
-        {
-            var nextPractice = game.practiceUI?.rectTrans;
-            if (nextPractice?.Pointer != practicePointer)
-            {
-                RestorePractice();
-                practiceRect = nextPractice;
-                practicePointer = practiceRect?.Pointer ?? IntPtr.Zero;
-                practiceOriginal = practiceRect == null ? Vector2.zero : practiceRect.anchoredPosition;
-                lastPracticeX = lastPracticeY = float.NaN;
-            }
-            ApplyPosition(practiceRect, practiceOriginal, practiceX, practiceY, ref lastPracticeX, ref lastPracticeY);
-        }
-        else RestorePractice();
+        RefreshPracticeTarget(game);
+        ApplyPosition(practiceRect, practiceOriginal, practiceX, practiceY, ref lastPracticeX, ref lastPracticeY);
 
         ApplyPosition(fpsRect, fpsOriginal, fpsX, fpsY, ref lastFpsX, ref lastFpsY);
         ApplyHudScales(game, scoreScale, inputScale, spScale, practiceScale, fpsScale, realtime, scaleChanged);
@@ -140,11 +131,54 @@ internal sealed class NativeHudLayout
             lastFpsColor = fpsColor;
         }
 
-        lastPracticeEnabled = practiceEnabled;
         lastPracticeX = practiceX;
         lastPracticeY = practiceY;
         lastFpsX = fpsX;
         lastFpsY = fpsY;
+    }
+
+    // PracticeUI is serialized on GameManager even when the game's practice
+    // flag or songLoaded state is temporarily false. The editable stats panel
+    // is PracticeUI's own RectTransform, so resolve it directly.
+    private void RefreshPracticeTarget(GameManager game)
+    {
+        var ui = GetPracticeUi(game);
+        var next = ui?.rectTrans ?? ui?.GetComponent<RectTransform>();
+        if ((next?.Pointer ?? IntPtr.Zero) == practicePointer) return;
+        RestorePractice();
+        practiceRect = next;
+        practicePointer = next?.Pointer ?? IntPtr.Zero;
+        practiceOriginal = next == null ? Vector2.zero : next.anchoredPosition;
+        lastPracticeX = lastPracticeY = float.NaN;
+    }
+
+    private PracticeUI? GetPracticeUi(GameManager game)
+    {
+        var ui = game.practiceUI;
+        if (ui != null) return cachedPracticeUi = ui;
+        if (cachedPracticeUi != null) return cachedPracticeUi;
+        long now = Environment.TickCount64;
+        if (now < nextPracticeLookupTick) return null;
+        nextPracticeLookupTick = now + 1000;
+        return cachedPracticeUi = UnityEngine.Object.FindObjectOfType<PracticeUI>();
+    }
+
+    public void ApplyPracticeBeforeSongReady(GameManager game, float x, float y, float scale)
+    {
+        RefreshPracticeTarget(game);
+        ApplyPosition(practiceRect, practiceOriginal, x, y, ref lastPracticeX, ref lastPracticeY);
+        if (scale != 1) Scale(practiceRect, scale, 5); else RestoreKind(practiceRect);
+    }
+
+    public string DescribePracticeTarget(GameManager? game)
+    {
+        if (game == null) return "GameManager missing";
+        var ui = GetPracticeUi(game);
+        if (ui == null) return $"PracticeUI missing; songLoaded={game.songLoaded}, playersInit={game.playersInit}";
+        var panel = ui.rectTrans;
+        if (panel == null) return "PracticeUI exists but rectTrans is null";
+        return $"panelActive={panel.gameObject.activeInHierarchy}, panelSize={panel.rect.width:0}x{panel.rect.height:0}, "
+            + $"songLoaded={game.songLoaded}, playersInit={game.playersInit}, practiceFlag={game.globalVariables?.isPracticeEnabled}";
     }
 
     private void ApplyHudScales(GameManager game, float scoreScale, float inputScale, float spScale,
@@ -194,12 +228,6 @@ internal sealed class NativeHudLayout
         if (hudRoot != null && manager?.comboFont?.transform.parent?.Pointer == hudRoot.Pointer)
         {
             Scale(hudRoot, factor, 1);
-            if (game.playerObjects != null)
-                foreach (var player in game.playerObjects)
-                {
-                    var accuracy = player?.AccuracyText?.transform;
-                    if (accuracy != null && !IsWithin(accuracy, hudRoot)) Scale(accuracy, factor, 1);
-                }
             return;
         }
 
@@ -213,9 +241,6 @@ internal sealed class NativeHudLayout
             AddSpriteFontTargets(manager.scoreFont);
             AddSpriteFontTargets(manager.comboFont);
         }
-        if (game.playerObjects != null)
-            foreach (var player in game.playerObjects)
-                if (player != null) AddScoreTarget(player.AccuracyText?.transform);
         if (starProgresses == null || starProgresses.Length == 0)
             starProgresses = UnityEngine.Object.FindObjectsOfType<StarProgress>();
         foreach (var progress in starProgresses)
@@ -327,13 +352,30 @@ internal sealed class NativeHudLayout
         }
         rect = float.IsFinite(minX) && float.IsFinite(minY) && maxX - minX > 1 && maxY - minY > 1
             ? Rect.MinMaxRect(minX, minY, maxX, maxY) : default;
+        if (target == 1 && (rect.width <= 1 || rect.height <= 1))
+        {
+            // PracticeUI's ContentSizeFitter can leave Panel at zero height
+            // while its header and statistic rows are already visible.
+            bool childFound = false;
+            minX = minY = float.PositiveInfinity;
+            maxX = maxY = float.NegativeInfinity;
+            // Rows are added dynamically in practice. This fallback runs only
+            // while editing the practice HUD, so refresh that small child list.
+            resizeGraphics.Remove(transform.Pointer);
+            AddResizeBounds(transform, camera, ref childFound, ref minX, ref minY, ref maxX, ref maxY);
+            if (childFound) rect = Rect.MinMaxRect(minX, minY, maxX, maxY);
+        }
         return rect.width > 1 && rect.height > 1;
     }
 
     /// <summary>Finds screen bounds for the HUD groups edited by corner handles.</summary>
     public bool TryGetResizeScreenRect(GameManager game, int target, out Rect rect)
     {
-        if (target == 5) return TryGetScreenRect(1, out rect);
+        if (target == 5)
+        {
+            RefreshPracticeTarget(game);
+            return TryGetScreenRect(1, out rect);
+        }
         if (target == 6) return TryGetScreenRect(2, out rect);
 
         bool found = false;
@@ -351,25 +393,33 @@ internal sealed class NativeHudLayout
         {
             case 2:
                 var scoreManager = game.scoreManager;
+                bool scoreAnchorsFound = false;
                 if (scoreManager != null)
                 {
-                    AddResizeBounds(scoreManager.scoreFont?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                    AddResizeBounds(scoreManager.comboFont?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                    AddResizeBounds(scoreManager.comboTransform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                    AddSpriteFontResizeBounds(scoreManager.scoreFont, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                    AddSpriteFontResizeBounds(scoreManager.comboFont, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                    scoreAnchorsFound |= AddResizeBounds(scoreManager.scoreFont?.transform.Find("Score_BG"), worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                    scoreAnchorsFound |= AddResizeBounds(scoreManager.comboFont?.transform.Find("combo_bg"), worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 }
-                if (game.playerObjects != null)
-                    foreach (var player in game.playerObjects)
-                        if (player != null) AddResizeBounds(player.AccuracyText?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 if (starProgresses == null || starProgresses.Length == 0)
                     starProgresses = UnityEngine.Object.FindObjectsOfType<StarProgress>();
                 foreach (var progress in starProgresses)
-                    if (progress != null) AddResizeBounds(progress.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                    if (progress != null)
+                    {
+                        scoreAnchorsFound |= AddResizeBounds(progress.transform.Find("StarProgressBG"), worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                        scoreAnchorsFound |= AddResizeBounds(progress.transform.Find("star_outer"), worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                    }
                 if (songProgress == null || songProgress.Length == 0)
                     songProgress = UnityEngine.Object.FindObjectsOfType<SongProgress>();
                 foreach (var progress in songProgress)
-                    if (progress != null) AddResizeBounds(progress.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                    if (progress != null) scoreAnchorsFound |= AddResizeBounds(progress.transform.Find("SongProgressBG"), worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                // Fall back for a different HUD prefab, but keep the supplied
+                // build's outline anchored to the graphics users actually see.
+                if (!scoreAnchorsFound && scoreManager != null)
+                {
+                    AddResizeBounds(scoreManager.scoreFont?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                    AddResizeBounds(scoreManager.comboFont?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                    AddSpriteFontResizeBounds(scoreManager.scoreFont, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                    AddSpriteFontResizeBounds(scoreManager.comboFont, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                }
                 break;
             case 3:
                 if (inputViewers == null || inputViewers.Length == 0)

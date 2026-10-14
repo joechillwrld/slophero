@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.39", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.40", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -562,10 +562,15 @@ public sealed partial class Core : MelonMod
 
     private void DrawNativeHudMove()
     {
-        if (!nativeHud.TryGetScreenRect(nativeMoveTarget, out var rect))
+        var game = GameManager.field_Private_Static_GameManager_0;
+        Rect rect;
+        bool hasRect = nativeMoveTarget == 1 && game != null
+            ? nativeHud.TryGetResizeScreenRect(game, 5, out rect)
+            : nativeHud.TryGetScreenRect(nativeMoveTarget, out rect);
+        if (!hasRect)
         {
             string hint = nativeMoveTarget == 1
-                ? "Practice stats UI not found. Enter Practice mode, then reopen F8 → Game HUD."
+                ? "Practice stats panel was not found in this scene. Reopen F8 → Game HUD after it appears."
                 : "FPS readout was not found in this scene. Reopen F8 → Game HUD after it appears.";
             GUI.Box(new Rect(20, Screen.height - 110, Math.Max(300, Screen.width - 40), 44), hint);
             return;

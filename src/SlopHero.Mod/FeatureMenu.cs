@@ -129,7 +129,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.39 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.40 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
         // nine narrow tabs that clipped labels such as "Performance".
         const int tabColumns = 5;
@@ -204,8 +204,9 @@ public sealed partial class Core
                 break;
             case 5:
                 GUI.Label(new Rect(x, y, 540, 28), "Native game HUD. Offsets use the UI canvas's units.");
-                if (GUI.Button(new Rect(x, y + 36, 390, 32), "Move practice stats bar")) BeginNativeHudMove(1);
-                if (GUI.Button(new Rect(x + 400, y + 36, 140, 32), "Reset"))
+                if (GUI.Button(new Rect(x, y + 36, 218, 32), "Move practice stats")) BeginNativeHudMove(1);
+                if (GUI.Button(new Rect(x + 226, y + 36, 250, 32), "Resize practice stats")) BeginResizeTarget(5);
+                if (GUI.Button(new Rect(x + 484, y + 36, 140, 32), "Reset"))
                 { practiceHudX.Value = practiceHudY.Value = 0; preferencesDirty = true; }
                 Number("Practice stats horizontal offset", practiceHudX.Value, x, y + 74, -1500, 1500, v => practiceHudX.Value = v);
                 Number("Practice stats vertical offset", practiceHudY.Value, x, y + 112, -1500, 1500, v => practiceHudY.Value = v);
@@ -221,7 +222,7 @@ public sealed partial class Core
                 GUI.Label(new Rect(x, y + 400, 600, 60), "Color and size target the numeric FPS readout, not its separator. Position moves the full FPS row. The game's FPS display must be enabled first.");
                 break;
             case 6:
-                GUI.Label(new Rect(x, y, 632, 32), "Score box includes score, combo, accuracy, star progress, and song progress.");
+                GUI.Label(new Rect(x, y, 632, 32), "Score box includes score, combo, star progress, and song progress.");
                 Number("Score box", scoreHudScale.Value, x, y + 42, .5f, 2.5f, v => { scoreHudScale.Value = v; preferencesDirty = true; });
                 Number("Input viewer", inputViewerScale.Value, x, y + 82, .5f, 2.5f, v => { inputViewerScale.Value = v; preferencesDirty = true; });
                 Number("Star power bar", starPowerHudScale.Value, x, y + 122, .5f, 2.5f, v => { starPowerHudScale.Value = v; preferencesDirty = true; });
@@ -243,7 +244,7 @@ public sealed partial class Core
                 }
                 if (GUI.Button(new Rect(x, y + 416, 400, 34), "Edit selected HUD with corner handles")) BeginResizeTarget(resizeSelection);
                 GUI.Label(new Rect(x + 410, y + 416, 220, 56), "F8 returns here; Escape finishes.");
-                GUI.Label(new Rect(x, y + 462, 632, 48), "Drag a corner to resize. Drag inside counters or song info to move them. FPS resizing is under Game HUD.");
+                GUI.Label(new Rect(x, y + 462, 632, 48), "Drag a corner to resize. Drag counters or song info to move; practice and FPS layout controls are also on Game HUD.");
                 break;
             case 7:
                 DrawProfiles(x, y);
@@ -380,7 +381,11 @@ public sealed partial class Core
                 if (cachedResizeRectValid)
                     LoggerInstance.Msg($"Resize editor bounds: {ResizeTargetLabels[resizeTarget]} at {cachedResizeRect.x:0},{cachedResizeRect.y:0} size {cachedResizeRect.width:0}x{cachedResizeRect.height:0}.");
                 else
-                    LoggerInstance.Warning($"Resize editor could not find visible bounds for {ResizeTargetLabels[resizeTarget]}.");
+                {
+                    string detail = resizeTarget == 5
+                        ? $" ({nativeHud.DescribePracticeTarget(Il2Cpp.GameManager.field_Private_Static_GameManager_0)})" : "";
+                    LoggerInstance.Warning($"Resize editor could not find visible bounds for {ResizeTargetLabels[resizeTarget]}{detail}.");
+                }
             }
         }
         rect = cachedResizeRect;
@@ -408,7 +413,7 @@ public sealed partial class Core
         if (!TryGetCachedResizeRect(out var rect))
         {
             string hint = resizeTarget == 5
-                ? "Practice stats are visible only after entering Practice mode. F8 returns to settings."
+                ? "Practice stats panel was not found in this scene. F8 returns to settings."
                 : resizeTarget == 6
                     ? "FPS readout was not found in this scene. F8 returns to settings."
                     : "This HUD is not available in the current scene. F8 returns to settings.";
@@ -437,30 +442,20 @@ public sealed partial class Core
                 resizeMoveDragging = true;
                 resizeDragOffset = e.mousePosition - new Vector2(rect.x, rect.y);
             }
-            else
+            else if (resizeTarget >= 5)
             {
-                // Native HUDs have small or hard-to-see corners. Dragging
-                // anywhere inside their outline now resizes them horizontally;
-                // the visible corner handles remain available for radial resize.
-                resizeHandle = 4;
+                resizeMoveDragging = true;
                 resizeStartMouse = e.mousePosition;
             }
+            else return; // Clone Hero's own layout controls move these HUDs.
             e.Use();
         }
         if (e.type == EventType.MouseDrag && resizeHandle >= 0)
         {
-            if (resizeHandle == 4)
-            {
-                float factor = MathF.Exp((e.mousePosition.x - resizeStartMouse.x) / 220f);
-                SetResizeValue(resizeStartValue * factor);
-            }
-            else
-            {
-                // Keep the drag origin fixed for the entire gesture. The
-                // displayed bounds refresh at 20 Hz and must not shift the ratio.
-                float radius = Vector2.Distance(resizeDragCenter, e.mousePosition);
-                if (resizeStartRadius > 1) SetResizeValue(resizeStartValue * radius / resizeStartRadius);
-            }
+            // Keep the drag origin fixed for the entire gesture. The
+            // displayed bounds refresh at 20 Hz and must not shift the ratio.
+            float radius = Vector2.Distance(resizeDragCenter, e.mousePosition);
+            if (resizeStartRadius > 1) SetResizeValue(resizeStartValue * radius / resizeStartRadius);
             e.Use();
         }
         if (e.type == EventType.MouseDrag && resizeMoveDragging && resizeTarget < 2)
@@ -469,6 +464,16 @@ public sealed partial class Core
                 (int)(e.mousePosition.y - resizeDragOffset.y), (int)rect.width, (int)rect.height, Screen.width, Screen.height);
             if (resizeTarget == 0) { hudX.Value = p.X; hudY.Value = p.Y; }
             else { songX.Value = p.X; songY.Value = p.Y; }
+            preferencesDirty = true;
+            e.Use();
+        }
+        if (e.type == EventType.MouseDrag && resizeMoveDragging && resizeTarget >= 5)
+        {
+            var delta = nativeHud.MoveByScreenDelta(resizeTarget == 5 ? 1 : 2,
+                e.mousePosition.x - resizeStartMouse.x, e.mousePosition.y - resizeStartMouse.y);
+            if (resizeTarget == 5) { practiceHudX.Value += delta.x; practiceHudY.Value += delta.y; }
+            else { fpsHudX.Value += delta.x; fpsHudY.Value += delta.y; }
+            resizeStartMouse = e.mousePosition;
             preferencesDirty = true;
             e.Use();
         }
@@ -503,9 +508,9 @@ public sealed partial class Core
                 : $" — {ResizeValue():0.00}×");
             GUI.Box(new Rect(rect.xMin, Math.Max(0, rect.yMin - 26), Math.Max(150, label.Length * 8), 22), label);
             GUI.Box(new Rect(20, 16, Math.Max(300, Screen.width - 40), 34),
-                $"Resize mode: {label}. Drag a corner; drag inside to resize native HUDs.");
+                $"HUD edit: {label}. Drag a corner to resize.");
             GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44),
-                "Corners resize all targets. Drag inside counters/song info to move; drag inside native HUDs to resize. F8 returns; Escape finishes.");
+                "Drag inside counters, song info, practice stats, or FPS to move. Use Clone Hero's layout controls for other HUDs. F8 returns; Escape finishes.");
         }
         finally
         {
@@ -909,7 +914,25 @@ public sealed partial class Core
         // All HUD and visual changes refresh at 5–20 Hz, so resolving the
         // manager at the same cadence is sufficient.
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
-        if (game == null || !game.songLoaded || !game.playersInit || game.globalVariables == null) return;
+        if (game == null || game.globalVariables == null) return;
+        bool songReady = game.songLoaded && game.playersInit;
+        if (!songReady)
+        {
+            // Practice's stats panel may exist before the songLoaded/player
+            // gates reopen. Keep its saved position and size usable then.
+            bool practiceHudRequested = resizeTarget == 5 || nativeMoveTarget == 1
+                || practiceHudX.Value != 0 || practiceHudY.Value != 0 || practiceHudScale.Value != 1;
+            if (nativeHudPending && practiceHudRequested)
+            {
+                try { nativeHud.ApplyPracticeBeforeSongReady(game, practiceHudX.Value, practiceHudY.Value, practiceHudScale.Value); }
+                catch (Exception ex)
+                {
+                    nativeHudError = true;
+                    LoggerInstance.Error($"Practice HUD customization stopped after an error: {ex}");
+                }
+            }
+            return;
+        }
 
         if (nativeHudPending)
         {
@@ -917,7 +940,7 @@ public sealed partial class Core
             {
                 Color fpsTint;
                 try { fpsTint = ParseColor(fpsTextColor.Value); } catch (FormatException) { fpsTint = Color.white; }
-                nativeHud.Apply(game, game.globalVariables.isPracticeEnabled,
+                nativeHud.Apply(game,
                     practiceHudX.Value, practiceHudY.Value, fpsHudX.Value, fpsHudY.Value,
                 customizeFpsColor.Value, fpsTint, scoreHudScale.Value, inputViewerScale.Value,
                     starPowerHudScale.Value, practiceHudScale.Value,
