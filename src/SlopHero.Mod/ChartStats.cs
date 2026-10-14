@@ -8,7 +8,7 @@ internal sealed class ChartStats
 {
     private IntPtr enginePointer, notesPointer;
     private int cursor;
-    private long misses, rangeStart, rangeEnd;
+    private long resolvedHeads, rangeStart, rangeEnd;
     private double lastSongTime = double.NegativeInfinity;
     private int lastHits;
 
@@ -29,7 +29,7 @@ internal sealed class ChartStats
             // instead of marshalling thousands of previous notes after a seek.
             cursor = practice ? OrderedNoteSearch.LowerBound(count, start,
                 i => notes[i]?.field_Public_Int64_0 ?? long.MinValue) : 0;
-            misses = 0;
+            resolvedHeads = 0;
             enginePointer = engine.Pointer;
             notesPointer = notes.Pointer;
             rangeStart = start;
@@ -51,11 +51,15 @@ internal sealed class ChartStats
             // Disjoint child heads are omitted by the game's results denominator.
             if (!ChartNote.CountsTowardAccuracy(flags)) { cursor++; continue; }
             if (!ChartNote.IsResolved(state)) break;
-            if (ChartNote.IsMissed(state)) misses++;
+            // Count each judged head once. A note can first be marked missed
+            // and then accepted as a late hit; the native hit counter reflects
+            // that correction, while a cached miss decision would not.
+            resolvedHeads++;
             cursor++;
         }
-        // Native engine offsets 0x9C and 0xD4 respectively, accessed through
-        // generated interop properties rather than hard-coded pointer reads.
-        return new LiveStats(hits, misses, engine.field_Public_Int32_17);
+        // The game's results screen computes misses as eligible heads minus
+        // native hits. Use judged heads here so future notes stay excluded.
+        // The ghost counter is the same native field PracticeUI reads.
+        return LiveStats.FromResolvedHeads(hits, resolvedHeads, engine.field_Public_Int32_17);
     }
 }

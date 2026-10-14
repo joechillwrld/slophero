@@ -31,6 +31,11 @@ Check(new LiveStats(0, 0, 10).HitPercentage is null, "No notes is undefined");
 Check(new LiveStats(10, 0, 100).HitPercentage == 100, "Ghosts do not lower hit percentage");
 Check(new LiveStats(0, 10, 0).HitPercentage == 0, "All misses");
 Check(new LiveStats(long.MaxValue, long.MaxValue, 0).HitPercentage == 50, "No integer overflow");
+var lateHits = LiveStats.FromResolvedHeads(617, 627, 96);
+Check(lateHits.Misses == 10 && Math.Abs(lateHits.HitPercentage!.Value - 61700d / 627) < .000001,
+    "Late hits use the game's resolved-head total minus native hits");
+Check(LiveStats.FromResolvedHeads(12, 10, 0).Misses == 0,
+    "Native hits can run ahead of a bounded chart scan without showing negative misses");
 Check(ChartNote.CountsTowardAccuracy(1), "Chord head counts");
 Check(ChartNote.CountsTowardAccuracy(4), "Ordinary chord child counts");
 Check(!ChartNote.CountsTowardAccuracy(6 | 16), "Disjoint chord child omitted");

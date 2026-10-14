@@ -10,6 +10,13 @@ public readonly record struct LiveStats
     public double? HitPercentage => Hits == 0 && Misses == 0
         ? null : 100d * Hits / ((double)Hits + Misses);
 
+    public static LiveStats FromResolvedHeads(long hits, long resolvedHeads, long ghostInputs)
+    {
+        if (resolvedHeads < 0) throw new ArgumentOutOfRangeException(nameof(resolvedHeads));
+        // Native hits can advance before a bounded chart scan catches up.
+        return new LiveStats(hits, Math.Max(0, resolvedHeads - hits), ghostInputs);
+    }
+
     public LiveStats(long hits, long misses, long ghostInputs)
     {
         if (hits < 0) throw new ArgumentOutOfRangeException(nameof(hits));

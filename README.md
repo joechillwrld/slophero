@@ -1,8 +1,8 @@
-# SlopHero 0.4.41 alpha
+# SlopHero 0.4.42 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.41 fixes the practice-stats outline and move controls.** The panel was present and sized correctly, but the mod passed a managed array to Unity's IL2CPP `GetWorldCorners` method, then read unchanged corners from the managed array. The editor now passes a reusable IL2CPP array for both practice/FPS HUDs and UI graphics. Version 0.4.40 tightened the score-box outline and made corner handles the only way to resize. Earlier changes and the five optional Performance switches are described below.
+**Version 0.4.42 fixes late-hit miss totals.** The live HUD now calculates misses from judged chart heads minus the game's native hit counter, matching the results screen's counting rule. A late hit can no longer remain cached as a miss. The HUD briefly refreshes more often when playback ends so final ghost and hit values can catch up with the native practice panel. Version 0.4.41 fixed the practice-stats outline and move controls. Earlier changes and the five optional Performance switches are described below.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.41 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.41-alpha.zip?raw=true)
+[Download v0.4.42 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.42-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -581,8 +581,8 @@ controls. Each rendering-error category logs once per session instead of floodin
 
 ## HUD
 
-- **Misses:** resolved chart heads marked missed, using the game's results-screen
-  counting rule for disjoint chord children.
+- **Misses:** judged chart heads minus the game's native hit count, using the
+  results-screen counting rule for disjoint chord children and late hits.
 - **Hit:** `hits / (hits + misses) * 100` for resolved notes in the current run.
   Before any note resolves it shows an em dash. Extra fret inputs do not reduce
   this percentage.
@@ -590,7 +590,8 @@ controls. Each rendering-error category logs once per session instead of floodin
 - **Ghosts:** the game's live **Ghost Inputs** counter, which feeds the guitar
   results screen. This is separate from overstrums and drum ghost-note hits.
 
-Counters refresh up to five times per second and reset when the engine, chart,
+Counters normally refresh up to five times per second, with a brief faster
+refresh when playback ends. They reset when the engine, chart,
 practice range, or song attempt changes. The first enabled guitar player's HUD
 is shown; per-player multiplayer overlays and drum HUDs are outside this build.
 

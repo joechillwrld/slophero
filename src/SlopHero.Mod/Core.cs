@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.41", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.42", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -39,7 +39,8 @@ public sealed partial class Core : MelonMod
     private string? capture;
     private string status = "Starting...", statsText = "";
     private string practiceWaitState = "";
-    private double nextStats, nextOverridePass, transitionStarted, noticeUntil;
+    private double nextStats, nextOverridePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
+    private bool lastStatsSongPlaying;
     private int? pendingSection;
     private IntPtr pendingSong;
     private IntPtr sourceManager;
@@ -106,6 +107,8 @@ public sealed partial class Core : MelonMod
         rings.Clear();
         visualError = false;
         nextStats = 0;
+        finalStatsRefreshUntil = 0;
+        lastStatsSongPlaying = false;
         nextOverridePass = 0;
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
@@ -224,6 +227,16 @@ public sealed partial class Core : MelonMod
             }
             var game = gameplay && gameplayInitialized ? GameManager.field_Private_Static_GameManager_0 : null;
             bool ready = game != null && game.songLoaded && game.playersInit && game.globalVariables != null;
+            bool songPlaying = ready && game!.isSongPlaying;
+            if (lastStatsSongPlaying && !songPlaying)
+            {
+                // The native practice panel can receive its final counters
+                // just after our last five-Hz sample. Recheck briefly at the
+                // end, then return to the normal low-cost refresh interval.
+                nextStats = 0;
+                finalStatsRefreshUntil = now + 1;
+            }
+            lastStatsSongPlaying = songPlaying;
             practiceModeActive = ready && game!.globalVariables!.isPracticeEnabled;
             if (ready) CompletePracticeTransition(game!);
             bool allow = ready && !transition && !settingsOpen && !moveHud && resizeTarget < 0 && Application.isFocused && !game!.isPaused
@@ -298,7 +311,7 @@ public sealed partial class Core : MelonMod
                     songText = string.Join("\n", lines);
                 }
                 else songText = "";
-                nextStats = now + .2;
+                nextStats = now + (now < finalStatsRefreshUntil ? .05 : .2);
             }
         }
         catch (Exception ex)

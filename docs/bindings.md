@@ -34,8 +34,10 @@ are field_Public_Int32_6 and field_Public_Int32_17.
 Live misses cannot use total chart length minus hits: that includes future
 notes. SlopHero reads the same time-ordered chart list as the results factory,
 from the getter at RVA `0x20F4F90`, generated property
-prop_List_1_ObjectPublicObInObDoSiDoUIInBoInUnique_0, and counts resolved missed
-heads. It processes heads incrementally, resetting on engine/chart replacement,
+prop_List_1_ObjectPublicObInObDoSiDoUIInBoInUnique_0, and counts resolved
+eligible heads minus the native hit count. It previously cached heads once as
+missed, which could overcount when the game accepted a late hit afterward.
+It processes heads incrementally, resetting on engine/chart replacement,
 time rewind, reduced hit count, or changed practice bounds. Catch-up is bounded
 to 4096 heads per refresh; large seeks may take several refreshes.
 
@@ -44,6 +46,9 @@ excludes heads having both flags. Note state at 0x84 identifies Hit (1) and
 Missed (2). The miss routine at RVA 0x20F3610 sets Missed with the setter at
 0x214B680. Other state flags describe dynamics, sustain, and squeeze status.
 The generated properties map to these exact fields.
+PracticeUI.Update at RVA `0x13C240` reads the same native engine hit and ghost
+fields at offsets `0x9C` and `0xD4`; a final-frame difference can come from
+SlopHero's five-Hz sampling. The HUD now briefly resamples after playback ends.
 
 ## Song controls
 
