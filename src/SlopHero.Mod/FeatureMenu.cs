@@ -129,7 +129,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.38 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.39 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
         // nine narrow tabs that clipped labels such as "Performance".
         const int tabColumns = 5;
@@ -410,7 +410,7 @@ public sealed partial class Core
             string hint = resizeTarget == 5
                 ? "Practice stats are visible only after entering Practice mode. F8 returns to settings."
                 : resizeTarget == 6
-                    ? "Turn on the game's FPS display first. F8 returns to settings."
+                    ? "FPS readout was not found in this scene. F8 returns to settings."
                     : "This HUD is not available in the current scene. F8 returns to settings.";
             GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44), hint);
             return;

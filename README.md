@@ -1,8 +1,8 @@
-# SlopHero 0.4.38 alpha
+# SlopHero 0.4.39 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.38 fixes the remaining native HUD targets.** Score sizing now includes score and combo SpriteFont digits, accuracy, star progress, and song progress. Input-viewer sizing targets its actual guitar, six-fret, and drum containers. FPS color selects the real numeric FPS readout rather than the slash separator; its color, size, position, and resize controls are grouped on Game HUD. Version 0.4.37 filtered bad off-screen bounds, which had placed handles far outside the display, and combined score, combo, accuracy, and star progress into one target. Version 0.4.36 added larger resize handles and drag-to-resize for native HUDs. Version 0.4.35 replaced `GUI.DrawTexture`, whose IL2CPP wrapper failed, with the supported `GUI.Box` path. The outline is drawn only while a resize target is actively being edited. Version 0.4.34 fixed the Sizing page crash and clipped menu titles: the HUD picker uses individual buttons instead of the failing `SelectionGrid(string[])` wrapper, and navigation uses two rows so page names fit. Star tint excludes the empty-track renderer (`StarProgress.starCountBG`). Version 0.4.34 also moved the 20 Hz gate ahead of `OnLateUpdate` settings and Unity-object checks. Version 0.4.32 limits visual-override dispatch to 20 Hz; timing reports record Performance switch states. Earlier changes and the five optional Performance switches are described below.
+**Version 0.4.39 corrects the gameplay-scene targets used by resizing and FPS customization.** Score and input-viewer outlines project through the scene's `HUDCam`; the scene has no camera tagged as `MainCamera`. Score sizing uses the shared `HUD` parent, input-viewer sizing uses its shared root, and FPS customization uses the `FrameRate` component and text on the actual `FPS` object. FPS color styles the first number inside the readout, leaving the slash and simulated FPS at their normal color. Version 0.4.38 attempted these fixes using the wrong objects, which is why its resize handles and FPS controls failed in game. Earlier changes and the five optional Performance switches are described below.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.38 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.38-alpha.zip?raw=true)
+[Download v0.4.39 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.39-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -301,14 +301,20 @@ behind-camera and off-screen points and include only bounds projected near the v
 combo, accuracy, and star progress share one target and one scale setting; old
 star-progress scaling is folded into the score-box scale during upgrade.
 
-## 0.4.38 native HUD target fixes
+## 0.4.39 native HUD target correction
 
-Score outlines use the actual SpriteFont digit renderers and combo transform,
-then include accuracy, star-progress, and song-progress components. Input-viewer
-outlines and scaling operate on the active guitar, six-fret, and drum containers
-rather than the wrapper component. FPS tint chooses the leftmost numeric value
-before the slash, leaving the separator and simulated-FPS value alone. FPS sizing
-and outline controls sit with its position and color controls on the Game HUD page.
+The supplied gameplay scene places score, combo, star, and song progress under
+`HUDCam/HUD`, and the input viewer under `HUDCam/Input Viewer`. There is no
+`MainCamera` tag, so the previous outlines could not project their bounds.
+Score and input sizing now use those visible shared parents. The FPS readout is
+one `FPS` object with a `FrameRate` component and one TextMeshProUGUI label;
+the previous search of its parent canvas could pick unrelated menu text.
+The outline and handles still draw only while resize mode is active.
+
+## 0.4.38 native HUD target attempt
+
+This release grouped score elements and moved FPS sizing controls to Game HUD,
+but its bounds and FPS object lookups did not match the gameplay scene.
 
 ## 0.4.32 override dispatch
 

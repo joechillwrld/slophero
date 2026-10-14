@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.38", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.39", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -566,7 +566,7 @@ public sealed partial class Core : MelonMod
         {
             string hint = nativeMoveTarget == 1
                 ? "Practice stats UI not found. Enter Practice mode, then reopen F8 → Game HUD."
-                : "FPS display not found. Enable the game's FPS display, then reopen F8 → Game HUD.";
+                : "FPS readout was not found in this scene. Reopen F8 → Game HUD after it appears.";
             GUI.Box(new Rect(20, Screen.height - 110, Math.Max(300, Screen.width - 40), 44), hint);
             return;
         }

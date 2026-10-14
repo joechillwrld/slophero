@@ -14,25 +14,28 @@ internal sealed class NativeHudLayout
     private readonly Vector3[] resizeGraphicCorners = new Vector3[4];
     private readonly Vector3[] resizeRendererCorners = new Vector3[8];
     private readonly Vector3[] nativeHudRectCorners = new Vector3[4];
-    private readonly List<Transform> inputContainerScratch = new(7);
     private readonly List<Transform> scoreGroupScratch = new(48);
     private InputViewer[]? inputViewers;
     private SPBar[]? spBars;
     private StarProgress[]? starProgresses;
     private SongProgress[]? songProgress;
     private RectTransform? practiceRect, fpsRect;
+    private FrameRate? fpsFrameRate;
     private IntPtr practicePointer, fpsPointer;
     private Vector2 practiceOriginal, fpsOriginal;
     private TMP_Text[] fpsTmpTexts = Array.Empty<TMP_Text>();
     private Text[] fpsLegacyTexts = Array.Empty<Text>();
     private Color[] fpsTmpOriginalColors = Array.Empty<Color>();
     private Color[] fpsLegacyOriginalColors = Array.Empty<Color>();
+    private string fpsPlainText = "", fpsStyledText = "";
     private float lastPracticeX = float.NaN, lastPracticeY = float.NaN;
     private float lastFpsX = float.NaN, lastFpsY = float.NaN;
     private bool lastPracticeEnabled, lastFpsTint;
     private Color lastFpsColor;
     private double nextProbe;
     private double nextScaleProbe;
+    private double nextFpsProbe;
+    private double nextFpsTintProbe;
     private float oldScoreScale = float.NaN, oldInputScale = float.NaN, oldSpScale = float.NaN, oldPracticeScale = float.NaN, oldFpsScale = float.NaN;
 
     public void Clear()
@@ -41,6 +44,7 @@ internal sealed class NativeHudLayout
         RestorePractice();
         RestoreFps();
         practiceRect = fpsRect = null;
+        fpsFrameRate = null;
         practicePointer = fpsPointer = IntPtr.Zero;
         inputViewers = null;
         spBars = null;
@@ -56,6 +60,8 @@ internal sealed class NativeHudLayout
         lastPracticeEnabled = lastFpsTint = false;
         nextProbe = 0;
         nextScaleProbe = 0;
+        nextFpsProbe = 0;
+        nextFpsTintProbe = 0;
     }
 
     public void Apply(GameManager game, bool practiceEnabled,
@@ -69,10 +75,30 @@ internal sealed class NativeHudLayout
             || tintFps != lastFpsTint || fpsColor != lastFpsColor;
         bool scaleChanged = scoreScale != oldScoreScale || inputScale != oldInputScale || spScale != oldSpScale
             || practiceScale != oldPracticeScale || fpsScale != oldFpsScale;
-        if (!changed && !scaleChanged && realtime < nextProbe && realtime < nextScaleProbe) return;
+        if (!changed && !scaleChanged && realtime < nextProbe && realtime < nextScaleProbe)
+        {
+            if (tintFps && realtime >= nextFpsTintProbe)
+            {
+                // FrameRate rewrites the text periodically. Restyle only when
+                // needed, at the existing 20 Hz HUD cadence, without scanning
+                // scene objects or rebuilding any GUI every game frame.
+                ApplyFpsColor(true, fpsColor);
+                nextFpsTintProbe = realtime + .05;
+            }
+            return;
+        }
         nextProbe = realtime + .25;
 
-        var fpsObject = game.FPSText;
+        // The gameplay scene has a dedicated FPS object with FrameRate and
+        // TextMeshProUGUI on the same GameObject. GameManager.FPSText is not a
+        // reliable reference to that object in this build.
+        if (fpsFrameRate == null && realtime >= nextFpsProbe)
+        {
+            fpsFrameRate = UnityEngine.Object.FindObjectOfType<FrameRate>();
+            nextFpsProbe = realtime + 1;
+        }
+        var fpsObject = fpsFrameRate != null && fpsFrameRate.gameObject.activeInHierarchy
+            ? fpsFrameRate.gameObject : null;
         var (nextFps, nextFpsTmpTexts, nextFpsLegacyTexts) = FindFpsHud(fpsObject);
         if (nextFps?.Pointer != fpsPointer || !SameTextTargets(fpsTmpTexts, nextFpsTmpTexts)
             || !SameTextTargets(fpsLegacyTexts, nextFpsLegacyTexts))
@@ -109,6 +135,7 @@ internal sealed class NativeHudLayout
         if (tintFps || tintFps != lastFpsTint || fpsColor != lastFpsColor || nextFps?.Pointer != fpsPointer)
         {
             ApplyFpsColor(tintFps, fpsColor);
+            nextFpsTintProbe = realtime + .05;
             lastFpsTint = tintFps;
             lastFpsColor = fpsColor;
         }
@@ -159,12 +186,27 @@ internal sealed class NativeHudLayout
 
     private void ApplyScoreHudScale(GameManager game, float factor)
     {
+        var manager = game.scoreManager;
+        var hudRoot = manager?.scoreFont?.transform.parent;
+        // In the supplied gameplay scene Score, Combo, Song Progress, and
+        // Star are all children of HUD. Scale that shared parent so the whole
+        // score box changes size as one piece instead of drifting apart.
+        if (hudRoot != null && manager?.comboFont?.transform.parent?.Pointer == hudRoot.Pointer)
+        {
+            Scale(hudRoot, factor, 1);
+            if (game.playerObjects != null)
+                foreach (var player in game.playerObjects)
+                {
+                    var accuracy = player?.AccuracyText?.transform;
+                    if (accuracy != null && !IsWithin(accuracy, hudRoot)) Scale(accuracy, factor, 1);
+                }
+            return;
+        }
+
         var candidates = scoreGroupScratch;
         candidates.Clear();
-        var manager = game.scoreManager;
         if (manager != null)
         {
-            AddScoreTarget(manager.transform);
             AddScoreTarget(manager.comboTransform);
             AddScoreTarget(manager.scoreFont?.transform);
             AddScoreTarget(manager.comboFont?.transform);
@@ -214,41 +256,9 @@ internal sealed class NativeHudLayout
 
     private void ScaleInputViewer(InputViewer viewer, float factor)
     {
-        var containers = inputContainerScratch;
-        containers.Clear();
-        AddInputContainer(viewer.guitarContainer, containers);
-        AddInputContainer(viewer.guitarTrailContainer, containers);
-        AddInputContainer(viewer.guitarGamepadContainer, containers);
-        AddInputContainer(viewer.sixFretContainer, containers);
-        AddInputContainer(viewer.sixFretTrailContainer, containers);
-        AddInputContainer(viewer.drumsContainer, containers);
-        AddInputContainer(viewer.drumsLeftyContainer, containers);
-        if (containers.Count == 0)
-        {
-            Scale(viewer.transform, factor, 2);
-            return;
-        }
-        for (int i = 0; i < containers.Count; i++)
-        {
-            var container = containers[i];
-            bool nested = false;
-            for (int j = 0; j < containers.Count; j++)
-            {
-                var parent = containers[j];
-                if (parent.Pointer == container.Pointer || !IsWithin(container, parent)) continue;
-                nested = true;
-                break;
-            }
-            if (!nested) Scale(container, factor, 2);
-        }
-    }
-
-    private static void AddInputContainer(GameObject? container, List<Transform> results)
-    {
-        if (container == null) return;
-        var transform = container.transform;
-        foreach (var existing in results) if (existing.Pointer == transform.Pointer) return;
-        results.Add(transform);
+        // All instrument-specific displays are children of Input Viewer in
+        // the gameplay scene. Scaling the root also covers the active mode.
+        Scale(viewer.transform, factor, 2);
     }
 
     private static bool IsWithin(Transform candidate, Transform root)
@@ -329,7 +339,13 @@ internal sealed class NativeHudLayout
         bool found = false;
         float minX = float.PositiveInfinity, minY = float.PositiveInfinity;
         float maxX = float.NegativeInfinity, maxY = float.NegativeInfinity;
-        Camera? worldCamera = Camera.main;
+        // Gameplay has a HUDCam for layers 5/12 and no MainCamera tag. Using
+        // Camera.main here made every sprite outline disappear.
+        if (target == 3 && (inputViewers == null || inputViewers.Length == 0))
+            inputViewers = UnityEngine.Object.FindObjectsOfType<InputViewer>();
+        Transform? cameraTarget = target == 3 ? inputViewers?.FirstOrDefault(v => v != null)?.transform
+            : game.scoreManager?.scoreFont?.transform;
+        Camera? worldCamera = FindHudCamera(cameraTarget);
 
         switch (target)
         {
@@ -361,15 +377,7 @@ internal sealed class NativeHudLayout
                 foreach (var viewer in inputViewers)
                 {
                     if (viewer == null) continue;
-                    bool foundContainer = false;
-                    foundContainer |= AddResizeBounds(viewer.guitarContainer?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                    foundContainer |= AddResizeBounds(viewer.guitarTrailContainer?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                    foundContainer |= AddResizeBounds(viewer.guitarGamepadContainer?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                    foundContainer |= AddResizeBounds(viewer.sixFretContainer?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                    foundContainer |= AddResizeBounds(viewer.sixFretTrailContainer?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                    foundContainer |= AddResizeBounds(viewer.drumsContainer?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                    foundContainer |= AddResizeBounds(viewer.drumsLeftyContainer?.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
-                    if (!foundContainer) AddResizeBounds(viewer.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
+                    AddResizeBounds(viewer.transform, worldCamera, ref found, ref minX, ref minY, ref maxX, ref maxY);
                 }
                 break;
             case 4:
@@ -382,6 +390,16 @@ internal sealed class NativeHudLayout
 
         rect = found ? Rect.MinMaxRect(minX, minY, maxX, maxY) : default;
         return found && rect.width > 1 && rect.height > 1;
+    }
+
+    private static Camera? FindHudCamera(Transform? target)
+    {
+        for (var current = target; current != null; current = current.parent)
+        {
+            var camera = current.GetComponent<Camera>();
+            if (camera != null && camera.enabled) return camera;
+        }
+        return Camera.main;
     }
 
     private bool AddResizeBounds(Transform? transform, Camera? worldCamera,
@@ -482,56 +500,11 @@ internal sealed class NativeHudLayout
     private static (RectTransform? Transform, TMP_Text[] TmpTexts, Text[] LegacyTexts) FindFpsHud(GameObject? fpsObject)
     {
         if (fpsObject == null) return (null, Array.Empty<TMP_Text>(), Array.Empty<Text>());
-        var parent = fpsObject.transform.parent;
-        var parentRect = parent == null ? null : parent.GetComponent<RectTransform>();
-        if (parentRect != null)
-        {
-            var tmpTexts = parent!.gameObject.GetComponentsInChildren<TMP_Text>(true)
-                .Where(IsFpsValueText).OrderBy(t => FpsTextScreenX(t.transform)).Take(1).ToArray();
-            var legacyTexts = parent.gameObject.GetComponentsInChildren<Text>(true)
-                .Where(t => t != null && IsFpsValueText(t.text))
-                .OrderBy(t => FpsTextScreenX(t.transform)).Take(1).ToArray();
-            // The first numeric value before the slash is the real game FPS;
-            // leave the simulated-FPS value and separator at their game colors.
-            if (tmpTexts.Length > 0 && legacyTexts.Length > 0)
-            {
-                if (FpsTextScreenX(tmpTexts[0].transform) <= FpsTextScreenX(legacyTexts[0].transform))
-                    legacyTexts = Array.Empty<Text>();
-                else tmpTexts = Array.Empty<TMP_Text>();
-            }
-            if (tmpTexts.Length + legacyTexts.Length > 0)
-                return (parentRect, tmpTexts, legacyTexts);
-        }
-
-        var ownRect = fpsObject.GetComponent<RectTransform>()
-            ?? fpsObject.GetComponentInChildren<RectTransform>(true);
-        var ownTmpTexts = fpsObject.GetComponentsInChildren<TMP_Text>(true)
-            .Where(IsFpsValueText).OrderBy(t => FpsTextScreenX(t.transform)).Take(1).ToArray();
-        var ownLegacyTexts = fpsObject.GetComponentsInChildren<Text>(true)
-            .Where(t => t != null && IsFpsValueText(t.text))
-            .OrderBy(t => FpsTextScreenX(t.transform)).Take(1).ToArray();
-        if (ownTmpTexts.Length > 0 && ownLegacyTexts.Length > 0)
-        {
-            if (FpsTextScreenX(ownTmpTexts[0].transform) <= FpsTextScreenX(ownLegacyTexts[0].transform))
-                ownLegacyTexts = Array.Empty<Text>();
-            else ownTmpTexts = Array.Empty<TMP_Text>();
-        }
-        return (ownRect, ownTmpTexts, ownLegacyTexts);
-    }
-
-    private static bool IsFpsValueText(TMP_Text text) => text != null && IsFpsValueText(text.text);
-
-    private static bool IsFpsValueText(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return false;
-        return text.Any(char.IsDigit);
-    }
-
-    private static float FpsTextScreenX(Transform transform)
-    {
-        var canvas = transform.GetComponentInParent<Canvas>();
-        Camera? camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-        return RectTransformUtility.WorldToScreenPoint(camera, transform.position).x;
+        var rect = fpsObject.GetComponent<RectTransform>();
+        var tmp = fpsObject.GetComponent<TextMeshProUGUI>();
+        if (tmp != null) return (rect, new[] { tmp }, Array.Empty<Text>());
+        var legacy = fpsObject.GetComponent<Text>();
+        return (rect, Array.Empty<TMP_Text>(), legacy == null ? Array.Empty<Text>() : new[] { legacy });
     }
 
     private static bool SameTextTargets<T>(T[] current, T[] next) where T : UnityEngine.Object
@@ -557,10 +530,23 @@ internal sealed class NativeHudLayout
         {
             var text = fpsTmpTexts[i];
             if (text == null) continue;
-            var current = text.color;
-            var target = enabled ? color : fpsTmpOriginalColors[i];
-            target.a = current.a;
-            if (current != target) text.color = target;
+            // FrameRate writes the FPS and simulated FPS into one TMP label.
+            // Tinting TMP_Text.color affects the slash and both numbers. Rich
+            // text scopes the color to the first number instead.
+            var current = text.text ?? "";
+            var plain = current == fpsStyledText ? fpsPlainText : current;
+            if (enabled)
+            {
+                var styled = TintFirstNumber(plain, color);
+                if (current != styled) text.text = styled;
+                fpsPlainText = plain;
+                fpsStyledText = styled;
+            }
+            else
+            {
+                if (current != plain) text.text = plain;
+                fpsPlainText = fpsStyledText = "";
+            }
         }
         for (int i = 0; i < fpsLegacyTexts.Length; i++)
         {
@@ -571,6 +557,30 @@ internal sealed class NativeHudLayout
             target.a = current.a;
             if (current != target) text.color = target;
         }
+    }
+
+    private static string TintFirstNumber(string value, Color color)
+    {
+        int start = 0;
+        while (start < value.Length)
+        {
+            // The game's FPS label may already contain TMP color tags; hex
+            // digits in a tag are not part of the visible FPS number.
+            if (value[start] == '<')
+            {
+                int tagEnd = value.IndexOf('>', start + 1);
+                if (tagEnd >= 0) { start = tagEnd + 1; continue; }
+            }
+            if (char.IsDigit(value[start])) break;
+            start++;
+        }
+        if (start == value.Length) return value;
+        int end = start;
+        while (end < value.Length && (char.IsDigit(value[end]) || value[end] == '.' || value[end] == ',')) end++;
+        int r = Mathf.RoundToInt(Mathf.Clamp01(color.r) * 255);
+        int g = Mathf.RoundToInt(Mathf.Clamp01(color.g) * 255);
+        int b = Mathf.RoundToInt(Mathf.Clamp01(color.b) * 255);
+        return value[..start] + $"<color=#{r:X2}{g:X2}{b:X2}>" + value[start..end] + "</color>" + value[end..];
     }
 
     private void RestorePractice()
@@ -585,7 +595,12 @@ internal sealed class NativeHudLayout
     {
         if (fpsRect != null) fpsRect.anchoredPosition = fpsOriginal;
         for (int i = 0; i < fpsTmpTexts.Length && i < fpsTmpOriginalColors.Length; i++)
-            if (fpsTmpTexts[i] != null) fpsTmpTexts[i].color = fpsTmpOriginalColors[i];
+            if (fpsTmpTexts[i] != null)
+            {
+                if (fpsTmpTexts[i].text == fpsStyledText) fpsTmpTexts[i].text = fpsPlainText;
+                fpsTmpTexts[i].color = fpsTmpOriginalColors[i];
+            }
+        fpsPlainText = fpsStyledText = "";
         for (int i = 0; i < fpsLegacyTexts.Length && i < fpsLegacyOriginalColors.Length; i++)
             if (fpsLegacyTexts[i] != null) fpsLegacyTexts[i].color = fpsLegacyOriginalColors[i];
         fpsRect = null;
