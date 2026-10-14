@@ -1,4 +1,5 @@
 using Il2Cpp;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Il2CppTMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,9 +12,9 @@ internal sealed class NativeHudLayout
     private readonly Dictionary<IntPtr, (Transform Transform, Vector3 Original, int Kind)> resized = new();
     private readonly Dictionary<IntPtr, Graphic[]> resizeGraphics = new();
     private readonly Dictionary<IntPtr, Renderer[]> resizeRenderers = new();
-    private readonly Vector3[] resizeGraphicCorners = new Vector3[4];
+    private Il2CppStructArray<Vector3>? resizeGraphicCorners;
     private readonly Vector3[] resizeRendererCorners = new Vector3[8];
-    private readonly Vector3[] nativeHudRectCorners = new Vector3[4];
+    private Il2CppStructArray<Vector3>? nativeHudRectCorners;
     private readonly List<Transform> scoreGroupScratch = new(48);
     private InputViewer[]? inputViewers;
     private SPBar[]? spBars;
@@ -340,12 +341,13 @@ internal sealed class NativeHudLayout
         }
         var canvas = transform.GetComponentInParent<Canvas>();
         Camera? camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-        transform.GetWorldCorners(nativeHudRectCorners);
+        var corners = nativeHudRectCorners ??= new Il2CppStructArray<Vector3>(4);
+        transform.GetWorldCorners(corners);
         float minX = float.PositiveInfinity, minY = float.PositiveInfinity;
         float maxX = float.NegativeInfinity, maxY = float.NegativeInfinity;
-        foreach (var corner in nativeHudRectCorners)
+        for (int i = 0; i < corners.Length; i++)
         {
-            var point = RectTransformUtility.WorldToScreenPoint(camera, corner);
+            var point = RectTransformUtility.WorldToScreenPoint(camera, corners[i]);
             if (!float.IsFinite(point.x) || !float.IsFinite(point.y)) continue;
             minX = Math.Min(minX, point.x); maxX = Math.Max(maxX, point.x);
             minY = Math.Min(minY, Screen.height - point.y); maxY = Math.Max(maxY, Screen.height - point.y);
@@ -470,9 +472,10 @@ internal sealed class NativeHudLayout
             var canvas = graphic.GetComponentInParent<Canvas>();
             Camera? camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay
                 ? null : (canvas.worldCamera ?? worldCamera);
-            graphic.rectTransform.GetWorldCorners(resizeGraphicCorners);
-            for (int i = 0; i < resizeGraphicCorners.Length; i++)
-                IncludeResizePoint(resizeGraphicCorners[i], camera, ref objectFound, ref objectMinX, ref objectMinY, ref objectMaxX, ref objectMaxY);
+            var corners = resizeGraphicCorners ??= new Il2CppStructArray<Vector3>(4);
+            graphic.rectTransform.GetWorldCorners(corners);
+            for (int i = 0; i < corners.Length; i++)
+                IncludeResizePoint(corners[i], camera, ref objectFound, ref objectMinX, ref objectMinY, ref objectMaxX, ref objectMaxY);
         }
 
         // Clone Hero's gameplay HUD is built from SpriteRenderers, not UI

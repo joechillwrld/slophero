@@ -1,8 +1,8 @@
-# SlopHero 0.4.40 alpha
+# SlopHero 0.4.41 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.40 tightens the score-box resize outline and repairs practice-stats editing.** The outline follows the visible score, combo, star, and song-progress graphics, and no longer includes the separate leaderboard accuracy row. Only the corner handles resize. Dragging inside counters, song info, practice stats, or FPS moves them. Practice-stats controls locate the serialized panel directly even while Clone Hero's practice or song-loaded flags are transitioning; a zero-height layout falls back to the panel's visible children. Game HUD now places Move and Resize for practice stats side by side. Version 0.4.39 corrected the HUD camera and FPS targets. Earlier changes and the five optional Performance switches are described below.
+**Version 0.4.41 fixes the practice-stats outline and move controls.** The panel was present and sized correctly, but the mod passed a managed array to Unity's IL2CPP `GetWorldCorners` method, then read unchanged corners from the managed array. The editor now passes a reusable IL2CPP array for both practice/FPS HUDs and UI graphics. Version 0.4.40 tightened the score-box outline and made corner handles the only way to resize. Earlier changes and the five optional Performance switches are described below.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.40 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.40-alpha.zip?raw=true)
+[Download v0.4.41 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.41-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -300,6 +300,15 @@ resize rectangles tens of thousands of pixels off-screen. Bounds now discard
 behind-camera and off-screen points and include only bounds projected near the viewport. Score,
 combo, accuracy, and star progress share one target and one scale setting; old
 star-progress scaling is folded into the score-box scale during upgrade.
+
+## 0.4.41 practice and FPS bounds
+
+The v0.4.40 log confirmed that the practice panel was active, 310×200 pixels,
+and in practice mode, yet the editor reported no bounds. The game's
+`RectTransform.GetWorldCorners` wrapper takes an `Il2CppStructArray<Vector3>`;
+passing a managed array filled a temporary copy. The editor now reuses an
+IL2CPP array and reads the filled corners. The same correction covers FPS
+bounds and UI-graphic fallback bounds.
 
 ## 0.4.40 resize editor and practice panel
 
