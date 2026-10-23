@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.68", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.69", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -114,6 +114,7 @@ public sealed partial class Core : MelonMod
         lastGameplayUiSuspendState = null;
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
+        highwayAnimations.Clear(HarmonyInstance);
         if (compatible && gameplay && skipGameplayMouseUi.Value)
             mouseUiGameplay.Update(HarmonyInstance, requested: true, gameplayActive: false);
         if (compatible && gameplay && pauseGameplayUiProcessing.Value)
@@ -123,6 +124,7 @@ public sealed partial class Core : MelonMod
             bool capRequested = throttleWhammyTexture.Value;
             whammyTextureThrottle.Update(HarmonyInstance, capRequested, gameplay);
             lastWhammyCapSetting = capRequested;
+            highwayAnimations.Update(HarmonyInstance, pauseHighwayAnimations.Value, gameplay);
         }
         visuals.Clear();
         performance.Clear();
@@ -175,6 +177,7 @@ public sealed partial class Core : MelonMod
         lastGameplayUiSuspendState = null;
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
+        highwayAnimations.Clear(HarmonyInstance);
         if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; practiceModeActive = false; }
         settingsOpen = moveHud = hudDragging = false;
         resizeTarget = -1;
@@ -243,6 +246,7 @@ public sealed partial class Core : MelonMod
                     mouseUiGameplay.Disable();
                     cheatScanner.Restore();
                     gameplayUiEvents.Disable();
+                    highwayAnimations.SetSuppressed(false);
                 }
                 hudDragging = false;
                 nativeMoveTarget = 0;
@@ -286,6 +290,7 @@ public sealed partial class Core : MelonMod
                 UpdateCursor();
             }
             if (!Application.isFocused && mouseUiGameplay.IsInstalled) mouseUiGameplay.Disable();
+            if (!Application.isFocused) highwayAnimations.SetSuppressed(false);
             if (capture != null)
             {
                 var binding = InputBinding.Capture();
@@ -311,6 +316,7 @@ public sealed partial class Core : MelonMod
                 whammyTextureThrottle.Update(HarmonyInstance, capRequested, gameplay);
                 lastWhammyCapSetting = capRequested;
             }
+            highwayAnimations.Update(HarmonyInstance, pauseHighwayAnimations.Value, gameplay);
             if (transition && now - transitionStarted > 30)
             {
                 pendingSection = null;
@@ -345,6 +351,19 @@ public sealed partial class Core : MelonMod
             var game = gameplay && gameplayInitialized ? GameManager.field_Private_Static_GameManager_0 : null;
             bool ready = game != null && game.songLoaded && game.playersInit && game.globalVariables != null;
             bool songPlaying = ready && game!.isSongPlaying;
+            bool pauseHighwayVisuals = ready && songPlaying && !game!.isPaused && !game.isSongOver
+                && game.actualPlayerCount == 1 && !transition && !settingsOpen && !moveHud
+                && resizeTarget < 0 && Application.isFocused;
+            if (pauseHighwayVisuals)
+            {
+                try
+                {
+                    var net = CHNetManager.instance;
+                    pauseHighwayVisuals = net == null || (int)net.field_Private_ConnectionState_0 == 0;
+                }
+                catch { pauseHighwayVisuals = false; }
+            }
+            highwayAnimations.SetSuppressed(pauseHighwayAnimations.Value && pauseHighwayVisuals);
             if (!cheatScannerError)
             {
                 try
@@ -886,6 +905,7 @@ public sealed partial class Core : MelonMod
     {
         mouseUiGameplay.Clear(HarmonyInstance);
         gameplayUiEvents.Clear(HarmonyInstance);
+        highwayAnimations.Clear(HarmonyInstance);
         whammyTextureThrottle.LogSummary();
         whammyTextureThrottle.Clear(HarmonyInstance);
         timings.Finish();

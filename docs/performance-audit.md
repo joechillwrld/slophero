@@ -1243,3 +1243,229 @@ texture and skipped 7,756 under the configured cap. This confirms the cap is
 working on that texture; it does not measure GPU compute work or establish an
 FPS increase. The two timing captures are not a controlled A/B, so they cannot
 quantify the UI hook's gain.
+
+### v0.4.68 follow-up capture
+
+The newer v0.4.68 log confirms that the broad `EventSystem.Update` pause was
+active for the full 30-second timing window. The narrower mouse-UI hook was
+enabled at the same time, so this capture cannot distinguish their effects;
+with the broad hook suppressing `EventSystem.Update`, the mouse handler is
+downstream and should not run. A useful future comparison needs to vary those
+two switches independently. Rewired polling remained untouched.
+
+The cheat-scanner option was also enabled, but the active-state transition log
+reports `already-disabled`, so it had no scanner work to remove in this run.
+The later F8 settings snapshot says `state=missing` after the mod restored the
+scanner and cleared its cached reference; that is not evidence that the scanner
+ran during the timing window.
+
+The 30-second capture reports 2,593.1 mod Update calls/s and 1,296.5 scheduled
+render callbacks/s. `Time.unscaledDeltaTime` samples were at or below 0.56 ms
+at p95 and 0.62 ms at p99, with a 38.419 ms maximum. Scheduled-render callback
+intervals were at or below 0.92/1.01 ms at p95/p99, with a 10.151 ms maximum;
+GUI repaint intervals reached 9.612 ms. These are separate Unity-side signals,
+not presented-frame timings, and the log does not correlate individual long
+samples across them. It shows mostly short intervals with rare outliers, but
+cannot tell whether those outliers were visible frame hitches.
+
+SlopHero's measured callbacks remain small in this capture: `OnUpdate` rounds
+to 0.002 ms across 77,794 calls, performance-effect synchronization to
+0.087 ms across 60 calls, Canvas property synchronization to 0.011 ms across
+598 calls, and HUD repaint to 0.058 ms across 369 calls. This makes the mod's
+measured managed callbacks an unlikely source of the large isolated interval;
+it does not include Harmony-prefix cost, Unity Canvas rebuild/render cost, or
+GPU work.
+
+The whammy cap matched 18,107 `Texture2D.Apply` calls and skipped 7,461
+(41.2%). This proves the cap is active in the observed CPU upload path. It
+does not prove a frame-time benefit: it does not skip any work the producer
+may perform before `Apply`, nor GPU compute dispatch. The older 2019.4 source
+dump and generated current metadata and native DLL are enough to keep screening
+candidates; no more asset chunks or current-build symbols are needed for this
+work.
+
+Rechecking the supplied CPU-method CSV exposed another unresolved cluster:
+`version.dll` offsets `+0x2CFD57`, `+0x9C4C`, and `+0x2D2124` each carry about
+8.9 seconds of sampled CPU weight in the 31.1-second capture. Their weights
+closely track the two large `GameAssembly` offsets above (about 9.0 seconds),
+so these likely overlap along a hot call path and must not be added together.
+
+The uploaded 7.7 MB x64 `version.dll` is the MelonLoader native bootstrap
+proxy: it embeds `MelonLoader.Bootstrap`, and the matching game log reports
+MelonLoader v0.8.0-ci.2548. Disassembly places the hot addresses immediately
+after indirect calls (`call *%r14`, `call *%rbx`, and `call *0x20(%rax)`).
+These are delegate/interface call return sites, so sampled weight attributed
+there may be work inside the invoked callback, not overhead in the proxy
+wrapper. Its PE debug directory contains type-13 COFF-group metadata but no
+CodeView/PDB symbols; the exact callback names cannot be recovered from this
+DLL alone.
+
+The same method export names 1,623 ms in `MelonLoader.dll`'s
+`IL_STUB_ReversePInvoke`, 960 ms in `IL_STUB_PInvoke`, 400 ms in
+`MelonEventBase.Invoke`, 101 ms in `SlopHero.Core.OnUpdate`, and 143 ms in
+`SlopHero.Core.OnLateUpdate`. These are overlapping sampled stack weights,
+not additive totals. They show that the named SlopHero callbacks are much
+smaller than the unresolved ~8.9-second path, but do not locate which callback
+or patch owns that path. The process/thread stack exports supplied with this
+capture have empty stack columns. A stack-bearing trace from the same capture
+would be more useful than additional game assets or the older 2019 source.
+
+The native `GameAssembly` PCs are also nested, not independent hot methods.
+Both resolve to its `.text` section. `GameAssembly+0x2FAB159` is the return
+site immediately after a direct call to `GameAssembly+0x2FAB600`; the second
+hot PC, `GameAssembly+0x2FAB63D`, is the return site after an indirect method
+call inside that child function. The exported
+`il2cpp_runtime_invoke` at `GameAssembly+0x2F80B50` jumps to the parent at
+`+0x2FAB100`, which calls the child. This ties the roughly 9-second matching
+weights to IL2CPP's reflection-style method-invocation path, not three separate
+game loops. PE unwind data recovers the function ranges without a PDB.
+
+The `version.dll+0x9C4C` return site maps to MelonLoader's IL2CPP
+`InvokeDetour`: the binary contains the exact `Internal_ActiveSceneChanged`
+and `Invoke hijacked` strings used by its [public source](https://github.com/LavaGang/MelonLoader/blob/master/MelonLoader.Bootstrap/RuntimeHandlers/Il2Cpp/Il2CppHandler.cs), and the surrounding
+logic matches `Il2CppHandler.InvokeDetour` forwarding to the original
+`il2cpp_runtime_invoke`. That detour stays on the invocation path, but once
+startup is complete it quickly forwards and returns. The sampled address is
+after the forwarded call, so its 8.9-second weight mostly describes work in
+the underlying invocation and callback, not measured MelonLoader wrapper cost.
+SlopHero uses reflection only to resolve Harmony targets during setup; a source
+scan found no `MethodInfo.Invoke` in its per-frame paths. The trace still lacks
+the caller stack needed to name which game callback, Harmony patch, or other
+mod is issuing the expensive invocations. This is now the strongest lead, but
+it is not a safe patch target until that caller is identified.
+
+### Next screening lanes (no PDB required)
+
+There are several independent paths worth pursuing; none requires current
+build symbols:
+
+1. **Name the hot IL2CPP caller.** Re-export the existing ETL's sampled CPU
+   view with Clone Hero expanded through Thread and Stack. Even unresolved
+   module-plus-offset frames will reveal which caller enters
+   `il2cpp_runtime_invoke`; the supplied `GameAssembly.dll` can then be
+   disassembled around those addresses. This is the highest-value lead because
+   it can separate game callbacks, Harmony patches, and other mods.
+2. **Map Unity's native hotspots.** The method export contains several large,
+   overlapping `UnityPlayer.dll` offsets and NVIDIA-driver frames. The exact
+   installed `UnityPlayer.dll` will let us disassemble those offsets without a
+   PDB; stack frames will show which path reaches them. Their inclusive export
+   weights alone are not exclusive CPU costs or proof of a GPU bottleneck.
+3. **Separate existing gameplay experiments.** The v0.4.68 run enabled both
+   broad `EventSystem.Update` suspension and the narrower mouse-event skip, so
+   it cannot attribute any change. Compare each independently with the same
+   chart/settings. The whammy hook skipped 41.2% of matching CPU texture
+   uploads, but needs its own frame-time comparison and still leaves producer
+   and GPU-compute work intact.
+4. **Audit hook overhead while options are off.** SlopHero's named callbacks
+   are small, but current timing buckets do not include Harmony prefix/postfix
+   cost. Inventory every persistent patch and test whether an inactive optional
+   feature can remove its hook entirely, preserving input polling and immediate
+   feature behavior. Any candidate should be gated by call frequency from the
+   stack-bearing trace before changing code.
+
+The immediate file that would enable lane 2 is the exact `UnityPlayer.dll`
+from the same Clone Hero installation. Lane 1 can use the ETL already captured;
+it needs a stack-bearing WPA export, not a PDB or another asset bundle.
+
+### Current native files and hotspot disassembly
+
+The newly supplied `UnityPlayer.dll` is Unity 2022.3.62f2 and includes
+unwind records covering the sampled addresses. It has a CodeView PDB identity,
+but no PDB was supplied; function bounds and call instructions are still
+recoverable from the PE. The exact bytes are SHA-256
+`43fb0aea1b80c74963dae88ec7fc1c3c1993d893ce94d12972000fcc9b653ad1`.
+
+Disassembly sharpens, but does not yet name, the top native rows:
+
+- `UnityPlayer+0x6B3C1C` is immediately after an indirect callback call. The
+  surrounding function clears callback state and returns through a helper.
+  The call target is dynamic, so this remains a strong stack-trace target.
+- `UnityPlayer+0x577AB9` is a recheck/loop site after a helper that manipulates
+  atomic ring-buffer state. This resembles worker-queue scheduling; the stack
+  is needed to tell whether the sampled thread is doing useful work or waiting
+  for it. Do not hook or throttle it by address.
+- `UnityPlayer+0x8050DB` sits in a Windows event/timer path that calls
+  `PeekMessageA`, `GetMessageW`, `CreateEventA`, and `timeBeginPeriod`. These
+  services can affect window input and frame pacing, so this is diagnostic
+  evidence rather than a suppression target.
+- `UnityPlayer+0x80869B` follows a helper and calls `GetCurrentProcess` and
+  `TerminateProcess`. That shape is consistent with an exit/error path; its
+  large inclusive CPU attribution is not credible as steady gameplay work
+  without the caller stack.
+
+The other uploads add context rather than a new per-frame removal target.
+`baselib.dll` is the matching Unity 2022.3.62f2 runtime library; its largest
+sampled address in this export is only about 114 ms inclusive. `Plugins.zip`
+contains BASS audio libraries, RtMidi, Rewired input backends, Discord SDK,
+HTTP, file-picker/process helpers, and Burst. The method export attributes
+about 1.7 seconds inclusive to BASS and about 73 ms to Discord SDK, while the
+current hot rows do not identify a removable plugin workload. Preserve audio,
+1000 Hz instrument input, online services, and other player-facing features.
+The plugin CPU figures are inclusive stack weights, not exclusive costs.
+`Resources.zip` contains only Unity's built-in resource files, and
+`il2cpp_data.zip` contains metadata plus framework resource blobs; neither adds
+active gameplay code to inspect.
+
+One low-priority stutter lead is managed JIT activity: the export attributes
+roughly 190 ms inclusive to CoreCLR JIT compilation during the 31-second
+window. It may be normal first-use/background compilation rather than a
+gameplay hitch. Compare a warmed-up capture with a just-launched capture before
+considering any code warm-up. `ClonZones`'s largest named detour is about 271 ms
+inclusive in this trace; that is small, and the user's prior removal test saw
+no noticeable change, so it is not a current optimization target.
+
+### Additional gameplay-source screening
+
+I compared the old source's per-frame renderer and player paths with the
+current 1.1.0.6142 metadata and the existing method export. The old source is
+not a safe patch specification, but it helps identify what to measure next:
+
+- The older `HighwayScroll.Update` used `Renderer.material.mainTextureOffset`.
+  The exact current build has already moved to a per-renderer
+  `MaterialPropertyBlock`: its native Update at RVA `0x3818E0` reads `songTime`
+  and calls `Renderer.GetPropertyBlock`, `MaterialPropertyBlock.SetVector`, and
+  `Renderer.SetPropertyBlock` each update. That removes the old material
+  instance concern, but the read-modify-write still crosses into Unity every
+  frame. The method was not named in the CPU export, so count and cost are
+  unknown. It is a concrete low-risk profiling target; do not suppress or
+  replace it until its use and effect on highway rendering are measured.
+- The old `Fret_Animator.Update` repeatedly assigns sprite, mask, sorting-order,
+  and enabled state even when the held/pressed state has not changed. The
+  current build still has `GuitarFretAnimator`, but this capture does not
+  identify its native Update cost. The named ClonZones detour is about 271 ms
+  inclusive and prior removal testing showed no visible gain, so neither is a
+  compelling optimization target yet.
+- `BasePlayer.UpdateHitDetection` walks chart notes in the active hit window,
+  marks misses, and advances chord state. Its cost scales with notes currently
+  in range, but it is intertwined with hit windows, late misses, drums, and
+  online state. Preserve it; the measured player-update weight is modest, and
+  any scoring rewrite would carry a high correctness risk.
+- The old `MIDIInputManager.Update` body is empty; MIDI work is handled through
+  device callbacks and player mapping. The current trace does not name a MIDI
+  hot method. This argues against claiming that disabling the manager improves
+  frame performance, while keeping the separate opt-in for users who do not
+  use pro drums remains reasonable.
+
+The useful next measurement is an exact-build call count for `HighwayScroll`
+and `GuitarFretAnimator` Update methods, ideally with native-inclusive time.
+Until those are named in a trace, the established mouse-raycast path remains
+the only game-side candidate with strong, directly attributable evidence.
+
+### v0.4.69 highway-animation experiment
+
+The exact-build `HighwayScroll.Update` disassembly confirms a per-update
+`Renderer.GetPropertyBlock` → `MaterialPropertyBlock.SetVector` →
+`Renderer.SetPropertyBlock` sequence, followed by background-video/track-fade
+state handling. The existing CPU-method export did not attribute measurable
+exclusive cost to this method, so the potential frame benefit is unknown.
+
+After the user authorized an experimental build, v0.4.69 adds the separate,
+default-off `PerformancePauseHighwayAnimations` option. When enabled, it hooks
+`HighwayScroll.Update` only in Gameplay and skips the whole visual updater only
+during an active, focused, offline solo chart. It resumes on pause, menu focus,
+multiplayer/online play, and scene exit. This freezes highway texture motion,
+background video, and track-fade presentation while active; it does not alter
+notes, timing, audio, score, or input. The hook is installed only when the
+option is enabled. The capture confirms the target and scope, not a performance
+gain; compare the same solo chart with the option off and on before treating it
+as an optimization.
