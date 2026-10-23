@@ -341,7 +341,7 @@ public sealed partial class Core
                 Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to restore)", x, y + 352);
                 Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, y + 380);
                 Toggle(skipGameplayMouseUi, "Experimental: skip gameplay mouse UI raycasts", x, y + 408);
-                Toggle(throttleWhammyTexture, "Experimental: cap duplicate CPU whammy texture uploads at 200 Hz", x, y + 440);
+                Toggle(throttleWhammyTexture, "Experimental: cap duplicate CPU whammy writes/uploads at 200 Hz", x, y + 440);
                 Toggle(pauseGameplayCheatScanner, "Pause cheat-code scanner during solo songs", x, y + 468);
                 Toggle(pauseGameplayUiProcessing, "Experimental: pause UI events (also pauses keyboard/controller UI navigation)", x, y + 496);
                 Toggle(pauseHighwayAnimations, "Experimental: freeze highway, video, and track-fade visuals in solo play", x, y + 526);

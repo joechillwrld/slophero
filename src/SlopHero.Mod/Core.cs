@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.74", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.75", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -935,6 +935,7 @@ public sealed partial class Core : MelonMod
 
     public override void OnDeinitializeMelon()
     {
+        mouseUiGameplay.LogSummary();
         mouseUiGameplay.Clear(HarmonyInstance);
         gameplayUiEvents.Clear(HarmonyInstance);
         highwayAnimations.Clear(HarmonyInstance);

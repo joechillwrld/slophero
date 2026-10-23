@@ -16,9 +16,16 @@ internal sealed class MouseUiGameplayOverride
     private bool installed;
     private bool failed;
     private bool suppressMouse;
+    private long skippedMouseProcessCalls;
 
     internal bool IsInstalled => installed;
     internal bool IsSuppressed => installed && suppressMouse;
+
+    internal void LogSummary()
+    {
+        if (!installed && skippedMouseProcessCalls == 0) return;
+        MelonLogger.Msg($"Sloptifine mouse-UI experiment: hookInstalled={installed}, currentlySuppressed={IsSuppressed}, ProcessMouseEvent calls skipped={skippedMouseProcessCalls}; counts include only calls bypassed by the gameplay mouse gate.");
+    }
 
     internal void Update(HarmonyLib.Harmony harmony, bool requested, bool gameplayActive)
     {
@@ -106,5 +113,11 @@ internal sealed class MouseUiGameplayOverride
         installed = false;
     }
 
-    private static bool BeforeMouseProcessing() => active == null || !active.suppressMouse;
+    private static bool BeforeMouseProcessing()
+    {
+        MouseUiGameplayOverride? instance = active;
+        if (instance == null || !instance.suppressMouse) return true;
+        instance.skippedMouseProcessCalls++;
+        return false;
+    }
 }

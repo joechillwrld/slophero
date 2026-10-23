@@ -1,5 +1,40 @@
 # Performance audit notes
 
+### v0.4.75 trace findings and mouse-path verification
+
+The supplied CPU export covers about 31 seconds. Its largest identified
+CloneHero UI samples map directly through the v1.1 `dump.cs`: `EventSystem.Update`
+(1,610 sampled ms), `StandaloneInputModule.ProcessMouseEvent(int)` (1,451),
+`GetMousePointerEventData(int)` (1,394), `EventSystem.RaycastAll` (1,358),
+`GraphicRaycaster.Raycast` (1,105), and its rectangle-hit test (906). These are
+inclusive sampled method weights; they overlap and must not be added as
+exclusive CPU time. The existing mouse switch targets the exact
+`ProcessMouseEvent(int)` entry that the dump shows on this path, bypassing
+pointer creation and raycasts while preserving controller polling. The latest
+runtime snapshots showed `suppressed=false` while the F8 menu was open, so
+they did not prove that the bypass ran during the timing window. v0.4.75 counts
+only calls actually skipped and reports the count at shutdown; the hot path
+does not log or allocate.
+
+The same export attributes samples to the supplied `version.dll`. PE exports
+identify that file as `MelonLoader.Bootstrap.dll`, the loader bootstrap that
+hosts its .NET runtime. The export has no usable call stacks, so those samples
+cannot be separated into loader, CLR, Harmony, or SlopHero work. The largest
+GameAssembly mouse/UI offsets map to the methods above. Other recurring input
+offsets map into Rewired `InputManager_Base.DoUpdate` and `ReInput`; the
+1000 Hz controller path remains untouched. Kernel stack-walk methods also
+appear heavily in this capture, so WPA's sampling cost may influence the
+captured run; it is not evidence of equivalent overhead during normal play.
+
+The older source's `Helper.InvokeRepeating` is used only by its whammy updater
+and catches up missed intervals in a loop. That is an interesting hitch-time
+lead, but the supplied v1.1 generated assemblies expose no method named
+`InvokeRepeating`, and the old source's static producer does not appear on the
+current `GuitarNoteRenderer` wrapper. I did not patch that stale call shape.
+v0.4.74 instead guards the live CPU texture write/upload path observed in the
+current logs; its new `SetPixels` match/skip counters will show whether the
+older 1×24 write shape is still used.
+
 ### v0.4.74 whammy CPU-write gate
 
 The existing default-off cap rejected redundant `Texture2D.Apply()` uploads,
