@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.60", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.61", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -103,6 +103,8 @@ public sealed partial class Core : MelonMod
         statsText = songText = "";
         counterCanvas.Clear();
         mouseUiGameplay.Clear(HarmonyInstance);
+        if (compatible && gameplay && skipGameplayMouseUi.Value)
+            mouseUiGameplay.Update(HarmonyInstance, requested: true, gameplayActive: false);
         visuals.Clear();
         performance.Clear();
         hiddenLeaderboard.Clear();
@@ -207,7 +209,7 @@ public sealed partial class Core : MelonMod
             {
                 if (moveHud || resizeTarget >= 0) { moveHud = false; resizeTarget = -1; resizeHandle = -1; resizeMoveDragging = false; settingsOpen = true; }
                 else settingsOpen = !settingsOpen;
-                if (settingsOpen || moveHud || resizeTarget >= 0) mouseUiGameplay.Disable(HarmonyInstance);
+                if (settingsOpen || moveHud || resizeTarget >= 0) mouseUiGameplay.Disable();
                 hudDragging = false;
                 nativeMoveTarget = 0;
                 nativeHudDragging = false;
@@ -249,7 +251,7 @@ public sealed partial class Core : MelonMod
                 SavePreferences();
                 UpdateCursor();
             }
-            if (!Application.isFocused && mouseUiGameplay.IsInstalled) mouseUiGameplay.Disable(HarmonyInstance);
+            if (!Application.isFocused && mouseUiGameplay.IsInstalled) mouseUiGameplay.Disable();
             if (capture != null)
             {
                 var binding = InputBinding.Capture();
@@ -427,7 +429,7 @@ public sealed partial class Core : MelonMod
     {
         var pause = game.pauseMenu?.GetComponent<PauseMenu>();
         if (pause == null) { Notice("Could not find the game's restart handler."); return; }
-        mouseUiGameplay.Disable(HarmonyInstance);
+        mouseUiGameplay.Disable();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
         restartHold.RequireRelease();
@@ -447,7 +449,7 @@ public sealed partial class Core : MelonMod
         pendingSong = game.globalVariables.currentSongEntry.Pointer;
         sourceManager = game.Pointer;
         practiceWaitState = "";
-        mouseUiGameplay.Disable(HarmonyInstance);
+        mouseUiGameplay.Disable();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
         restartHold.RequireRelease();

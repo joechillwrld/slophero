@@ -916,11 +916,15 @@ until pausing. This is now implemented as the default-off Sloptifine option
 `PerformanceSkipGameplayMouseUi` in the Performance tab. It patches only the
 zero-argument `StandaloneInputModule.ProcessMouseEvent()` wrapper, which
 avoids the captured mouse path before it reaches pointer raycasts; the parent
-input module continues into its keyboard/controller navigation. The hook is
-installed only while the setting is enabled and Clone Hero reports active,
-unpaused gameplay. Its existing 20 Hz game-state check controls activation;
-the hook is removed on pause, settings/menu focus, focus loss, transitions,
-scene changes, and shutdown. With the option off, no mouse hook remains
+input module continues into its keyboard/controller navigation. Mouse
+processing is suppressed only while the setting is enabled and Clone Hero
+reports active, unpaused gameplay. When enabled, the hook is installed as the
+Gameplay scene loads and stays pass-through until the existing 20 Hz
+game-state check reports active play. Pause, settings, and focus changes
+immediately restore mouse processing
+through the prefix; the hook is removed when the option is turned off, on scene
+changes, and at shutdown. Installing it before a chart starts avoids Harmony
+patch/JIT work during active play. With the option off, no mouse hook remains
 installed. The preference is included in saved profiles. Instrument polling
 and the 1000 Hz Rewired update are untouched.
 
@@ -935,9 +939,12 @@ The first v0.4.59 runtime log showed that lookup failing closed with
 generated UnityEngine.UI wrapper confirmed the method exists with the expected
 zero-argument signature, but Il2CppInterop exposes it as `Public` through
 reflection even though Unity declares it protected. The initial lookup asked
-only for non-public methods. v0.4.60 searches both visibility flags; this fixes
-the resolution error, while actual in-game activation still needs confirmation
-from the next runtime log.
+only for non-public methods. v0.4.60 searches both visibility flags; the next
+runtime log confirmed that the hook activates. That run also recorded a single
+16.9 ms `OnUpdate` maximum shortly after Harmony patched the method. Timing
+alone cannot prove the patch caused the spike, but v0.4.61 moves installation
+to Gameplay scene load and keeps the hook pass-through while paused, so resume
+does not patch again mid-song.
 
 The trace also attributes 2,116 ms to `Rewired.InputManager_Base.DoUpdate`.
 That is kept intact by design: it is input work, and this profile is no reason

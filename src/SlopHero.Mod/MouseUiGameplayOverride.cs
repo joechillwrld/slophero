@@ -15,26 +15,30 @@ internal sealed class MouseUiGameplayOverride
     private MethodInfo? target;
     private bool installed;
     private bool failed;
+    private bool suppressMouse;
 
     internal bool IsInstalled => installed;
 
     internal void Update(HarmonyLib.Harmony harmony, bool requested, bool gameplayActive)
     {
-        if (!requested || !gameplayActive)
+        if (!requested)
         {
             Restore(harmony);
-            if (!requested) failed = false;
+            failed = false;
             return;
         }
 
-        if (installed || failed) return;
-        Install(harmony);
+        if (!installed && !failed) Install(harmony);
+        suppressMouse = installed && gameplayActive;
     }
 
-    internal void Disable(HarmonyLib.Harmony harmony) => Restore(harmony);
+    // Keep the hook installed for the current gameplay scene so pause/resume
+    // and opening the mod menu do not re-JIT Harmony in the middle of play.
+    internal void Disable() => suppressMouse = false;
 
     internal void Clear(HarmonyLib.Harmony harmony)
     {
+        suppressMouse = false;
         Restore(harmony);
         failed = false;
     }
@@ -56,16 +60,18 @@ internal sealed class MouseUiGameplayOverride
             if (target == null)
                 throw new MissingMethodException("UnityEngine.EventSystems.StandaloneInputModule.ProcessMouseEvent()");
 
+            suppressMouse = false;
             active = this;
             var prefix = typeof(MouseUiGameplayOverride).GetMethod(nameof(BeforeMouseProcessing),
                 BindingFlags.Static | BindingFlags.NonPublic)!;
             harmony.Patch(target, prefix: new HarmonyMethod(prefix));
             installed = true;
-            MelonLogger.Msg("Sloptifine experimental gameplay mouse-UI skip enabled; mouse hover/clicks return when paused.");
+            MelonLogger.Msg("Sloptifine experimental mouse-UI hook ready; it skips mouse UI only during active gameplay.");
         }
         catch (Exception ex)
         {
             active = null;
+            suppressMouse = false;
             if (target != null)
             {
                 try { harmony.Unpatch(target, HarmonyPatchType.All, harmony.Id); }
@@ -85,6 +91,7 @@ internal sealed class MouseUiGameplayOverride
         // Make an in-flight or partially retained prefix pass through before
         // removing it; this keeps the game behavior safe if Unpatch fails.
         active = null;
+        suppressMouse = false;
         try
         {
             if (target != null) harmony.Unpatch(target, HarmonyPatchType.All, harmony.Id);
@@ -97,5 +104,5 @@ internal sealed class MouseUiGameplayOverride
         installed = false;
     }
 
-    private static bool BeforeMouseProcessing() => active == null;
+    private static bool BeforeMouseProcessing() => active == null || !active.suppressMouse;
 }
