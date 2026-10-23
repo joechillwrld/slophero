@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.66", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.67", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -46,6 +46,9 @@ public sealed partial class Core : MelonMod
     private bool? lastWhammyCapSetting;
     private bool aprilFoolsError;
     private bool cheatScannerError;
+    private bool gameplayUiEventError;
+    private bool? lastCheatScannerPauseState;
+    private bool? lastGameplayUiSuspendState;
     private bool lastStatsSongPlaying;
     private IntPtr localStatsPlayer;
     private int? pendingSection;
@@ -106,9 +109,15 @@ public sealed partial class Core : MelonMod
         counterCanvas.Clear();
         cheatScanner.Restore();
         cheatScannerError = false;
+        gameplayUiEventError = false;
+        lastCheatScannerPauseState = null;
+        lastGameplayUiSuspendState = null;
+        gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
         if (compatible && gameplay && skipGameplayMouseUi.Value)
             mouseUiGameplay.Update(HarmonyInstance, requested: true, gameplayActive: false);
+        if (compatible && gameplay && pauseGameplayUiProcessing.Value)
+            gameplayUiEvents.Update(HarmonyInstance, requested: true, gameplayActive: false);
         if (compatible)
         {
             bool capRequested = throttleWhammyTexture.Value;
@@ -161,6 +170,10 @@ public sealed partial class Core : MelonMod
         counterCanvas.Clear();
         cheatScanner.Restore();
         cheatScannerError = false;
+        gameplayUiEventError = false;
+        lastCheatScannerPauseState = null;
+        lastGameplayUiSuspendState = null;
+        gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
         if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; practiceModeActive = false; }
         settingsOpen = moveHud = hudDragging = false;
@@ -229,6 +242,7 @@ public sealed partial class Core : MelonMod
                 {
                     mouseUiGameplay.Disable();
                     cheatScanner.Restore();
+                    gameplayUiEvents.Disable();
                 }
                 hudDragging = false;
                 nativeMoveTarget = 0;
@@ -345,12 +359,46 @@ public sealed partial class Core : MelonMod
                         pauseCheats = net == null || (int)net.field_Private_ConnectionState_0 == 0;
                     }
                     cheatScanner.Apply(pauseCheats);
+                    if (lastCheatScannerPauseState != cheatScanner.IsPaused)
+                    {
+                        if (cheatScanner.IsPaused || lastCheatScannerPauseState == true)
+                            LoggerInstance.Msg($"Sloptifine solo cheat scanner {(cheatScanner.IsPaused ? "paused" : "restored")}.");
+                        lastCheatScannerPauseState = cheatScanner.IsPaused;
+                    }
                 }
                 catch (Exception ex)
                 {
                     cheatScanner.Restore();
                     cheatScannerError = true;
                     LoggerInstance.Warning($"Sloptifine cheat scanner pause stopped; vanilla scanner restored: {ex.Message}");
+                }
+            }
+            if (!gameplayUiEventError)
+            {
+                try
+                {
+                    bool pauseUiEvents = pauseGameplayUiProcessing.Value && ready && songPlaying
+                        && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
+                        && !transition && !settingsOpen && !moveHud && resizeTarget < 0
+                        && Application.isFocused;
+                    if (pauseUiEvents)
+                    {
+                        var net = CHNetManager.instance;
+                        pauseUiEvents = net == null || (int)net.field_Private_ConnectionState_0 == 0;
+                    }
+                    gameplayUiEvents.Update(HarmonyInstance, pauseGameplayUiProcessing.Value, pauseUiEvents);
+                    if (lastGameplayUiSuspendState != gameplayUiEvents.IsSuspended)
+                    {
+                        if (gameplayUiEvents.IsSuspended || lastGameplayUiSuspendState == true)
+                            LoggerInstance.Msg($"Sloptifine gameplay UI events {(gameplayUiEvents.IsSuspended ? "suspended" : "restored")}.");
+                        lastGameplayUiSuspendState = gameplayUiEvents.IsSuspended;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    gameplayUiEvents.Clear(HarmonyInstance);
+                    gameplayUiEventError = true;
+                    LoggerInstance.Warning($"Sloptifine UI-event pause stopped; Unity UI events restored: {ex.Message}");
                 }
             }
             if (lastStatsSongPlaying && !songPlaying)
@@ -836,6 +884,7 @@ public sealed partial class Core : MelonMod
     public override void OnDeinitializeMelon()
     {
         mouseUiGameplay.Clear(HarmonyInstance);
+        gameplayUiEvents.Clear(HarmonyInstance);
         whammyTextureThrottle.LogSummary();
         whammyTextureThrottle.Clear(HarmonyInstance);
         timings.Finish();

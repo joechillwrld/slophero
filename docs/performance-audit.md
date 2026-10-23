@@ -1209,3 +1209,21 @@ accounted for only about 1 ms of sampled CPU in the supplied capture. Current
 `BuildCheck.Update` handles an update prompt, and the older source places its
 network request in a startup coroutine rather than a per-frame poll. None
 supports a safe gameplay-wide disable from the evidence available.
+
+### v0.4.67 broader UI-event experiment
+
+The same 31-second ETW export attributes substantial inclusive CPU weight to
+Unity UI event processing: about 1,610 ms in `EventSystem.Update`, 1,484 ms in
+`StandaloneInputModule.Process`, 1,451 ms in mouse processing, and 1,358 ms in
+`EventSystem.RaycastAll`. These values overlap and come from the older trace;
+they are leads, not a current-build FPS result. The v0.4.66 log confirms the
+narrow mouse hook installed, but does not measure a paired before/after run.
+
+Version 0.4.67 adds a separate, default-off experiment that skips
+`EventSystem.Update` only during active offline solo songs. It restores the
+callback on pause, menu entry, scene change, lost focus, or when the option is
+off. This also suspends UI keyboard/controller navigation during the song;
+instrument polling remains on. The setting has transition-only log messages so
+the next capture can verify it engaged without per-frame logging. If it causes
+pause, input, or UI problems, turn it off in the Sloptifine tab; it does not
+change chart timing or score logic.
