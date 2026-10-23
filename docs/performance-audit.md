@@ -2,6 +2,19 @@
 
 ## Live capture findings and measurement correction
 
+### v0.4.51 source-level optimization
+
+The v0.4.50 capture showed that `Core.OnUpdate` ran around 2,342 times/s while
+its average measured body cost rounded to 0.004 ms. The body was also reading
+the IL2CPP game manager, song readiness, practice mode, and eligibility fields
+on every tick even though HUD statistics only change at 5 Hz. Version 0.4.51
+keeps the configured restart/practice bindings polled on each active gameplay
+update, but performs idle game-state and transition-readiness checks at 20 Hz.
+When either shortcut is held, eligibility still updates each tick. This keeps
+the responsive control path live and removes redundant manager/property reads
+while idle. The likely gain is small and needs a comparable live capture; the
+prior 0.004 ms average is too coarsely rounded to quantify it.
+
 ### v0.4.50 follow-up capture (30 seconds)
 
 The new log loaded v0.4.50 with the same reported settings as the v0.4.49
@@ -399,11 +412,12 @@ speedup claim.
 
 ## Current hot paths
 
-- `Core.OnUpdate` is invoked at the game's unlocked update rate, including
-  SlopHero's shortcut polling. The v0.4.43 measured average was about 4
-  microseconds per call; v0.4.44 temporarily gated gameplay checks to 120 Hz,
-  but v0.4.45 restored the every-update behavior. Chart-stat formatting and
-  note scans remain gated to 5 Hz and are skipped when their fields are hidden.
+- `Core.OnUpdate` is invoked at the game's unlocked update rate. Shortcut
+  bindings remain live at that cadence, but v0.4.51 limits idle game-state
+  reads to 20 Hz; state checks return to every update while a shortcut is held.
+  The v0.4.50 measured average was about 4 microseconds per call. Chart-stat
+  formatting and note scans remain gated to 5 Hz and are skipped when their
+  fields are hidden.
 - The custom counter HUD draws one combined background/text control per repaint.
   The measured average was about 15 microseconds. It is now the largest steady
   SlopHero callback in the latest measured capture; replacing it with a more complex

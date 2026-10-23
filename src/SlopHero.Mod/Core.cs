@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.50", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.51", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -40,7 +40,7 @@ public sealed partial class Core : MelonMod
     private string? capture;
     private string status = "Starting...", statsText = "";
     private string practiceWaitState = "";
-    private double nextStats, nextOverridePass, nextOptionalServicePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
+    private double nextStats, nextGameStateRefresh, nextOverridePass, nextOptionalServicePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
     private bool lastStatsSongPlaying;
     private IntPtr localStatsPlayer;
     private int? pendingSection;
@@ -114,6 +114,7 @@ public sealed partial class Core : MelonMod
         rings.Clear();
         visualError = false;
         nextStats = 0;
+        nextGameStateRefresh = 0;
         finalStatsRefreshUntil = 0;
         lastStatsSongPlaying = false;
         localStatsPlayer = IntPtr.Zero;
@@ -245,6 +246,31 @@ public sealed partial class Core : MelonMod
                 transition = false;
                 Notice("Transition did not finish; use the normal game menus and send Latest.log.");
             }
+
+            // Poll action bindings at the simulation cadence, but avoid
+            // repeatedly crossing the IL2CPP boundary for game state when no
+            // action is held. HUD data still refreshes at 5 Hz; practice and
+            // transition readiness refresh at 20 Hz.
+            bool shortcutContext = gameplay && gameplayInitialized && !transition
+                && !settingsOpen && !moveHud && resizeTarget < 0 && Application.isFocused;
+            bool restartPressed = shortcutContext && InputBinding.Pressed(restartButton.Value, ref restartBinding);
+            bool practicePressed = shortcutContext && InputBinding.Pressed(practiceButton.Value, ref practiceBinding);
+            bool statsRefreshDue = gameplay && gameplayInitialized && now >= nextStats;
+            bool gameStateRefreshDue = now >= nextGameStateRefresh;
+            if (!shortcutContext && !gameplay)
+            {
+                practiceModeActive = false;
+                restartHold.Update(false, false, now, Duration);
+                practiceHold.Update(false, false, now, Duration);
+                return;
+            }
+            if (!restartPressed && !practicePressed && !statsRefreshDue && !gameStateRefreshDue)
+            {
+                restartHold.Update(false, false, now, Duration);
+                practiceHold.Update(false, false, now, Duration);
+                return;
+            }
+            nextGameStateRefresh = now + .05;
             var game = gameplay && gameplayInitialized ? GameManager.field_Private_Static_GameManager_0 : null;
             bool ready = game != null && game.songLoaded && game.playersInit && game.globalVariables != null;
             bool songPlaying = ready && game!.isSongPlaying;
@@ -264,13 +290,13 @@ public sealed partial class Core : MelonMod
                 && game.actualPlayerCount == 1 && (int)game.globalVariables!.gameMode == 0
                 && !practiceModeActive && !game.globalVariables.isPlayingSetlist
                 && (CHNetManager.instance == null || (int)CHNetManager.instance.field_Private_ConnectionState_0 == 0);
-            if (restartHold.Update(allow && InputBinding.Pressed(restartButton.Value, ref restartBinding), allow, now, Duration))
+            if (restartHold.Update(allow && restartPressed, allow, now, Duration))
             {
                 BeginRestart(game!);
                 return;
             }
             bool practiceAllowed = allow && !practiceFailed;
-            if (practiceHold.Update(practiceAllowed && InputBinding.Pressed(practiceButton.Value, ref practiceBinding), practiceAllowed, now, Duration))
+            if (practiceHold.Update(practiceAllowed && practicePressed, practiceAllowed, now, Duration))
             {
                 BeginPractice(game!);
                 return;
@@ -278,6 +304,7 @@ public sealed partial class Core : MelonMod
             if (!ready || transition || game == null || game.playerObjects == null)
             {
                 statsText = "";
+                if (statsRefreshDue) nextStats = now + .2;
                 return;
             }
             if (now >= nextStats)
