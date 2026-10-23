@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.64", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.65", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -43,6 +43,7 @@ public sealed partial class Core : MelonMod
     private string practiceWaitState = "";
     private double nextStats, nextGameStateRefresh, nextOverridePass, nextOptionalServicePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
     private double nextAprilFoolsPass;
+    private bool? lastWhammyCapSetting;
     private bool aprilFoolsError;
     private bool lastStatsSongPlaying;
     private IntPtr localStatsPlayer;
@@ -106,7 +107,11 @@ public sealed partial class Core : MelonMod
         if (compatible && gameplay && skipGameplayMouseUi.Value)
             mouseUiGameplay.Update(HarmonyInstance, requested: true, gameplayActive: false);
         if (compatible)
-            whammyTextureThrottle.Update(HarmonyInstance, throttleWhammyTexture.Value, gameplay);
+        {
+            bool capRequested = throttleWhammyTexture.Value;
+            whammyTextureThrottle.Update(HarmonyInstance, capRequested, gameplay);
+            lastWhammyCapSetting = capRequested;
+        }
         visuals.Clear();
         performance.Clear();
         starProgressParticles.Clear();
@@ -195,7 +200,7 @@ public sealed partial class Core : MelonMod
             if (compatible && !aprilFoolsError && now >= nextAprilFoolsPass)
             {
                 nextAprilFoolsPass = now + .1;
-                try { aprilFools.Apply(disableAprilFools.Value, now); }
+                try { aprilFools.Apply(disableAprilFools.Value, now, scanPong: !gameplay); }
                 catch (Exception ex)
                 {
                     aprilFools.Restore();
@@ -274,7 +279,15 @@ public sealed partial class Core : MelonMod
             if (compatible && !settingsOpen && !moveHud && !gameplay)
                 SongSpeedControl.ProcessSelectedSpeedInput(songSpeedStep.Value, now);
             if (!compatible) return;
-            whammyTextureThrottle.Update(HarmonyInstance, throttleWhammyTexture.Value, gameplay);
+            // Scene transitions already reconcile the hook. While a scene is
+            // stable, only a changed preference needs patch work; this path
+            // otherwise ran on every unlocked simulation tick.
+            bool capRequested = throttleWhammyTexture.Value;
+            if (lastWhammyCapSetting != capRequested)
+            {
+                whammyTextureThrottle.Update(HarmonyInstance, capRequested, gameplay);
+                lastWhammyCapSetting = capRequested;
+            }
             if (transition && now - transitionStarted > 30)
             {
                 pendingSection = null;

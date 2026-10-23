@@ -14,7 +14,7 @@ internal sealed class AprilFoolsOverrides
     private bool savedHaveFun;
     private bool applied;
 
-    public void Apply(bool disable, double realtime)
+    public void Apply(bool disable, double realtime, bool scanPong)
     {
         if (!disable)
         {
@@ -48,7 +48,10 @@ internal sealed class AprilFoolsOverrides
         // The Pong object is a joke minigame, not a gameplay service. Search
         // infrequently and only while suppression is enabled; disabling its
         // GameObject stops its own updates and rendering without destroying it.
-        if (realtime < nextPongScan) return;
+        // Pong is menu content. The Gameplay scene contains no Pong object,
+        // so avoid a scene-wide FindObjectsOfType scan during a chart. When
+        // returning to a menu, the scan runs immediately if it is overdue.
+        if (!scanPong || realtime < nextPongScan) return;
         nextPongScan = realtime + 2.0;
         foreach (var game in UnityEngine.Object.FindObjectsOfType<PongersGame>())
         {

@@ -1151,3 +1151,36 @@ also suppress raycasts requested by non-mouse UI code, so the trace does not
 justify broadening the patch. The next useful performance comparison is a
 matched WPA capture with the mouse option off and on, keeping chart, scene,
 resolution, and frame multiplier the same.
+
+### v0.4.64 log and v0.4.65 follow-up
+
+The new 0.4.64 log confirms both experimental hooks installed in Gameplay and
+reports 10,551 `Texture2D.Apply()` calls on the texture captured for
+`_GlobalWhammyTexture`: 6,009 allowed and 4,542 skipped. This establishes the
+cap engages on this setup; it does not measure the CPU cost of pixel preparation
+before `Apply`, the upload cost, or an FPS gain. The log's 30-second capture
+observed 2,492 simulation updates and 1,246 scheduled render callbacks per
+second. SlopHero's `OnUpdate` averaged 0.002 ms, visual overrides 0.016 ms,
+Canvas HUD sync 0.013 ms, and performance effects 0.078 ms at their own lower
+call rates. A 38.133 ms simulation-update gap remains unattributed by these
+per-callback timers. No SlopHero exception appears in the file.
+
+Version 0.4.65 removes two redundant mod paths: scene loading already sets
+the whammy hook state, so the ordinary simulation loop reconciles it only when
+the preference changes; and Pong object discovery, which was previously run
+every two seconds, is skipped in Gameplay while April Fools and NoteBomber
+suppression still runs. The Gameplay scene and live snapshot contain no Pong
+object. Discovery resumes in menus. These changes preserve the option behavior
+but are expected to have small, unmeasured frame-time effects.
+
+Current native `HighwayScroll.Update` checks
+`OnDemandRendering.willCurrentFrameRender` before it touches the sprite's
+material property block, so skipping its Update on non-rendering simulation
+ticks would duplicate an existing game optimization. Current `CameraShake.Update`
+returns immediately when its animation flag is clear, making its single active
+instance a weak performance target. The older whammy source writes pixels
+before calling `Texture2D.Apply`, but its renderer startup differs from v1.1;
+the current producer and cost are not yet established. Suppressing a guessed
+producer would risk whammy visuals or timing, especially online. A matched
+current-version CPU/GPU frame capture with the existing mouse/whammy switches
+off and on is the next evidence needed for a larger game-side rewrite.
