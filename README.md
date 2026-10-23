@@ -1,8 +1,8 @@
-# SlopHero 0.4.44 alpha
+# SlopHero 0.4.45 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.44 reduces repeated gameplay-state work.** F8, Escape, button capture, menu speed typing, and frame-timing samples still run every frame. GameManager checks and hold-based song controls now run at most 120 times per second instead of on every unlocked game update; the HUD still refreshes at its normal cadence. The v0.4.43 log measured about 2,317 updates per second, so this removes many redundant native reads without changing note scoring or timing. The FPS effect still needs an in-game comparison. Version 0.4.43 targeted online counters, the Counter HUD switch, and other unnecessary mod work; earlier features are described below.
+**Version 0.4.45 restores every-update polling for SlopHero's restart and practice shortcuts.** The 120 Hz gameplay gate in v0.4.44 reduced the mod's Update time, but it also delayed those button checks and did not improve the supplied whole-frame capture. Clone Hero's own note input was unaffected. The mod's HUD and visual refreshes retain their existing lower cadences. Version 0.4.43 targeted online counters, the Counter HUD switch, and other unnecessary mod work; earlier features are described below.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.44 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.44-alpha.zip?raw=true)
+[Download v0.4.45 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.45-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

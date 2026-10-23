@@ -1,5 +1,23 @@
 # Performance audit notes
 
+## 0.4.45 input cadence restoration
+
+The v0.4.44 capture used the same mod settings as v0.4.43 except that its
+configured speed was 110% instead of 150%. It measured about 2,289 updates/s,
+with frame p50 <=0.47 ms, p95 <=0.65 ms, p99 <=0.76 ms, and a 9.832 ms maximum.
+`OnUpdate` fell from roughly 0.004 ms to 0.001 ms per call, while FC rings,
+visual overrides, score graphics, and HUD repaint stayed similar. The
+whole-frame percentiles were slightly worse, and the unmatched speed setting
+prevents attributing that change to the mod. The user's experience was similar
+or slightly worse. No SlopHero runtime errors were logged.
+
+The 120 Hz gate also delayed SlopHero's restart/practice button polling. It did
+not alter Clone Hero's note-input polling, but the added shortcut latency is
+unwanted. Version 0.4.45 removes that gate so the shortcuts are checked on
+every game update again. Other established lower-frequency HUD and visual
+refreshes are unchanged. There is no measured FPS benefit to claim for this
+rollback; future work should target a demonstrated bottleneck.
+
 ## 0.4.44 gameplay update cadence
 
 The v0.4.43 capture below observed roughly 2,317 `OnUpdate` calls per second,
@@ -86,11 +104,11 @@ speedup claim.
 
 ## Current hot paths
 
-- `Core.OnUpdate` is invoked at the game's unlocked update rate. The v0.4.43
-  measured average was about 4 microseconds per call; v0.4.44 gates gameplay
-  state and hold checks to 120 Hz while keeping one-frame input events live.
-  Chart-stat formatting and note scans remain gated to 5 Hz and are skipped
-  when their fields are hidden.
+- `Core.OnUpdate` is invoked at the game's unlocked update rate, including
+  SlopHero's shortcut polling. The v0.4.43 measured average was about 4
+  microseconds per call; v0.4.44 temporarily gated gameplay checks to 120 Hz,
+  but v0.4.45 restored the every-update behavior. Chart-stat formatting and
+  note scans remain gated to 5 Hz and are skipped when their fields are hidden.
 - The custom counter HUD draws one combined background/text control per repaint.
   The measured average was about 15 microseconds. It is now the largest steady
   SlopHero callback in the latest measured capture; replacing it with a more complex
