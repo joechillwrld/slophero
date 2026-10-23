@@ -1,9 +1,26 @@
 # Performance audit notes
 
+## v0.4.43 Windows capture
+
+The user reported smoother, more consistent play with v0.4.43. The 30-second
+capture in the supplied `Latest.log` recorded 69,512 frame samples at about
+2,317 updates/s, with p50 <=0.46 ms, p95 <=0.64 ms, p99 <=0.73 ms, and a
+3.695 ms maximum. SlopHero logged no runtime errors. Its `OnUpdate` callback
+averaged 0.004 ms across 69,512 calls; HUD repaint averaged 0.013 ms across
+35,219 calls; visual overrides averaged 0.013 ms across 597 calls. The inner
+player/speed and score-graphics timings are subsets of visual overrides and
+must not be added to that total.
+
+The user also reduced the simulated-frame multiplier, which changes displayed
+FPS. The apparent ~200 FPS difference is therefore not an optimization gain.
+The capture is useful as a frame-pacing baseline, but it is not a matched
+before/after benchmark and cannot assign the reported improvement to one edit.
+
 ## 0.4.43 targeted changes
 
 The mod compiles against the user's re-uploaded v1.1.0.6142 IL2CPP and
-MelonLoader references. Windows gameplay measurements are still needed.
+MelonLoader references. Matched Windows before/after measurements are still
+needed to quantify the effect of each change.
 
 - When the pre-song speed row is absent, `SongSpeedControl` used to call
   `GameObject.Find("SongOptions")` on every unlocked menu update. Missing-object
@@ -22,10 +39,9 @@ MelonLoader references. Windows gameplay measurements are still needed.
 These changes remove identifiable work; they do not establish a whole-game FPS
 gain. A controlled in-game timing comparison is needed before claiming one.
 
-This note summarizes what the supplied timing logs and the SlopHero hot paths
-currently establish. The latest `Latest.log` attached with v0.4.33 contains no
-timing capture; it records the settings-page exception described below, so it
-cannot measure current gameplay cost.
+The earlier v0.4.33 log contained no timing capture; it recorded a settings-page
+exception and could not measure gameplay cost. The comparisons below use the
+older captures that were available at the time.
 
 ## Measurements from the supplied logs
 
