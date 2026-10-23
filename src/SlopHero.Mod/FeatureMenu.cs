@@ -19,7 +19,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
     private MelonPreferences_Entry<bool> customizeFpsColor = null!;
     private MelonPreferences_Entry<bool> disableHitParticles = null!, disableSustainParticles = null!, disableFretEffects = null!;
-    private MelonPreferences_Entry<bool> stopMidiInput = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!, useCanvasCounterHud = null!, freezeLyricsScroll = null!;
+    private MelonPreferences_Entry<bool> stopMidiInput = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!, useCanvasCounterHud = null!, freezeComboSmokeScroll = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
     private readonly VisualOverrides visuals = new();
@@ -27,7 +27,7 @@ public sealed partial class Core
     private readonly PerformanceOverrides performance = new();
     private readonly OptionalServiceOverrides optionalServices = new();
     private readonly HiddenLeaderboardOverride hiddenLeaderboard = new();
-    private readonly LyricsScrollOverride lyricsScroll = new();
+    private readonly ComboSmokeScrollOverride comboSmokeScroll = new();
     private readonly RuntimeTimings timings = new();
     private string songText = "", editText = "", editLabel = "", editError = "";
     private Action<string>? editApply;
@@ -108,7 +108,16 @@ public sealed partial class Core
         disableDiscordPresence = preferences.CreateEntry("PerformanceDisableDiscordPresence", false);
         suspendHiddenLeaderboard = preferences.CreateEntry("PerformanceSuspendHiddenLeaderboard", false);
         useCanvasCounterHud = preferences.CreateEntry("PerformanceCanvasCounterHud", false);
-        freezeLyricsScroll = preferences.CreateEntry("PerformanceFreezeLyricsBackgroundScroll", false);
+        freezeComboSmokeScroll = preferences.CreateEntry("PerformanceFreezeComboSmokeScroll", false);
+        var legacyFreezeLyricsScroll = preferences.CreateEntry("PerformanceFreezeLyricsBackgroundScroll", false);
+        if (legacyFreezeLyricsScroll.Value)
+        {
+            // 0.4.53 exposed this switch but searched the wrong hierarchy. Carry
+            // an explicitly enabled setting forward to its corrected target.
+            if (!freezeComboSmokeScroll.Value) freezeComboSmokeScroll.Value = true;
+            legacyFreezeLyricsScroll.Value = false;
+            preferences.SaveToFile();
+        }
         fcColor = preferences.CreateEntry("FcColor", "FFD700");
         pfcColor = preferences.CreateEntry("PerfectFcColor", "00FFFF");
         songProgressColor = preferences.CreateEntry("SongProgressColor", "00FFFF");
@@ -138,7 +147,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.53 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.54 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
         // nine narrow tabs that clipped labels such as "Performance".
         const int tabColumns = 5;
@@ -177,7 +186,7 @@ public sealed partial class Core
                             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
                             || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                         SongSpeedControl.TryRead(out int speedSetting);
-                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeLyricsScroll={freezeLyricsScroll.Value}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                         LogGameplaySnapshot();
                         timings.Start();
                     }
@@ -267,14 +276,14 @@ public sealed partial class Core
                 Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to re-enable)", x, y + 168);
                 Toggle(suspendHiddenLeaderboard, "Skip hidden offline leaderboard motion checks", x, y + 210);
                 Toggle(useCanvasCounterHud, "Try Canvas renderer for counters (experimental)", x, y + 252);
-                Toggle(freezeLyricsScroll, "Freeze lyric background scrolling (keeps it visible)", x, y + 294);
+                Toggle(freezeComboSmokeScroll, "Pause combo smoke scrolling (smoke remains visible)", x, y + 294);
                 GUI.Label(new Rect(x, y + 338, 632, 140),
                     "Independent, optional switches. Effect switches stop their components, not just their drawing. " +
                     "They do not change notes, scoring, or timing. MIDI restores immediately when switched off. " +
                     "The leaderboard switch skips six motion checks only while the offline list is fully hidden; " +
                     "online play and visible leaderboards are left alone. Canvas counters use the original renderer " +
-                    "in the editor or if Canvas fails. Freeze pauses the two lyric-background UV animations while " +
-                    "leaving their sprites and lyrics visible; the game's lyric-background visibility setting still works. " +
+                    "in the editor or if Canvas fails. The smoke switch pauses only the local guitar's two combo-smoke " +
+                    "UV animations while leaving the smoke visible. " +
                     "All changes restore when switched off or when gameplay ends. Discord presence needs a restart to restore.");
                 break;
         }
@@ -694,7 +703,7 @@ public sealed partial class Core
             Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput);
             Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
             Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
-            Bool("PerformanceFreezeLyricsBackgroundScroll", freezeLyricsScroll);
+            Bool("PerformanceFreezeComboSmokeScroll", freezeComboSmokeScroll);
         }
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
@@ -732,7 +741,10 @@ public sealed partial class Core
         Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput);
         Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
         Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
-        Bool("PerformanceFreezeLyricsBackgroundScroll", freezeLyricsScroll);
+        if (values.ContainsKey("PerformanceFreezeComboSmokeScroll"))
+            Bool("PerformanceFreezeComboSmokeScroll", freezeComboSmokeScroll);
+        else
+            Bool("PerformanceFreezeLyricsBackgroundScroll", freezeComboSmokeScroll);
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Float("SettingsMenuScale", settingsMenuScale, .85f, 1.4f); Float("ScoreHudScale", scoreHudScale, .5f, 2.5f); Float("InputViewerScale", inputViewerScale, .5f, 2.5f); Float("StarPowerHudScale", starPowerHudScale, .5f, 2.5f); Float("PracticeHudScale", practiceHudScale, .5f, 2.5f); Float("FpsHudScale", fpsHudScale, .5f, 2.5f);
         if (!values.ContainsKey("ScoreHudScale"))
@@ -922,7 +934,7 @@ public sealed partial class Core
 
     private bool visualError;
     private bool hiddenLeaderboardError;
-    private bool lyricsScrollError;
+    private bool comboSmokeScrollError;
     private double nextHiddenLeaderboardPass;
     public override void OnLateUpdate()
     {
@@ -948,17 +960,6 @@ public sealed partial class Core
         if (now < nextOverridePass) return;
         nextOverridePass = now + .05;
 
-        if (!lyricsScrollError && (freezeLyricsScroll.Value || lyricsScroll.NeedsRestore))
-        {
-            try { lyricsScroll.Apply(freezeLyricsScroll.Value, now); }
-            catch (Exception ex)
-            {
-                lyricsScroll.Clear();
-                lyricsScrollError = true;
-                LoggerInstance.Warning($"Lyric background optimization stopped; original animation states were restored: {ex.Message}");
-            }
-        }
-
         if (useCanvasCounterHud.Value || counterCanvas.HasObjects)
         {
             long canvasTiming = timings.Begin();
@@ -983,14 +984,25 @@ public sealed partial class Core
         bool visualRequested = hideSides.Value || hideStrings.Value || hideBeats.Value || tintScore.Value;
         bool practiceSpeedRequested = lockSpeed.Value && practiceModeActive;
         bool performanceRequested = disableHitParticles.Value || disableSustainParticles.Value || disableFretEffects.Value;
+        bool comboSmokeRequested = !comboSmokeScrollError && (freezeComboSmokeScroll.Value || comboSmokeScroll.NeedsRestore);
         bool visualPending = !visualError && (visualRequested || practiceSpeedRequested || visuals.NeedsUpdate
             || tintFc.Value || rings.NeedsUpdate || performanceRequested || performance.NeedsUpdate);
-        if (!nativeHudPending && !visualPending) return;
+        if (!nativeHudPending && !visualPending && !comboSmokeRequested) return;
 
         // Avoid GameManager/IL2CPP property reads at the unlocked update rate.
         // All HUD and visual changes refresh at 5–20 Hz, so resolving the
         // manager at the same cadence is sufficient.
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
+        if (comboSmokeRequested)
+        {
+            try { comboSmokeScroll.Apply(freezeComboSmokeScroll.Value, game, now); }
+            catch (Exception ex)
+            {
+                comboSmokeScroll.Clear();
+                comboSmokeScrollError = true;
+                LoggerInstance.Warning($"Combo smoke optimization stopped; original animation states were restored: {ex.Message}");
+            }
+        }
         if (game == null || game.globalVariables == null) return;
         bool songReady = game.songLoaded && game.playersInit;
         if (!songReady)
@@ -1127,7 +1139,7 @@ public sealed partial class Core
                 catch { return "unavailable"; }
             }
             LoggerInstance.Msg($"Gameplay snapshot: visual scripts enabled/found-active-objects: softMask={Count<Il2Cpp.SoftMaskController>()}, blurScaler={Count<Il2Cpp.BlurScaler>()}, customFade={Count<Il2Cpp.CustomFadeProperties>()}, beatPulse={Count<Il2Cpp.BeatPulse>()}, cameraShake={Count<Il2Cpp.CameraShake>()}, uvScroll={Count<Il2Cpp.UVScroll>()}, lyrics={Count<Il2Cpp.LyricDisplay>()}.");
-            LoggerInstance.Msg($"Gameplay snapshot: live visual script paths: cameraShake={LivePaths<Il2Cpp.CameraShake>()}; uvScroll={LivePaths<Il2Cpp.UVScroll>()}; lyrics={LivePaths<Il2Cpp.LyricDisplay>()}; customFade={LivePaths<Il2Cpp.CustomFadeProperties>()}.");
+            LoggerInstance.Msg($"Gameplay snapshot: live visual script paths: cameraShake={LivePaths<Il2Cpp.CameraShake>()}; uvScroll={LivePaths<Il2Cpp.UVScroll>()}; lyrics={LivePaths<Il2Cpp.LyricDisplay>()}; customFade={LivePaths<Il2Cpp.CustomFadeProperties>()}; comboSmokeTracked/pausedByMod={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}.");
             var sprites = UnityEngine.Object.FindObjectsOfType<SpriteRenderer>();
             int enabledSprites = 0;
             foreach (var sprite in sprites)

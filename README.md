@@ -1,4 +1,4 @@
-# SlopHero 0.4.53 alpha
+# SlopHero 0.4.54 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
@@ -6,11 +6,13 @@ features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.53 adds a lyric-background animation optimization.** It
-can pause the two live lyric-background UV updates while leaving the lyrics
-and background sprites visible. The Performance tab keeps this and all other
-optimizations off by default. This is a narrow CPU-side lead; no whole-game FPS
-gain is claimed without a controlled capture. It also retains the optional
+**Version 0.4.54 corrects the combo-smoke animation switch using paths from a
+live gameplay capture.** It pauses the local guitar's two combo-smoke UV
+updates while leaving the smoke visible. The Performance tab keeps this and
+all other optimizations off by default. This is a narrow CPU-side lead; no
+whole-game FPS gain is claimed without a controlled capture. Version 0.4.53
+looked under the wrong hierarchy, so its lyric-background switch matched
+nothing. It also retains the optional
 Canvas renderer for the counter HUD. It
 updates retained UI objects only when the counter text, position, or appearance
 changes. The established IMGUI renderer remains the default and handles HUD
@@ -21,7 +23,7 @@ for measured limits and current targets.
 
 ## Install
 
-[Download v0.4.53 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.53-alpha.zip?raw=true)
+[Download v0.4.54 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.54-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -296,18 +298,24 @@ scripts, SpriteRenderers, cameras, canvases, animators, video players, and
 particle systems. Those counts guide future game-side changes; they do not
 disable any native game components.
 
-## 0.4.53 optional lyric-background animation freeze
+## 0.4.54 optional combo-smoke animation pause
 
-**F8 → Performance → Freeze lyric background scrolling** is off by default.
-When enabled, SlopHero disables only `UVScroll` components directly attached
-to `CurrentLyricBackground` and `nextLyricBackground` under the Gameplay
-`HUDCam/Menu Canvas/Lyrics` object. It preserves each component's
-original enabled state and restores it when the option is switched off or the
-Gameplay scene ends. The lyrics and background sprites stay visible, and the
-game's own lyric/background visibility options continue to work. Static native
-inspection confirms these two live components advance texture UVs and update a
-material property block on each simulation tick; their actual CPU cost and any
-FPS gain remain unmeasured.
+**F8 → Performance → Pause combo smoke scrolling** is off by default. When
+enabled, SlopHero targets only `smoke_combo_fast` and `smoke_combo_slow` beneath
+the local guitar's `Combo/multiplier` object. It pauses their `UVScroll`
+components while leaving the smoke renderers visible; remote players are not
+targeted. It restores original component states when disabled, on scene
+changes, and during mod shutdown. Discovery repeats at a two-second interval
+while enabled so practice transitions that recreate player visuals are
+covered without searching the hierarchy every frame.
+
+The 0.4.53 option searched below `HUDCam/Menu Canvas/Lyrics`, but the supplied
+live log showed both UV components under the guitar combo smoke instead. That
+release's switch therefore matched nothing. The same log's off/on captures
+cannot measure this optimization: the old switch was a no-op, and the runs had
+different durations and callback cadence. The captures show stable-looking
+callback percentiles in both runs, but do not isolate the UV scripts' native
+cost or measure GPU presentation.
 
 ## 0.4.31 Performance options
 

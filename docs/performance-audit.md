@@ -63,43 +63,52 @@ objects do not prove they are the two live `UVScroll` instances. The new
 opt-in capture logs actual hierarchy paths for the live candidate classes so
 the next capture can establish those identities directly.
 
-### v0.4.53 lyric scrolling lead
+### v0.4.53 path mistake and v0.4.54 correction
 
-The latest runtime capture found two enabled `UVScroll` components. Native
-inspection at `UVScroll.Update` (RVA `0x144D70`) shows each component advances
-two texture offsets from `Time.deltaTime`, wraps them, then writes the result
-through a `MaterialPropertyBlock` to its SpriteRenderer every simulation tick.
-At the captured 2,371 simulation Updates/s, that is about 4,743 script calls
-and property-block writes each second. This is concrete redundant visual work,
-although the capture cannot measure its CPU time or prove a whole-game FPS
-gain.
+The latest log shows the two enabled `UVScroll` components at
+`Guitar Player(Clone)/Combo/multiplier/smoke_combo_fast` and
+`Guitar Player(Clone)/Combo/multiplier/smoke_combo_slow`. The live lyrics object
+is `HUDCam/Menu Canvas/Lyrics` and has no `UVScroll`. This directly disproves
+the path assumption used in 0.4.53: its lyric-background switch searched the
+wrong hierarchy and did nothing. That was my implementation error.
 
-Version 0.4.53 adds **F8 → Performance → Freeze lyric background scrolling**,
-off by default. When enabled, it disables only `UVScroll` components directly
-attached to `CurrentLyricBackground` and `nextLyricBackground` below the known
-`HUDCam/Menu Canvas/Lyrics` hierarchy. It does not hide the lyric text or
-background sprites and leaves the base game's background-visibility option
-alone. The mod restores each component's original enabled state when the switch
-turns off or Gameplay ends. It performs no scene search while the switch is off
-and discovers the two components once per song while it is on.
+Version 0.4.54 changes **F8 → Performance → Pause combo smoke scrolling** to
+target only those two named child objects beneath the active local input
+guitar's `Combo/multiplier`. It disables each `UVScroll` component, not its
+renderer, so the smoke stays visible. Remote players are excluded. Original
+enabled states restore when the option turns off, a scene changes, or the mod
+shuts down. While enabled, hierarchy discovery retries every two seconds to
+catch player visual objects recreated during practice transitions; it does not
+walk the hierarchy each frame. The feature remains default-off.
+
+The user captured a run with the old switch off and another with it on, but
+those runs do not form an A/B test because the old switch matched no objects.
+They also differ in duration (23.7 versus 30.0 seconds) and update cadence.
+Both report `renderFrameInterval=2` and 100% song speed. The off run recorded
+simulation p95/p99 intervals of 0.65/0.79 ms and scheduled-render p95/p99 of
+1.12/1.33 ms; the on run recorded 0.58/0.66 ms and 1.02/1.14 ms. These values
+show no evident slowdown in either capture, but they cannot be attributed to
+the switch and do not measure native `UVScroll` CPU time or GPU presentation.
+The corrected build reports how many combo smoke components it tracked and
+paused so a future capture can confirm the switch actually engaged.
 
 Other leads from the same capture, ranked by what is actually known:
 
 | Candidate | Current evidence | Action |
 | --- | --- | --- |
-| `UVScroll` lyric backgrounds | Two enabled in the capture; each performs per-tick offset and material-property work. | Narrow reversible switch added. Expected gain is small/unknown pending controlled CPU and frame-time comparison. |
+| Combo-smoke `UVScroll` | Two enabled local objects, with live hierarchy paths confirmed. Native `Update` advances texture offsets and writes a material property block on simulation ticks. | Reversible, default-off switch added. Actual CPU and frame-time gain remain unmeasured. |
 | `CameraShake` | One enabled. Native `Update` returns immediately when its shake-state flag is clear; the heavier path is event-driven while shaking. | Leave alone; no idle hot path established. |
-| `LyricDisplay` | One enabled. Its native `Update` has an early path when there is no current lyric phrase. | Leave alone; disabling it would break an existing lyrics feature and no material cost is shown. |
-| `CustomFadeProperties` | Ten enabled. Native `Update` compares four cached values and returns when unchanged. Scene-path mapping remains unresolved. | Weak lead; avoid suspending text fades until actual live paths and measured cost are known. |
+| `LyricDisplay` | One enabled. Its native `Update` has an early path when there is no current lyric phrase. | Leave alone; disabling it would break lyrics, and no material cost is shown. |
+| `CustomFadeProperties` | Ten enabled beneath guitar fret-lightning objects. Native `Update` compares four cached values and returns when unchanged. | Weak lead; avoid suspending fret effects until profiling shows meaningful cost. |
 | `SoftMaskController`, `BlurScaler`, `BeatPulse` | No enabled instances found in this song capture. | Not gameplay targets in this run. |
-| `VideoPlayer` | One of two components enabled in the capture; earlier snapshots did not record whether it was playing. | v0.4.53's capture records active/playing counts. Check for a playing background only if it recurs; the existing game video toggle should remain authoritative. |
+| `VideoPlayer` | One of two components enabled in the capture; one was playing. | The existing game video toggle should remain authoritative. |
 | 3 cameras, 11 canvases, 257 enabled SpriteRenderers, 3 animators | Counts only; they do not measure overdraw, Canvas rebuilds, draw calls, or GPU cost. | Need Unity Profiler/RenderDoc or comparable GPU/CPU profiling before any changes. Avoid disabling scene objects by count alone. |
 
-The opt-in timing capture now logs hierarchy paths for the live camera-shake,
+The opt-in timing capture logs hierarchy paths for live camera-shake,
 UV-scroll, lyrics, and custom-fade components, and records whether active video
-players are actually playing. This discovery runs once before the 30-second
-window, not per frame. It is intended to replace object-count guesses with
-component identities in future audits.
+players are playing. It discovers these once before the 30-second window, not
+per frame. These paths replace the previous unsupported lyric-background
+guess with direct runtime evidence.
 
 The safe rewrite decision is therefore to avoid a wholesale rewrite. The
 current measurements show SlopHero's named callback work is already small

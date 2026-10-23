@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.53", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.54", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -103,9 +103,9 @@ public sealed partial class Core : MelonMod
         visuals.Clear();
         performance.Clear();
         hiddenLeaderboard.Clear();
-        lyricsScroll.Clear();
+        comboSmokeScroll.Clear();
         hiddenLeaderboardError = false;
-        lyricsScrollError = false;
+        comboSmokeScrollError = false;
         nextHiddenLeaderboardPass = 0;
         nativeHud.Clear();
         resizeTarget = -1;
@@ -156,9 +156,9 @@ public sealed partial class Core : MelonMod
         visuals.Clear();
         performance.Clear();
         hiddenLeaderboard.Clear();
-        lyricsScroll.Clear();
+        comboSmokeScroll.Clear();
         hiddenLeaderboardError = false;
-        lyricsScrollError = false;
+        comboSmokeScrollError = false;
         nextHiddenLeaderboardPass = 0;
         nativeHud.Clear();
         nativeHudActive = false;
@@ -757,6 +757,7 @@ public sealed partial class Core : MelonMod
     {
         timings.Finish();
         performance.Clear();
+        comboSmokeScroll.Clear();
         counterCanvas.Clear();
         optionalServices.Restore();
         settingsOpen = moveHud = hudDragging = false;
