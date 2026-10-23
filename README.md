@@ -1,11 +1,15 @@
-# SlopHero 0.4.73 alpha
+# SlopHero 0.4.74 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
 features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.73
+build, compiled against its loader and generated assemblies. Version 0.4.74
+extends the default-off whammy cap to skip redundant 1×24 CPU pixel writes
+before their matching texture upload, while retaining the existing upload cap
+as a fallback. The hook only matches the whammy texture and column shape;
+other texture writes pass through. Version 0.4.73
 fixes the mouse-raycast experiment to intercept the integer overload that
 Clone Hero actually calls during gameplay; the old wrapper hook only appeared
 installed and did not stop the measured path. Version 0.4.72 checks the two
@@ -36,7 +40,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.73 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.73-alpha.zip)
+[Download SlopHero v0.4.74 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.74-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

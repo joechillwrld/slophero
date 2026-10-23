@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using HarmonyLib;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using MelonLoader;
 using UnityEngine;
 
@@ -20,6 +21,7 @@ internal sealed class WhammyTextureThrottle
 
     private readonly List<MethodInfo> captureMethods = new();
     private MethodInfo? applyMethod;
+    private MethodInfo? setPixelsMethod;
     private Texture? targetTexture;
     private IntPtr targetTexturePointer;
     private string lastTargetType = "not observed";
@@ -27,6 +29,8 @@ internal sealed class WhammyTextureThrottle
     private long matchedApplyCalls;
     private long allowedUploads;
     private long skippedUploads;
+    private long matchedColumnWrites;
+    private long skippedColumnWrites;
     private int globalTextureId;
     private bool installed;
     private bool failed;
@@ -35,6 +39,7 @@ internal sealed class WhammyTextureThrottle
     private bool gameplayActive;
 
     internal bool IsInstalled => installed;
+    internal bool IsColumnWriteHookInstalled => setPixelsMethod != null;
 
     internal void Update(HarmonyLib.Harmony harmony, bool enabled, bool isGameplay)
     {
@@ -77,11 +82,12 @@ internal sealed class WhammyTextureThrottle
 
     internal void LogSummary()
     {
-        if (!installed && matchedApplyCalls == 0 && allowedUploads == 0 && skippedUploads == 0) return;
+        if (!installed && matchedApplyCalls == 0 && allowedUploads == 0 && skippedUploads == 0
+            && matchedColumnWrites == 0 && skippedColumnWrites == 0) return;
         string matchState = matchedApplyCalls > 0
             ? "Texture2D.Apply calls matched the captured Unity object"
             : "no matching Texture2D.Apply calls were observed";
-        MelonLogger.Msg($"Sloptifine whammy upload experiment: wrapper={lastTargetType}, matchedApply={matchedApplyCalls}, allowed={allowedUploads}, skipped={skippedUploads}; {matchState}; CPU Texture2D.Apply only, 200 Hz cap. GPU compute dispatch is unchanged.");
+        MelonLogger.Msg($"Sloptifine whammy upload experiment: wrapper={lastTargetType}, matchedApply={matchedApplyCalls}, allowed={allowedUploads}, skipped={skippedUploads}, columnSetPixelsHook={setPixelsMethod != null}, matchedWhammyColumnWrites={matchedColumnWrites}, skippedWhammyColumnWrites={skippedColumnWrites}; {matchState}; CPU upload cap, 200 Hz. GPU compute dispatch is unchanged.");
     }
 
     private void InstallCaptureHooks(HarmonyLib.Harmony harmony)
@@ -139,6 +145,7 @@ internal sealed class WhammyTextureThrottle
             harmony.Patch(apply, prefix: prefix);
             applyMethod = apply;
             installed = true;
+            InstallColumnWriteHook(harmony);
             MelonLogger.Msg("Sloptifine experimental whammy upload cap installed for Gameplay.");
         }
         catch (Exception ex)
@@ -149,9 +156,46 @@ internal sealed class WhammyTextureThrottle
         }
     }
 
+    private void InstallColumnWriteHook(HarmonyLib.Harmony harmony)
+    {
+        MethodInfo? setPixels = null;
+        try
+        {
+            // Clone Hero's CPU whammy producer writes one 1x24 column, then
+            // calls Apply immediately. Reject redundant columns before their
+            // CPU-side pixel copy; the Apply prefix remains the final guard
+            // and fallback for other writes to the same texture.
+            setPixels = typeof(Texture2D).GetMethod(nameof(Texture2D.SetPixels),
+                BindingFlags.Instance | BindingFlags.Public, binder: null,
+                types: new[] { typeof(int), typeof(int), typeof(int), typeof(int), typeof(Il2CppStructArray<Color>) },
+                modifiers: null)
+                ?? throw new MissingMethodException("Texture2D.SetPixels(int, int, int, int, Color[])");
+            var prefix = new HarmonyMethod(typeof(WhammyTextureThrottle).GetMethod(
+                nameof(BeforeWhammyColumnWrite), BindingFlags.Static | BindingFlags.NonPublic)!);
+            harmony.Patch(setPixels, prefix: prefix);
+            setPixelsMethod = setPixels;
+        }
+        catch (Exception ex)
+        {
+            if (setPixels != null)
+            {
+                try { harmony.Unpatch(setPixels, HarmonyPatchType.All, harmony.Id); }
+                catch { /* Keep the verified Apply-only fallback. */ }
+            }
+            // The Apply cap still works when this Unity overload is absent.
+            MelonLogger.Warning($"Sloptifine could not skip redundant whammy pixel writes; retaining the Apply-only cap: {ex.Message}");
+        }
+    }
+
     private void RestoreApply(HarmonyLib.Harmony harmony)
     {
         gameplayActive = false;
+        try
+        {
+            if (setPixelsMethod != null) harmony.Unpatch(setPixelsMethod, HarmonyPatchType.All, harmony.Id);
+        }
+        catch (Exception ex) { MelonLogger.Warning($"Sloptifine whammy SetPixels-hook cleanup failed: {ex.Message}"); }
+        setPixelsMethod = null;
         try
         {
             if (applyMethod != null) harmony.Unpatch(applyMethod, HarmonyPatchType.All, harmony.Id);
@@ -228,5 +272,29 @@ internal sealed class WhammyTextureThrottle
         instance.lastUploadTimestamp = now;
         instance.allowedUploads++;
         return true;
+    }
+
+    private static bool BeforeWhammyColumnWrite(Texture2D __instance, int x, int y,
+        int blockWidth, int blockHeight, Il2CppStructArray<Color> colors)
+    {
+        // The older renderer writes each frame as a single column at y=0
+        // across all 24 instrument lanes. Row clears are 1024x1 and must
+        // continue to run; unrelated texture writes also pass through.
+        if (x < 0 || y != 0 || blockWidth != 1 || blockHeight != 24
+            || colors == null || colors.Length != 24)
+            return true;
+
+        WhammyTextureThrottle? instance = active;
+        if (instance == null || !instance.requested || !instance.gameplayActive
+            || instance.targetTexturePointer == IntPtr.Zero || __instance.Pointer != instance.targetTexturePointer)
+            return true;
+
+        instance.matchedColumnWrites++;
+        long last = instance.lastUploadTimestamp;
+        if (last == 0 || Stopwatch.GetTimestamp() - last >= MinimumUploadIntervalTicks)
+            return true;
+
+        instance.skippedColumnWrites++;
+        return false;
     }
 }

@@ -1,5 +1,26 @@
 # Performance audit notes
 
+### v0.4.74 whammy CPU-write gate
+
+The existing default-off cap rejected redundant `Texture2D.Apply()` uploads,
+but only after the caller had already written its pixels. The older source
+shows the CPU updater writing one `1x24` column to the shared whammy texture,
+then applying it. v0.4.74 adds a matching `Texture2D.SetPixels(int,int,int,int,
+Color[])` prefix: it skips only a `1x24` write at `y=0` to the captured whammy
+texture when the 200 Hz upload interval has not elapsed. The existing `Apply`
+prefix remains the final guard and still controls row clears and any other
+matching writes. If that Unity overload is unavailable, the mod logs the
+fallback and keeps the previous Apply-only cap. The hook is only installed
+when the experimental option is enabled in Gameplay; all unrelated textures,
+input, scoring, and GPU compute dispatch remain untouched.
+
+The latest v0.4.73 log matched 20,205 Apply calls to the whammy texture and
+skipped 8,982, confirming the upload gate was active. It does not prove the
+current game's producer uses the older source's exact `1x24` SetPixels shape.
+The next log reports how many candidate writes matched and how many were
+skipped; this tells us whether the upstream gate engages. No frame-time gain
+is claimed from code inspection alone.
+
 ### v0.4.73 mouse-raycast target correction
 
 The latest v0.4.72 log had `PerformanceSkipGameplayMouseUi` enabled, but it
@@ -1547,9 +1568,8 @@ still restores captured vanilla values when customization is disabled. This
 removes optional callbacks from the game's desaturate setters for players who
 leave custom rings off; the CPU benefit is plausible but not measured.
 
-The WPA profile supplied with the recent trace exported only collapsed process
-totals: its `Thread ID` and `Stack` columns were blank for Clone Hero. The same
-ETL can provide the missing attribution by expanding the Clone Hero process
-and its highest-weight threads in the WPA CPU Usage (Sampled) table, then
-copying that expanded table. See `windows-performance-capture.md`; no new game
-files or ETL capture are needed for this step.
+The supplied method export has no usable call stacks, so it cannot name the
+caller above the reflected IL2CPP invocation path. That uncertainty does not
+block the mouse-path correction or the narrowly matched whammy-write gate in
+this release. Both can be checked from their existing runtime diagnostics;
+there is no new WPA capture step for v0.4.74.
