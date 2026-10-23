@@ -5,7 +5,7 @@ namespace SlopHero.Mod;
 
 internal sealed class RuntimeTimings
 {
-    private readonly long[] total = new long[6], maximum = new long[6], calls = new long[6];
+    private readonly long[] total = new long[7], maximum = new long[7], calls = new long[7];
     // 0.01 ms histogram bins through 19.99 ms, plus an overflow bin. This
     // captures frame pacing without allocating or sorting samples mid-song.
     private readonly int[] frameHistogram = new int[2001];
@@ -56,6 +56,6 @@ internal sealed class RuntimeTimings
             }
             return "n/a";
         }
-        MelonLogger.Msg($"Mod timing capture ({seconds:0.0}s), observed update rate={calls[0] / Math.Max(seconds, .001):0.0}/s; frame unscaledDelta samples={frameSamples}, p50={Percentile(.50)}, p95={Percentile(.95)}, p99={Percentile(.99)}, max={maxFrameMs:0.000}ms; {Describe(0, "Update")}; {Describe(1, "FC rings")}; {Describe(2, "Visual overrides")}; {Describe(4, "Player/speed overrides")}; {Describe(5, "Score graphics")}; {Describe(3, "HUD repaint")}. Inner visual timings are subsets of Visual overrides.");
+        MelonLogger.Msg($"Mod timing capture ({seconds:0.0}s), observed update rate={calls[0] / Math.Max(seconds, .001):0.0}/s; frame unscaledDelta samples={frameSamples}, p50={Percentile(.50)}, p95={Percentile(.95)}, p99={Percentile(.99)}, max={maxFrameMs:0.000}ms; {Describe(0, "Update")}; {Describe(1, "FC rings")}; {Describe(2, "Visual overrides")}; {Describe(4, "Player/speed overrides")}; {Describe(5, "Score graphics")}; {Describe(6, "Performance effects")}; {Describe(3, "HUD repaint")}. Inner visual timings are subsets of Visual overrides.");
     }
 }

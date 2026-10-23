@@ -129,7 +129,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.45 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.46 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
         // nine narrow tabs that clipped labels such as "Performance".
         const int tabColumns = 5;
@@ -964,8 +964,13 @@ public sealed partial class Core
         if (!visualPending) return;
         try
         {
-            performance.Apply(game, disableHitParticles.Value, disableSustainParticles.Value,
-                disableFretEffects.Value, now);
+            long performanceTiming = timings.Begin();
+            try
+            {
+                performance.Apply(game, disableHitParticles.Value, disableSustainParticles.Value,
+                    disableFretEffects.Value, now);
+            }
+            finally { timings.End(6, performanceTiming); }
             Color Read(MelonPreferences_Entry<string> e)
             {
                 if (parsedColors.TryGetValue(e.Value, out var cached)) return cached;

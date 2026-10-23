@@ -1,5 +1,111 @@
 # Performance audit notes
 
+## Base-game investigation after 0.4.45
+
+The v0.4.44 Windows capture measured roughly 2,289 game updates/s. SlopHero's
+named callbacks account for about 0.008 ms of CPU time per observed update on
+average: `Update` ~0.001 ms, HUD repaint ~0.007 ms after amortizing its 35,066
+calls over 68,658 updates, and visual/FC passes well below 0.001 ms each.
+This is an estimate from rounded averages, excludes unmeasured hooks and
+loader overhead, and is not a whole-game profiler result. It does show why
+throttling the shortcut path had little prospect of changing frame pacing.
+
+The v1.1.0.6142 generated Clone Hero assembly contains 103 types declaring
+`Update`, `LateUpdate`, `FixedUpdate`, or `OnGUI`. These declarations show
+possible work, not which components are active in the Gameplay scene or how
+expensive their native implementations are. The strongest *investigation*
+candidates outside the note/input/score path are:
+
+| Component | Evidence in generated assembly | What must be checked first |
+| --- | --- | --- |
+| `SoftMaskController` and `BlurScaler` | Both declare `Update`; the former holds a render texture and camera, the latter a camera and two blur materials. | Whether they are active during songs and actually schedule extra render passes. They may only serve menus or video effects. |
+| `CustomFadeProperties` | Declares `Update`, a sprite renderer, camera, and material property block. | Active instance count in Gameplay and whether its per-frame fades are already disabled by game settings. |
+| `InGameLeaderboardManager` and `InGameLeaderboardEntry` | Both declare `Update`; the manager also owns a task/coroutine and entry array. | Whether they update during offline songs. Any optimization must preserve optional leaderboards and online play. |
+| `BeatPulse`, `CameraShake`, `UVScroll`, `LyricDisplay` | Each declares `Update` and owns visual-only fields. | Active instance count, user-visible effect, and whether Clone Hero already provides an equivalent toggle. |
+
+`BasePlayer`, note renderers, `GameManager`, `BeatRenderer`, and `HighwayScroll`
+also declare update methods, but they are part of scoring, chart visibility, or
+input timing. They are not candidates for blind throttling. `MenuBackground`,
+`BuildCheck`, `News`, and Pong's `Ball`/`Paddle` are menu or minigame leads,
+unlikely to explain a normal song's frame time unless they persist in Gameplay.
+
+The re-uploaded native `GameAssembly.dll` and `global-metadata.dat` match the
+documented v1.1.0.6142 hashes. The external `resources.assets` script map is
+still unavailable in this workspace, so the scene's MonoBehaviour references
+cannot be joined conclusively to the generated class names. No base-game
+component has been disabled or changed from this investigation.
+
+### Gameplay scene (`level2`) findings
+
+The newly supplied `level2` is the Gameplay scene and contains 7,369 serialized
+objects, including 2,466 GameObjects, 404 MonoBehaviours, 1,755
+SpriteRenderers, two cameras, one VideoPlayer, and one ParticleSystem. These
+are scene defaults; scripts can activate/deactivate them at runtime. At the
+serialized scene state, 1,988 GameObjects are active through their parent
+hierarchy, but only 357 SpriteRenderers are also enabled. Raw object counts
+must therefore not be treated as draw-call or frame-cost measurements.
+
+- `HUDCam/Leaderboard` is active in the serialized hierarchy, with six
+  `InGameLeaderboardPrefab` entry objects and their script components active.
+  The assembly declares `Update` on the leaderboard manager and entries. The
+  scene's external `MonoScript` references are unresolved without the matching
+  resources file, so the exact script-to-class mapping is inferred from object
+  names for now. This is the best lead for checking whether offline play still
+  performs unnecessary leaderboard work, while preserving online features.
+- `HUDCam/Input Viewer` holds 2,159 GameObjects across guitar, GHL, and drums
+  variants. Its three instrument branches have 322 enabled SpriteRenderers in
+  the serialized state, and many more disabled ones. The manager has an
+  `Update` method, but the scene does not show which variants it disables when
+  the player/instrument is initialized. Disabling the viewer wholesale would
+  duplicate an existing visual preference and remove a useful display.
+- `HUDCam/Menu Canvas/Lyrics` is active by default and has one script component
+  on its root. It may be a candidate only if lyric updates occur when no
+  lyrics are displayed and there is no equivalent in-game setting.
+- The named `Text Mask` object is beneath the initially inactive practice
+  section menu. Its script identity is unconfirmed; this scene does not
+  establish an always-running gameplay soft-mask cost.
+- The background VideoPlayer is enabled but `playOnAwake=false`. The single
+  score-star ParticleSystem is also `playOnAwake=false`, non-looping, and capped
+  at 40 particles. Neither is evidence of constant background work.
+
+The remaining question is whether leaderboard entry `Update` and the input
+viewer keep running during offline gameplay. Static code shows the leaderboard
+manager returns before formatting unless its state flag and engine reference
+are both set, so the possible `String.Format` allocation is not a confirmed
+offline hot path. Entry updates are still a small unmeasured candidate. A
+runtime profiler is needed to establish live component state and actual CPU/GPU
+cost before altering base-game behavior.
+
+### Matching native code inspection
+
+The re-uploaded `GameAssembly.dll` and `global-metadata.dat` match the
+previously documented SHA-256 fingerprints exactly. Il2CppDumper mapped the
+following methods in the v1.1.0.6142 native binary:
+
+- `InGameLeaderboardManager.Update` (RVA `0x3728A0`) first checks a private
+  state flag at offset `0x70` and an engine pointer at `0x58`, returning when
+  either is absent. On its active path, it calculates an accuracy percentage,
+  boxes the result, and calls `String.Format` (RVA `0x1982590`) before updating
+  entries. This can allocate per update while the manager is active, but the
+  static files do not establish that this path is active in offline play.
+- `InGameLeaderboardEntry.Update` (RVA `0x17C0E0`) reads its transform position
+  each call, compares it with a cached position, and adjusts its CanvasGroup
+  when it moves. It has no check of leaderboard visibility or alpha inside
+  that method. Six entry objects start enabled in the serialized scene, though
+  gameplay code could disable them later. This is a small confirmed source of
+  potentially unnecessary per-frame work, not a measured bottleneck.
+- `InputViewer.Update` (RVA `0x1C0730`) is short and checks game/paused/viewer
+  state before calling deeper routines. Its 2,159 scene objects do not imply
+  2,159 active scripts or a large update cost. `LyricDisplay.Update` (RVA
+  `0x3AF8C0`) has an early path for an empty phrase list. `BlurScaler.Update`
+  (RVA `0x120560`) tests dimensions before the expensive render-texture resize
+  path; no per-frame reallocation is evident when dimensions are unchanged.
+
+The investigation now favors measuring the leaderboard manager's active
+branch and entry callbacks in a normal offline song before changing their
+cadence. A future change should leave note/input polling untouched and retain
+online leaderboard behavior. No SlopHero binary was built for this inspection.
+
 ## 0.4.45 input cadence restoration
 
 The v0.4.44 capture used the same mod settings as v0.4.43 except that its
@@ -17,6 +123,23 @@ unwanted. Version 0.4.45 removes that gate so the shortcuts are checked on
 every game update again. Other established lower-frequency HUD and visual
 refreshes are unchanged. There is no measured FPS benefit to claim for this
 rollback; future work should target a demonstrated bottleneck.
+
+## 0.4.46 effect-discovery cache
+
+When the optional hit-particle, sustain-particle, or fret-effect suppression
+was enabled, its 1-Hz pass rediscovered every particle below each player neck,
+re-enumerated fret animators, re-read every particle object's name, and fetched
+each animator's child renderers again. Version 0.4.46 caches those per-session
+lists and name classifications, and refreshes hierarchy discovery every five
+seconds or immediately when a switch changes. The existing 1-Hz suppression
+pass remains, newly added player necks are cached as soon as they appear, and
+turning the options off or changing scenes restores original component states
+and clears the caches. This avoids repeated interop and enumeration work while
+keeping the feature reversible. No matched Windows capture yet measures the
+size of the gain, and this optimization has no effect when all three options
+are off. The opt-in 30-second timing report now has a separate `Performance
+effects` bucket for this callback, so a matched run can quantify the remaining
+cost without mixing it with visual overrides.
 
 ## 0.4.44 gameplay update cadence
 
@@ -168,9 +291,8 @@ do not prove those effects are active during a given song.
 
 ## Next optimization target
 
-The evidence points to the always-visible custom HUD repaint as the next
-measurable mod cost, while the long frame spikes remain outside the measured
-callback maxima. Any change to HUD rendering should be compared with the same
-chart, HUD visibility, settings, resolution, and capture duration. A future
-timing capture is needed to judge the current fix; the latest log did not run
-one.
+The custom HUD repaint remains the largest measured mod callback by aggregate
+time, while the long frame spikes remain outside the measured callback maxima.
+The base-game candidates above need scene-presence and native-work evidence
+before changing them. Any claimed FPS improvement needs a matched chart,
+speed, HUD visibility, settings, resolution, and capture duration.

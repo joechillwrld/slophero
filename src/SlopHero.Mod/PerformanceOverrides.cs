@@ -12,11 +12,26 @@ namespace SlopHero.Mod;
 /// </summary>
 internal sealed class PerformanceOverrides
 {
+    private readonly record struct ParticleEffect(ParticleSystem Component, bool IsHit, bool IsSustain);
+    private sealed class NeckEffects
+    {
+        public NeckEffects(ParticleEffect[] particles, Animator[] animators)
+        {
+            Particles = particles;
+            Animators = animators;
+        }
+
+        public ParticleEffect[] Particles { get; }
+        public Animator[] Animators { get; }
+    }
+
     private readonly Dictionary<IntPtr, (ParticleSystem Component, GameObject Object, bool Active)> particles = new();
     private readonly Dictionary<IntPtr, (Animator Component, bool Enabled)> animators = new();
     private readonly Dictionary<IntPtr, (Renderer Component, bool Enabled)> renderers = new();
+    private readonly Dictionary<IntPtr, NeckEffects> neckEffects = new();
+    private readonly Dictionary<IntPtr, Renderer[]> animatorRenderers = new();
     private bool hitParticles, sustainParticles, fretEffects;
-    private double nextScan;
+    private double nextScan, nextDiscovery;
 
     public bool NeedsUpdate => hitParticles || sustainParticles || fretEffects
         || particles.Count != 0 || animators.Count != 0 || renderers.Count != 0;
@@ -25,7 +40,7 @@ internal sealed class PerformanceOverrides
     {
         Restore();
         hitParticles = sustainParticles = fretEffects = false;
-        nextScan = 0;
+        nextScan = nextDiscovery = 0;
     }
 
     public void Apply(GameManager game, bool disableHitParticles, bool disableSustainParticles,
@@ -43,35 +58,55 @@ internal sealed class PerformanceOverrides
             Restore();
             return;
         }
-        // Scan only the player neck hierarchy, and at most once per second.
-        // Player effect pools are children of this hierarchy; no global scene
-        // search or per-frame component discovery is needed.
+        // Apply to cached player-neck effects at most once per second. Rebuild
+        // the hierarchy lists immediately on toggle, then every five seconds
+        // to catch effects or players added during a song. The effect pools
+        // are stable for a session, so rediscovering every child every second
+        // only creates avoidable IL2CPP wrapper/enumerator work.
         if (!changed && realtime < nextScan) return;
         nextScan = realtime + 1.0;
         if (game.playerObjects == null) return;
+        bool discover = changed || neckEffects.Count == 0 || realtime >= nextDiscovery;
+        if (discover) nextDiscovery = realtime + 5.0;
 
         foreach (var player in game.playerObjects)
         {
             if (player == null || !player.enabled || player.neckController == null) continue;
             var neck = player.neckController;
-            foreach (var system in neck.GetComponentsInChildren<ParticleSystem>(true))
+            if (discover || !neckEffects.TryGetValue(neck.Pointer, out var effects))
+                neckEffects[neck.Pointer] = effects = Discover(neck);
+
+            foreach (var effect in effects.Particles)
             {
+                var system = effect.Component;
                 if (system == null) continue;
-                string name = system.gameObject.name;
-                bool suppress = disableSustainParticles
-                    ? name.Contains("Sustain", StringComparison.OrdinalIgnoreCase)
-                    : false;
-                bool noteParticle = name.StartsWith("Particles_Note", StringComparison.OrdinalIgnoreCase);
-                bool hitParticle = noteParticle && !name.Contains("Sustain", StringComparison.OrdinalIgnoreCase);
-                suppress |= disableHitParticles && hitParticle;
+                bool suppress = disableSustainParticles && effect.IsSustain
+                    || disableHitParticles && effect.IsHit;
                 if (suppress) Disable(system); else Restore(system);
             }
 
             if (disableFretEffects)
-                foreach (var animator in EffectAnimators(neck)) Disable(animator);
+                foreach (var effectAnimator in effects.Animators)
+                    if (effectAnimator != null) Disable(effectAnimator);
             else
-                foreach (var animator in EffectAnimators(neck)) Restore(animator);
+                foreach (var animatorToRestore in effects.Animators)
+                    if (animatorToRestore != null) Restore(animatorToRestore);
         }
+    }
+
+    private static NeckEffects Discover(BaseNeckController neck)
+    {
+        var particles = new List<ParticleEffect>();
+        foreach (var system in neck.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            if (system == null) continue;
+            string name = system.gameObject.name;
+            bool isSustain = name.Contains("Sustain", StringComparison.OrdinalIgnoreCase);
+            bool isHit = name.StartsWith("Particles_Note", StringComparison.OrdinalIgnoreCase) && !isSustain;
+            particles.Add(new ParticleEffect(system, isHit, isSustain));
+        }
+
+        return new NeckEffects(particles.ToArray(), EffectAnimators(neck).ToArray());
     }
 
     private static IEnumerable<Animator> EffectAnimators(BaseNeckController neck)
@@ -124,7 +159,9 @@ internal sealed class PerformanceOverrides
         try { if (animator.enabled) animator.enabled = false; } catch { }
         try
         {
-            foreach (var renderer in animator.GetComponentsInChildren<Renderer>(true))
+            if (!animatorRenderers.TryGetValue(animator.Pointer, out var children))
+                animatorRenderers.Add(animator.Pointer, children = animator.GetComponentsInChildren<Renderer>(true).ToArray());
+            foreach (var renderer in children)
             {
                 if (renderer == null) continue;
                 if (!renderers.ContainsKey(renderer.Pointer)) renderers.Add(renderer.Pointer, (renderer, renderer.enabled));
@@ -142,14 +179,11 @@ internal sealed class PerformanceOverrides
 
     private void Restore(Animator animator)
     {
-        if (animators.Remove(animator.Pointer, out var state))
-            try { state.Component.enabled = state.Enabled; } catch { }
-        try
-        {
-            foreach (var renderer in animator.GetComponentsInChildren<Renderer>(true))
-                if (renderer != null) Restore(renderer);
-        }
-        catch { }
+        if (!animators.Remove(animator.Pointer, out var state)) return;
+        try { state.Component.enabled = state.Enabled; } catch { }
+        if (!animatorRenderers.TryGetValue(animator.Pointer, out var children)) return;
+        foreach (var renderer in children)
+            if (renderer != null) Restore(renderer);
     }
 
     private void Restore(Renderer renderer)
@@ -167,6 +201,8 @@ internal sealed class PerformanceOverrides
         foreach (var state in renderers.Values)
             try { state.Component.enabled = state.Enabled; } catch { }
         particles.Clear(); animators.Clear(); renderers.Clear();
+        neckEffects.Clear(); animatorRenderers.Clear();
+        nextScan = nextDiscovery = 0;
     }
 }
 
