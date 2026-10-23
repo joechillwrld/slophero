@@ -3,6 +3,7 @@ using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Video;
 
 namespace SlopHero.Mod;
 
@@ -18,7 +19,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
     private MelonPreferences_Entry<bool> customizeFpsColor = null!;
     private MelonPreferences_Entry<bool> disableHitParticles = null!, disableSustainParticles = null!, disableFretEffects = null!;
-    private MelonPreferences_Entry<bool> stopMidiInput = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!;
+    private MelonPreferences_Entry<bool> stopMidiInput = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!, useCanvasCounterHud = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
     private readonly VisualOverrides visuals = new();
@@ -105,6 +106,7 @@ public sealed partial class Core
         stopMidiInput = preferences.CreateEntry("PerformanceStopMidiInput", false);
         disableDiscordPresence = preferences.CreateEntry("PerformanceDisableDiscordPresence", false);
         suspendHiddenLeaderboard = preferences.CreateEntry("PerformanceSuspendHiddenLeaderboard", false);
+        useCanvasCounterHud = preferences.CreateEntry("PerformanceCanvasCounterHud", false);
         fcColor = preferences.CreateEntry("FcColor", "FFD700");
         pfcColor = preferences.CreateEntry("PerfectFcColor", "00FFFF");
         songProgressColor = preferences.CreateEntry("SongProgressColor", "00FFFF");
@@ -134,7 +136,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.51 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.52 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
         // nine narrow tabs that clipped labels such as "Performance".
         const int tabColumns = 5;
@@ -173,7 +175,7 @@ public sealed partial class Core
                             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
                             || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                         SongSpeedControl.TryRead(out int speedSetting);
-                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                         LogGameplaySnapshot();
                         timings.Start();
                     }
@@ -262,12 +264,13 @@ public sealed partial class Core
                 Toggle(stopMidiInput, "Pause drum MIDI input polling", x, y + 126);
                 Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to re-enable)", x, y + 168);
                 Toggle(suspendHiddenLeaderboard, "Skip hidden offline leaderboard motion checks", x, y + 210);
-                GUI.Label(new Rect(x, y + 264, 632, 150),
+                Toggle(useCanvasCounterHud, "Try Canvas renderer for counters (experimental)", x, y + 252);
+                GUI.Label(new Rect(x, y + 305, 632, 170),
                     "Independent, optional switches. Effect switches stop their components, not just their drawing. " +
                     "They do not change notes, scoring, or timing. MIDI restores immediately when switched off. " +
                     "The leaderboard switch skips six motion checks only while the offline list is fully hidden; " +
-                    "online play and visible leaderboards are left alone. Discord presence is disabled for this " +
-                    "session; switch it off and restart to restore it.");
+                    "online play and visible leaderboards are left alone. Canvas counters use the original renderer " +
+                    "in the editor or if Canvas fails. Discord presence needs a restart to restore.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -685,6 +688,7 @@ public sealed partial class Core
             Bool("PerformanceDisableHitParticles", disableHitParticles); Bool("PerformanceDisableSustainParticles", disableSustainParticles);
             Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput);
             Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
+            Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
         }
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
@@ -721,6 +725,7 @@ public sealed partial class Core
         Bool("PerformanceDisableHitParticles", disableHitParticles); Bool("PerformanceDisableSustainParticles", disableSustainParticles);
         Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput);
         Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
+        Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Float("SettingsMenuScale", settingsMenuScale, .85f, 1.4f); Float("ScoreHudScale", scoreHudScale, .5f, 2.5f); Float("InputViewerScale", inputViewerScale, .5f, 2.5f); Float("StarPowerHudScale", starPowerHudScale, .5f, 2.5f); Float("PracticeHudScale", practiceHudScale, .5f, 2.5f); Float("FpsHudScale", fpsHudScale, .5f, 2.5f);
         if (!values.ContainsKey("ScoreHudScale"))
@@ -935,6 +940,22 @@ public sealed partial class Core
         if (now < nextOverridePass) return;
         nextOverridePass = now + .05;
 
+        if (useCanvasCounterHud.Value || counterCanvas.HasObjects)
+        {
+            long canvasTiming = timings.Begin();
+            try
+            {
+                string? error = counterCanvas.Refresh(useCanvasCounterHud.Value,
+                    showHud.Value && !settingsOpen && !moveHud && resizeTarget < 0,
+                    statsText, hudX.Value, hudY.Value, fontSize.Value,
+                    new Color(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1),
+                    backgroundOpacity.Value);
+                if (error != null)
+                    LoggerInstance.Warning($"Canvas counter HUD failed; using the original renderer: {error}");
+            }
+            finally { timings.End(7, canvasTiming); }
+        }
+
         bool nativeHudRequested = nativeMoveTarget != 0 || resizeTarget >= 2 || practiceHudX.Value != 0 || practiceHudY.Value != 0
             || fpsHudX.Value != 0 || fpsHudY.Value != 0 || customizeFpsColor.Value
             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
@@ -1068,6 +1089,40 @@ public sealed partial class Core
             }
         }
         catch (Exception ex) { LoggerInstance.Warning($"Gameplay snapshot unavailable: {ex.Message}"); }
+
+        // One-time discovery during an explicitly requested timing capture.
+        // Counts establish which native visual Update candidates actually
+        // exist in a song before any optional suppression is considered.
+        try
+        {
+            static string Count<T>() where T : Behaviour
+            {
+                try
+                {
+                    var found = UnityEngine.Object.FindObjectsOfType<T>();
+                    int running = 0;
+                    foreach (var component in found)
+                        if (component != null && component.isActiveAndEnabled) running++;
+                    return $"{running}/{found.Length}";
+                }
+                catch { return "unavailable"; }
+            }
+            LoggerInstance.Msg($"Gameplay snapshot: visual scripts active/total: softMask={Count<Il2Cpp.SoftMaskController>()}, blurScaler={Count<Il2Cpp.BlurScaler>()}, customFade={Count<Il2Cpp.CustomFadeProperties>()}, beatPulse={Count<Il2Cpp.BeatPulse>()}, cameraShake={Count<Il2Cpp.CameraShake>()}, uvScroll={Count<Il2Cpp.UVScroll>()}, lyrics={Count<Il2Cpp.LyricDisplay>()}.");
+            var sprites = UnityEngine.Object.FindObjectsOfType<SpriteRenderer>();
+            int enabledSprites = 0;
+            foreach (var sprite in sprites)
+                if (sprite != null && sprite.enabled && sprite.gameObject.activeInHierarchy) enabledSprites++;
+            var cameras = UnityEngine.Object.FindObjectsOfType<Camera>();
+            int renderTextureCameras = 0;
+            foreach (var camera in cameras)
+                if (camera != null && camera.isActiveAndEnabled && camera.targetTexture != null) renderTextureCameras++;
+            var particles = UnityEngine.Object.FindObjectsOfType<ParticleSystem>();
+            int playingParticles = 0;
+            foreach (var particle in particles)
+                if (particle != null && particle.gameObject.activeInHierarchy && particle.isPlaying) playingParticles++;
+            LoggerInstance.Msg($"Gameplay snapshot: SpriteRenderers enabled/active-object={enabledSprites}/{sprites.Length}; cameras={Count<Camera>()} (render-texture targets={renderTextureCameras}), canvases={Count<Canvas>()}, animators={Count<UnityEngine.Animator>()}, videos={Count<VideoPlayer>()}, playing particle systems={playingParticles}/{particles.Length}.");
+        }
+        catch (Exception ex) { LoggerInstance.Warning($"Visual component snapshot unavailable: {ex.Message}"); }
     }
 
 }

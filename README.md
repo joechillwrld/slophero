@@ -1,18 +1,18 @@
-# SlopHero 0.4.51 alpha
+# SlopHero 0.4.52 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.51 reduces repeated IL2CPP game-state reads while no shortcut is
-held.** Restart/practice binding checks remain on each active gameplay update;
-stats refresh at 5 Hz and practice/transition state at 20 Hz. Controller input,
-chart timing, and all SlopHero features remain intact. The previous optional
-MIDI/Discord polling reduction and offline hidden-leaderboard optimization are
-also retained. See the [performance audit](docs/performance-audit.md) for the
-measured limits and current targets.
+**Version 0.4.52 adds an optional Canvas renderer for the counter HUD.** It
+updates retained UI objects only when the counter text, position, or appearance
+changes. The established IMGUI renderer remains the default and handles HUD
+editing; it also takes over if Canvas creation fails. A timing capture now
+records which candidate visual scripts and render components are active during
+a song. No FPS gain is claimed yet. See the [performance audit](docs/performance-audit.md)
+for measured limits and current targets.
 
 ## Install
 
-[Download v0.4.51 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.51-alpha.zip?raw=true)
+[Download v0.4.52 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.52-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -269,6 +269,23 @@ now run at 20 Hz; HUD counters remain on their existing 5 Hz refresh. Shortcut
 bindings are still polled on active gameplay updates, and a held shortcut
 continues to receive live eligibility checks. Practice-transition readiness
 may be recognized up to 50 ms later.
+
+## 0.4.52 optional Canvas counter HUD and visual snapshot
+
+**F8 → Performance → Try Canvas renderer for counters** is off by default.
+When on, a separate, noninteractive Unity Canvas displays the counter HUD
+during gameplay. Counter values retain their 5 Hz refresh; the Canvas receives
+position, color, opacity, and text changes at most 20 times per second. The
+normal HUD renderer handles moving and resizing. Switching the option off
+removes the Canvas on the next visual refresh, and a UI-wrapper failure restores the original
+renderer for that session. The song HUD is unchanged. Canvas GPU/rendering
+cost is not included in SlopHero's callback timing bucket, so a lower HUD
+callback time alone does not establish better FPS.
+
+An opt-in 30-second timing capture now also logs active counts for visual
+scripts, SpriteRenderers, cameras, canvases, animators, video players, and
+particle systems. Those counts guide future game-side changes; they do not
+disable any native game components.
 
 ## 0.4.31 Performance options
 

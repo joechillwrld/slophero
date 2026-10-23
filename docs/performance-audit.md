@@ -2,6 +2,35 @@
 
 ## Live capture findings and measurement correction
 
+### v0.4.52 experimental counter Canvas
+
+The v0.4.51 capture attributed about 0.51 CPU seconds per 30 seconds to the
+counter HUD's IMGUI repaint callback. Version 0.4.52 offers a default-off
+Canvas path for counters only. It creates its own screen-space Canvas with one
+background image and one TextMeshPro label during gameplay, without a graphics
+raycaster. It synchronizes retained UI properties at the existing 20 Hz visual
+cadence, and only writes text, color, size, or position when they change. The
+Canvas is hidden while editing, so the original move and resize interactions
+remain in IMGUI. Disabling the option destroys the Canvas; exceptions during
+construction or update latch a fallback to IMGUI for the session. Scene changes
+also destroy the Canvas. The option is experimental because compile-time checks
+cannot confirm the game's stripped UI methods or the relative rendering cost.
+
+The timing report includes a `Canvas HUD sync` bucket and records the switch's
+state. This bucket measures only SlopHero's UI property updates, not Unity's
+Canvas layout, rendering, GPU work, or presentation. A drop in the IMGUI HUD
+bucket therefore cannot by itself prove a game FPS gain. The default render
+path and all note/input/score logic are unchanged.
+
+The opt-in timing snapshot also counts active candidate visual scripts
+(`SoftMaskController`, `BlurScaler`, `CustomFadeProperties`, `BeatPulse`,
+`CameraShake`, `UVScroll`, and `LyricDisplay`), SpriteRenderers, cameras and
+render-texture targets, canvases, animators, video players, and playing particle
+systems. These are one-time discovery calls before the 30-second timing window;
+no scene traversal was added to every rendered frame. Counts identify live
+objects but not their CPU or GPU cost, so they do not justify disabling a
+component alone.
+
 ### v0.4.51 source-level optimization
 
 The v0.4.50 capture showed that `Core.OnUpdate` ran around 2,342 times/s while
@@ -14,6 +43,36 @@ When either shortcut is held, eligibility still updates each tick. This keeps
 the responsive control path live and removes redundant manager/property reads
 while idle. The likely gain is small and needs a comparable live capture; the
 prior 0.004 ms average is too coarsely rounded to quantify it.
+
+### v0.4.51 follow-up capture (30 seconds)
+
+The new log loaded v0.4.51 with the same reported gameplay settings as the
+v0.4.50 capture. The hidden leaderboard was still invisible with zero of six
+entry updates eligible, and the input-viewer snapshot again found 48 active
+guitar sprites and none in the GHL/drum branches. SlopHero reported no runtime
+exceptions; the only warning was the same Il2CppInterop startup fallback.
+
+The run observed 2,361.7 simulation Updates/s and 1,180.8 scheduled-render and
+GUI-repaint callbacks/s. Compared with v0.4.50, p95/p99 intervals were slightly
+shorter: simulation 0.59/0.66 ms (previously 0.64/0.73), scheduled render
+1.02/1.12 ms (1.06/1.22), and repaint 1.01/1.11 ms (1.06/1.23). The maxima
+were higher, however: 9.906 ms, 15.115 ms, and 10.189 ms respectively. The
+percentile movement is small and the isolated maxima do not identify a cause;
+these runs are not a controlled A/B, and the callback frequencies are not
+presented FPS or GPU frame times.
+
+Using the three-decimal averages, named non-overlapping SlopHero work is about
+0.60 CPU seconds per 30 seconds (roughly 2.0% of one continuously occupied
+core): Update 0.001 ms across 70,852 calls, HUD repaint 0.014 ms across 36,482
+calls, FC rings 0.005 ms across 597 calls, visual overrides 0.016 ms across
+597 calls, and performance effects 0.007 ms across 597 calls. The player/speed
+and score-graphics buckets are included within visual overrides. The estimate
+for the v0.4.50 capture was about 0.84 seconds, so the lower rounded Update
+average is consistent with less idle work after v0.4.51, but the rounded and
+uncontrolled captures do not establish a whole-game performance gain. The
+counter HUD remains the largest measured mod path at about 0.51 seconds per
+30-second run; replacing IMGUI with a Unity canvas would need a real A/B before
+it is justified.
 
 ### v0.4.50 follow-up capture (30 seconds)
 

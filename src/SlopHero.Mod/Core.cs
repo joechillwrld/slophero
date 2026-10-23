@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.51", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.52", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -18,6 +18,7 @@ public sealed partial class Core : MelonMod
     private readonly HoldTrigger practiceHold = new();
     private readonly ChartStats statsReader = new();
     private readonly NativeHudLayout nativeHud = new();
+    private readonly CounterCanvasHud counterCanvas = new();
     private SettingsProfiles? settingsProfiles;
     private string[] profileNames = Array.Empty<string>();
     private int profileIndex;
@@ -98,6 +99,7 @@ public sealed partial class Core : MelonMod
         practiceModeActive = false;
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
+        counterCanvas.Clear();
         visuals.Clear();
         performance.Clear();
         hiddenLeaderboard.Clear();
@@ -136,6 +138,7 @@ public sealed partial class Core : MelonMod
     public override void OnSceneWasUnloaded(int buildIndex, string sceneName)
     {
         SongSpeedControl.ResetMenuCache();
+        counterCanvas.Clear();
         if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; practiceModeActive = false; }
         settingsOpen = moveHud = hudDragging = false;
         resizeTarget = -1;
@@ -502,8 +505,10 @@ public sealed partial class Core : MelonMod
         // while editing so sliders, typing, and dragging remain responsive.
         bool resizeEditing = resizeTarget >= 0;
         if (!settingsOpen && !moveHud && !resizeEditing && Event.current.type != EventType.Repaint) return;
+        if (counterCanvas.Visible && (!showHud.Value || settingsOpen || moveHud || resizeEditing
+            || !gameplay || string.IsNullOrEmpty(statsText))) counterCanvas.Hide();
         bool noticeVisible = !compatible || (noticeUntil > 0 && clock.Elapsed.TotalSeconds < noticeUntil);
-        bool counterHudVisible = showHud.Value && gameplay && !string.IsNullOrEmpty(statsText);
+        bool counterHudVisible = !counterCanvas.Visible && showHud.Value && gameplay && !string.IsNullOrEmpty(statsText);
         bool songHudVisible = showSong.Value && gameplay && !string.IsNullOrEmpty(songText);
         if (!settingsOpen && !moveHud && !resizeEditing && !noticeVisible && !counterHudVisible && !songHudVisible) return;
         long timingStart = timings.Begin();
@@ -748,6 +753,7 @@ public sealed partial class Core : MelonMod
     {
         timings.Finish();
         performance.Clear();
+        counterCanvas.Clear();
         optionalServices.Restore();
         settingsOpen = moveHud = hudDragging = false;
         resizeTarget = -1;
