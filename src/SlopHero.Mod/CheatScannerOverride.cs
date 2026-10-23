@@ -11,8 +11,10 @@ internal sealed class CheatScannerOverride
 {
     private CheatManager? scanner;
     private bool originalEnabled;
+    private bool lookupAttempted;
 
-    internal bool IsPaused => scanner != null && originalEnabled && !scanner.enabled;
+    internal bool IsAvailable => scanner != null && scanner.Pointer != IntPtr.Zero;
+    internal string Status => !IsAvailable ? "missing" : !originalEnabled ? "already-disabled" : scanner!.enabled ? "running" : "paused";
 
     internal void Apply(bool pause)
     {
@@ -23,9 +25,23 @@ internal sealed class CheatScannerOverride
         }
 
         CheatManager? current = CheatManager.instance;
+        if (current == null || current.Pointer == IntPtr.Zero)
+        {
+            // The game's static singleton can be temporarily unset during a
+            // scene transition (or by another mod). Keep using our cached
+            // instance when possible, otherwise do one scene lookup for this
+            // active-song interval instead of rescanning on every game tick.
+            current = scanner;
+            if ((current == null || current.Pointer == IntPtr.Zero) && !lookupAttempted)
+            {
+                lookupAttempted = true;
+                current = UnityEngine.Object.FindObjectOfType<CheatManager>();
+            }
+        }
         if (current == null)
         {
-            Restore();
+            scanner = null;
+            originalEnabled = false;
             return;
         }
         if (scanner == null || scanner.Pointer != current.Pointer)
@@ -46,5 +62,6 @@ internal sealed class CheatScannerOverride
         }
         scanner = null;
         originalEnabled = false;
+        lookupAttempted = false;
     }
 }

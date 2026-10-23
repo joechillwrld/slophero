@@ -1,14 +1,17 @@
-# SlopHero 0.4.67 alpha
+# SlopHero 0.4.68 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
 features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.67
-adds an experimental, default-off switch that suspends Unity UI event processing
-during active solo songs, resuming on pause. The separate cheat-scanner switch
-also pauses its persistent per-tick scan during solo songs. The default-off
+build, compiled against its loader and generated assemblies. Version 0.4.68
+adds a bounded fallback lookup and live state reporting for the cheat-scanner
+pause option, which the new log showed was enabled without confirming that the
+scanner actually paused. Version 0.4.67 added an experimental, default-off
+switch that suspends Unity UI event processing during active solo songs,
+resuming on pause. The separate cheat-scanner switch also pauses its persistent
+per-tick scan during solo songs. The default-off
 200 Hz CPU whammy-texture cap remains scoped to Gameplay; texture assignment
 tracking still recognizes its target before a song starts. GPU compute
 rendering remains untouched. Earlier versions also added a separate option to suppress the
@@ -19,7 +22,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download v0.4.67 ZIP](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.67-alpha.zip)
+[Download v0.4.68 ZIP](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.68-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.67", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.68", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -47,7 +47,7 @@ public sealed partial class Core : MelonMod
     private bool aprilFoolsError;
     private bool cheatScannerError;
     private bool gameplayUiEventError;
-    private bool? lastCheatScannerPauseState;
+    private string? lastCheatScannerStatus;
     private bool? lastGameplayUiSuspendState;
     private bool lastStatsSongPlaying;
     private IntPtr localStatsPlayer;
@@ -110,7 +110,7 @@ public sealed partial class Core : MelonMod
         cheatScanner.Restore();
         cheatScannerError = false;
         gameplayUiEventError = false;
-        lastCheatScannerPauseState = null;
+        lastCheatScannerStatus = null;
         lastGameplayUiSuspendState = null;
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
@@ -171,7 +171,7 @@ public sealed partial class Core : MelonMod
         cheatScanner.Restore();
         cheatScannerError = false;
         gameplayUiEventError = false;
-        lastCheatScannerPauseState = null;
+        lastCheatScannerStatus = null;
         lastGameplayUiSuspendState = null;
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
@@ -359,11 +359,12 @@ public sealed partial class Core : MelonMod
                         pauseCheats = net == null || (int)net.field_Private_ConnectionState_0 == 0;
                     }
                     cheatScanner.Apply(pauseCheats);
-                    if (lastCheatScannerPauseState != cheatScanner.IsPaused)
+                    string scannerStatus = pauseCheats ? cheatScanner.Status : "";
+                    if (lastCheatScannerStatus != scannerStatus)
                     {
-                        if (cheatScanner.IsPaused || lastCheatScannerPauseState == true)
-                            LoggerInstance.Msg($"Sloptifine solo cheat scanner {(cheatScanner.IsPaused ? "paused" : "restored")}.");
-                        lastCheatScannerPauseState = cheatScanner.IsPaused;
+                        if (!string.IsNullOrEmpty(scannerStatus))
+                            LoggerInstance.Msg($"Sloptifine solo cheat scanner state: {scannerStatus}.");
+                        lastCheatScannerStatus = scannerStatus;
                     }
                 }
                 catch (Exception ex)

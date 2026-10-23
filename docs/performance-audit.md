@@ -1227,3 +1227,19 @@ instrument polling remains on. The setting has transition-only log messages so
 the next capture can verify it engaged without per-frame logging. If it causes
 pause, input, or UI problems, turn it off in the Sloptifine tab; it does not
 change chart timing or score logic.
+
+### v0.4.68 scanner state follow-up
+
+The latest v0.4.67 log confirms the broad UI hook suspended and restored
+correctly. It also records the cheat-scanner pause option as enabled while its
+state remained unpaused, so that optimization was not confirmed as active.
+Version 0.4.68 adds a single fallback lookup when the game's
+singleton is unavailable and reports whether the scanner is paused, already
+disabled, still running, or missing. This lookup is only attempted while the
+solo pause option is eligible, not on every simulation tick.
+
+The same run matched 19,014 CPU `Texture2D.Apply` calls to the shared whammy
+texture and skipped 7,756 under the configured cap. This confirms the cap is
+working on that texture; it does not measure GPU compute work or establish an
+FPS increase. The two timing captures are not a controlled A/B, so they cannot
+quantify the UI hook's gain.
