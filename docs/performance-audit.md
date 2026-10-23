@@ -1184,3 +1184,28 @@ the current producer and cost are not yet established. Suppressing a guessed
 producer would risk whammy visuals or timing, especially online. A matched
 current-version CPU/GPU frame capture with the existing mouse/whammy switches
 off and on is the next evidence needed for a larger game-side rewrite.
+
+### v0.4.65 log and persistent-service check
+
+The current log reports about 2,423 simulation updates/s and 1,211 render
+callbacks/s over 30 seconds, with a 39.757 ms maximum update interval. Its
+measured mod callbacks remain below the scale of that outlier. The supplied
+CPU export shows expensive Rewired input and Unity mouse-UI paths, but has no
+samples attributed to `CheatManager.Update`; a large gain from that scanner
+would be unsupported.
+
+The older source makes `CheatManager` persistent across scenes and loops over
+players and registered cheat codes each Update. Current 1.1 native code
+confirms the loop, and its `OnEnable`/`OnDisable` methods are empty. Version
+0.4.66 adds a separate, default-off switch that disables only this component
+during active, offline, single-player songs. It restores the component on
+pause, menu entry, scene exit, or option disable, preserving its registrations
+and leaving normal instrument input and online play alone.
+
+Two other persistent-service leads were rejected: current
+`GlobalVariables.Update` polls fullscreen state and notifies listeners when it
+changes, while `CHNetManager.Update` returns quickly while disconnected and
+accounted for only about 1 ms of sampled CPU in the supplied capture. Current
+`BuildCheck.Update` handles an update prompt, and the older source places its
+network request in a startup coroutine rather than a per-frame poll. None
+supports a safe gameplay-wide disable from the evidence available.

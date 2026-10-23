@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.65", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.66", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -45,6 +45,7 @@ public sealed partial class Core : MelonMod
     private double nextAprilFoolsPass;
     private bool? lastWhammyCapSetting;
     private bool aprilFoolsError;
+    private bool cheatScannerError;
     private bool lastStatsSongPlaying;
     private IntPtr localStatsPlayer;
     private int? pendingSection;
@@ -103,6 +104,8 @@ public sealed partial class Core : MelonMod
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
         counterCanvas.Clear();
+        cheatScanner.Restore();
+        cheatScannerError = false;
         mouseUiGameplay.Clear(HarmonyInstance);
         if (compatible && gameplay && skipGameplayMouseUi.Value)
             mouseUiGameplay.Update(HarmonyInstance, requested: true, gameplayActive: false);
@@ -156,6 +159,8 @@ public sealed partial class Core : MelonMod
     {
         SongSpeedControl.ResetMenuCache();
         counterCanvas.Clear();
+        cheatScanner.Restore();
+        cheatScannerError = false;
         mouseUiGameplay.Clear(HarmonyInstance);
         if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; practiceModeActive = false; }
         settingsOpen = moveHud = hudDragging = false;
@@ -220,7 +225,11 @@ public sealed partial class Core : MelonMod
             {
                 if (moveHud || resizeTarget >= 0) { moveHud = false; resizeTarget = -1; resizeHandle = -1; resizeMoveDragging = false; settingsOpen = true; }
                 else settingsOpen = !settingsOpen;
-                if (settingsOpen || moveHud || resizeTarget >= 0) mouseUiGameplay.Disable();
+                if (settingsOpen || moveHud || resizeTarget >= 0)
+                {
+                    mouseUiGameplay.Disable();
+                    cheatScanner.Restore();
+                }
                 hudDragging = false;
                 nativeMoveTarget = 0;
                 nativeHudDragging = false;
@@ -322,6 +331,28 @@ public sealed partial class Core : MelonMod
             var game = gameplay && gameplayInitialized ? GameManager.field_Private_Static_GameManager_0 : null;
             bool ready = game != null && game.songLoaded && game.playersInit && game.globalVariables != null;
             bool songPlaying = ready && game!.isSongPlaying;
+            if (!cheatScannerError)
+            {
+                try
+                {
+                    bool pauseCheats = pauseGameplayCheatScanner.Value && ready && songPlaying
+                        && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
+                        && !transition && !settingsOpen && !moveHud
+                        && resizeTarget < 0 && Application.isFocused;
+                    if (pauseCheats)
+                    {
+                        var net = CHNetManager.instance;
+                        pauseCheats = net == null || (int)net.field_Private_ConnectionState_0 == 0;
+                    }
+                    cheatScanner.Apply(pauseCheats);
+                }
+                catch (Exception ex)
+                {
+                    cheatScanner.Restore();
+                    cheatScannerError = true;
+                    LoggerInstance.Warning($"Sloptifine cheat scanner pause stopped; vanilla scanner restored: {ex.Message}");
+                }
+            }
             if (lastStatsSongPlaying && !songPlaying)
             {
                 // The native practice panel can receive its final counters
@@ -814,6 +845,7 @@ public sealed partial class Core : MelonMod
         starProgressParticles.Clear();
         comboSmokeScroll.Clear();
         counterCanvas.Clear();
+        cheatScanner.Restore();
         optionalServices.Restore();
         settingsOpen = moveHud = hudDragging = false;
         resizeTarget = -1;
