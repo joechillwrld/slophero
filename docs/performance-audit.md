@@ -1006,3 +1006,72 @@ that a canvas rebuild caused the 40 ms simulation gap. A Unity Profiler capture
 showing `Canvas.BuildBatch`, TMP mesh generation, and the main thread would be
 needed before changing the retained HUD path. No controller polling or note
 timing was changed during this review.
+
+### v0.4.62 runtime and source review
+
+The newest `Latest.log` confirms v0.4.62 loaded on Clone Hero 1.1.0.6142 and
+completed its 30-second capture without a SlopHero exception. The mouse-UI
+experiment was installed and active; the Canvas HUD path was enabled. The
+star-progress particle switch was enabled and reports `starSuppressed=True`;
+the one-shot snapshot consequently found zero playing particle systems. This
+verifies the option engaged, but it is not an off/on performance comparison.
+Measured SlopHero callback averages stayed small: Update 0.002 ms, Canvas HUD
+sync 0.012 ms, visual overrides 0.016 ms, and performance effects 0.078 ms.
+The simulation interval was at or below 0.58 ms at p95 and 0.67 ms at p99;
+the scheduled-render callback interval was at or below 1.01/1.17 ms. A single
+43.75 ms simulation interval remains unexplained. These are callback intervals,
+not GPU or display-present timings.
+
+I rechecked the earlier WPA CPU-method export alongside the exact-build
+Il2CppDumper output. The captured mouse path is identifiable in managed
+symbols: `StandaloneInputModule.ProcessMouseEvent` (1,451 sampled CPU ms),
+`PointerInputModule.GetMousePointerEventData` (1,394 ms),
+`EventSystem.RaycastAll` (1,358 ms), both `GraphicRaycaster.Raycast` overloads
+(1,105 and 914 ms), and `RectTransformUtility.RectangleContainsScreenPoint`
+(906 ms). These are sampled method weights from a roughly 31-second capture;
+do not add nested methods or read them as GPU time. Their presence supports the
+existing default-off mouse-UI experiment, whose current log confirms it is
+active, but the profile predates this latest run and therefore does not measure
+the experiment's effect.
+
+The same export attributes 2,116 sampled CPU ms to
+`Rewired.InputManager_Base.DoUpdate`. That remains untouched; it is core input
+work, and changing it would risk the user's 1000 Hz controller polling. The
+note-render update is visible but much smaller in this capture (about 114
+sampled CPU ms in one generic specialization). The export cannot establish
+whether the 43.75 ms interval came from garbage collection, a note burst, a
+driver wait, or another thread.
+
+Reviewing the older source archive uncovered two worthwhile but unproven
+renderer leads. First, the whammy texture helper schedules a 200 Hz update from
+each guitar renderer; its CPU fallback calls `Texture2D.Apply` every tick,
+while the GPU path uploads a buffer and dispatches a compute shader. A shared
+200 Hz cap could remove duplicate updates in multiplayer without changing the
+solo cadence, but current logs do not measure its call rate or cost. Current
+GameAssembly string literals confirm the CPU whammy texture and global texture
+still exist; they do not confirm the old scheduler survived unchanged. Any
+runtime patch should therefore remain experimental and preserve controller,
+whammy input, audio, note timing, and sustain scoring.
+
+Second, the older note renderer uses yield-based `GetNextBitPos` and pool-range
+enumerators inside per-frame render loops. Those iterator state machines may
+allocate, but the current obfuscated build's profile does not identify these
+allocations or show the note-renderer loop as a large CPU consumer. A Harmony
+rewrite of renderer loops would be higher risk than the evidence supports, so
+this is a profiling lead rather than a patch target. The safe next focus is to
+confirm current whammy scheduling and compare the already-installed mouse
+experiment with matched traces; neither finding justifies touching scoring or
+controller polling.
+
+The user approved a default-off whammy experiment. v0.4.63 adds a narrowly
+scoped hook for `Texture2D.Apply()` on the object the game assigns to the exact
+`_GlobalWhammyTexture` shader property. While gameplay is active, it permits at
+most one upload every 5 ms (200 Hz) and suppresses closer repeats. The hook is
+installed only while the option is enabled, and the log reports the observed
+texture type plus allowed/skipped upload counts. This targets the old CPU
+texture fallback; it does not hook compute dispatch or affect the GPU
+`RenderTexture` path. Enabling it before loading a song allows the assignment to
+be captured. The experiment leaves Texture2D writes, whammy input, controller
+polling, audio, chart timing, and scoring unchanged. Its actual benefit and
+whether the current build uses that CPU path remain unmeasured, so users should
+compare matched traces and leave it off if the game reports a RenderTexture.

@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.62", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.63", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -272,6 +272,7 @@ public sealed partial class Core : MelonMod
             if (compatible && !settingsOpen && !moveHud && !gameplay)
                 SongSpeedControl.ProcessSelectedSpeedInput(songSpeedStep.Value, now);
             if (!compatible) return;
+            whammyTextureThrottle.Update(HarmonyInstance, throttleWhammyTexture.Value, gameplay);
             if (transition && now - transitionStarted > 30)
             {
                 pendingSection = null;
@@ -418,6 +419,7 @@ public sealed partial class Core : MelonMod
         {
             // Disable on a binding failure instead of retrying bad game calls every frame.
             mouseUiGameplay.Clear(HarmonyInstance);
+            whammyTextureThrottle.Clear(HarmonyInstance);
             compatible = false;
             statsText = "";
             pendingSection = null;
@@ -788,6 +790,8 @@ public sealed partial class Core : MelonMod
     public override void OnDeinitializeMelon()
     {
         mouseUiGameplay.Clear(HarmonyInstance);
+        whammyTextureThrottle.LogSummary();
+        whammyTextureThrottle.Clear(HarmonyInstance);
         timings.Finish();
         aprilFools.Restore();
         visuals.RestoreBeatRenderers();
