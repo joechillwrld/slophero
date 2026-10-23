@@ -1,19 +1,19 @@
-# SlopHero 0.4.49 alpha
+# SlopHero 0.4.50 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.49 adds an optional offline optimization for hidden leaderboard
-motion checks and improves the timing report.** It skips six invisible entry
-updates while the list is fully hidden, then restores them within about 17 ms
-when the list appears or online play begins. The report separates simulation intervals,
-scheduled render callbacks, and Unity GUI repaint intervals; it does not claim
-GPU timing. See the [performance audit](docs/performance-audit.md) for the
-capture analysis and remaining targets. The HUD, controls, and gameplay
-features remain available.
+**Version 0.4.50 reduces idle polling for the optional MIDI and Discord
+performance switches to 10 checks per second.** Controller polling, note
+processing, and gameplay callbacks are unchanged. It also retains v0.4.49's
+offline-only suspension of hidden leaderboard motion checks and its corrected
+timing report. The report measures simulation and CPU-side render callbacks,
+not GPU presentation. See the [performance audit](docs/performance-audit.md)
+for capture analysis and remaining targets. All SlopHero features remain
+available.
 
 ## Install
 
-[Download v0.4.49 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.49-alpha.zip?raw=true)
+[Download v0.4.50 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.50-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -255,6 +255,13 @@ leaderboard entry motion checks only while their score list is fully invisible
 and Clone Hero is offline. Online score displays and visible entries retain
 the game's original behavior. Full settings profiles now include all
 Performance switches.
+
+## 0.4.50 low-frequency optional-service checks
+
+The optional MIDI-input and Discord Rich Presence switches are now serviced
+at 10 Hz instead of being visited on every Unity simulation tick. That cadence
+is sufficient for toggles and service discovery; it leaves controller input
+polling and chart timing untouched.
 
 ## 0.4.31 Performance options
 

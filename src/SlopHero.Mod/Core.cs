@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.49", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.50", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -40,7 +40,7 @@ public sealed partial class Core : MelonMod
     private string? capture;
     private string status = "Starting...", statsText = "";
     private string practiceWaitState = "";
-    private double nextStats, nextOverridePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
+    private double nextStats, nextOverridePass, nextOptionalServicePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
     private bool lastStatsSongPlaying;
     private IntPtr localStatsPlayer;
     private int? pendingSection;
@@ -170,7 +170,14 @@ public sealed partial class Core : MelonMod
         try
         {
             double now = clock.Elapsed.TotalSeconds;
-            optionalServices.Apply(stopMidiInput.Value, disableDiscordPresence.Value, now);
+            // MIDI and Discord service toggles do not participate in guitar
+            // input or note timing. Poll them at 10 Hz instead of once for
+            // every simulation tick on high-refresh/unlocked configurations.
+            if (now >= nextOptionalServicePass)
+            {
+                nextOptionalServicePass = now + .1;
+                optionalServices.Apply(stopMidiInput.Value, disableDiscordPresence.Value, now);
+            }
             if (Input.GetKeyDown(KeyCode.F8))
             {
                 if (moveHud || resizeTarget >= 0) { moveHud = false; resizeTarget = -1; resizeHandle = -1; resizeMoveDragging = false; settingsOpen = true; }

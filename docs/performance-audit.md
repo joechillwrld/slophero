@@ -2,6 +2,40 @@
 
 ## Live capture findings and measurement correction
 
+### v0.4.49 live capture (30 seconds)
+
+The newly supplied log confirms the v0.4.49 build loaded against the matching
+v1.1.0.6142 files and completed its capture without a SlopHero runtime error.
+The snapshot shows the hidden-leaderboard switch working: the score list was
+active but fully transparent (`alpha=0`), and zero of its six entry `Update`
+components were eligible. The guitar input-viewer branch reported 48 enabled
+sprites; the GHL and drum branches reported none in this run.
+
+The game ran about 2,300 simulation Updates/s with `renderFrameInterval=2`.
+Scheduled render callbacks and GUI repaints both measured about 1,150/s. Their
+interval percentiles were roughly 0.84–0.85 ms at p50, 1.07 ms at p95, and
+1.21–1.22 ms at p99, with maximum intervals of 6.439 ms and 6.495 ms. These
+remain CPU callback cadence measurements, not display FPS, presented-frame
+times, or GPU timings. The 8.392 ms maximum simulation interval is not itself
+evidence of an 8.392 ms rendered-frame hitch.
+
+Rounded callback costs give about 0.79 CPU seconds of measured SlopHero work
+over the 30-second capture (roughly 2.6% of one core): Update 0.004 ms across
+68,998 calls, HUD repaint 0.014 ms across 35,240 calls, performance effects
+0.008 ms across 597 calls, and visual overrides 0.013 ms across 597 calls.
+Nested player/speed and score-graphics buckets are already included in visual
+overrides; FC-ring work is separate and averaged 0.005 ms. These timings do not
+include native Clone Hero work, GPU cost, or driver wait, so the log does not
+support attributing a whole-game performance change to SlopHero.
+
+This capture had several visual/customization options enabled, including FC
+and score colors, highway-side/string/beatline hiding, constant practice speed,
+and the three optional effect suppressors. It is not an A/B comparison, so it
+cannot tell whether those options improve or reduce frame performance. The
+optional MIDI service switch was enabled; v0.4.50 reduces its service-manager
+checks from every simulation tick to 10 Hz. That is a small CPU cleanup, not a
+promised FPS gain, and it does not alter 1000 Hz controller polling.
+
 Earlier versions labeled `Time.unscaledDeltaTime` samples taken from
 `Core.OnUpdate` as whole-frame times. That was incorrect. Clone Hero can run
 multiple simulation Updates for one render, so the 2,320/s sample rate in the
