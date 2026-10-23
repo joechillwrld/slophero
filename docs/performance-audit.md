@@ -803,3 +803,145 @@ or agreed requirements. It also reveals secret song-options menus behind fret
 button sequences and an April-Fools flag toggled by a cheat. The current
 assembly's joke-mode fields and `PongersGame` type enabled a current-version
 suppression hook without changing note scoring or song timing.
+
+### v0.4.58 capture and current note/whammy path check
+
+The latest `Latest.log` confirms SlopHero v0.4.58 loaded against the supplied
+1.1.0.6142 build, with no SlopHero exception during the capture. It records
+2,461 simulation Updates/s and 1,230 scheduled-render and GUI-repaint callbacks/s
+at `renderFrameInterval=2`. The main `Core.OnUpdate` average is 0.002 ms across
+73,833 calls (0.402 ms maximum); the visual-override average is 0.014 ms across
+598 calls; the optional effect pass averages 0.147 ms across 30 calls; and the
+HUD repaint averages 0.061 ms across 321 calls. These named callbacks remain
+small compared with the native game work that is not measured here. The capture
+does not measure GPU presentation time.
+
+I disassembled the relevant methods from the supplied current `GameAssembly.dll`
+using its matching generated dump. `BaseGuitarNoteRenderer.Update` calls
+Unity's `OnDemandRendering.willCurrentFrameRender` before entering the note
+traversal and returns immediately on non-rendering updates. The subsequent
+note traversal is capped at 500 entries. This directly confirms that the
+current game already avoids running its main guitar-note rendering loop on the
+extra simulation ticks visible in the log. Adding a SlopHero throttle there
+would duplicate this optimization and could leave note visuals stale. The
+remaining loop is a real per-render-frame cost, but changing its pooling,
+ordering, or visible-note calculations is high risk for gameplay visuals.
+
+The 2019.4 source dump's whammy path is also concrete: `GuitarNoteRenderer.Start`
+starts `Helper.InvokeRepeating` at 200 Hz. That coroutine yields once per Unity
+frame, then calls its action repeatedly to catch up if more than 5 ms elapsed.
+Each call updates a shared 1024x24 whammy texture: the compute path uploads
+player data and dispatches a kernel; the CPU fallback calls `SetPixels` and
+`Texture2D.Apply`. That is a credible high-value lead in that old build,
+especially for the CPU fallback and catch-up bursts after a hitch.
+
+The current 1.1 native `GuitarNoteRenderer.Start` has a different shape: it
+initializes fields and delegates to the generic base renderer; it does not
+start that old coroutine or create the old renderer-owned texture state. The
+current generated dump still contains whammy input/settings and the
+`_GlobalWhammyTexture` shader-property string, so this does not prove that every
+whammy animation update was removed or moved elsewhere. It does establish that
+the old 200 Hz hook is not present at the old startup site. The old note source
+also had no `yield` inside its note traversal; the yielding was in the repeating
+helper, while song-scan and thread-wait coroutines were menu/loading work.
+
+No additional static game files are needed for this check: the current
+`GameAssembly.dll`, metadata, generated assemblies, and old source tree are
+already available. To decide whether any relocated whammy updater is expensive
+in a live 1.1 run, the useful missing evidence would be a Windows Unity Profiler
+CPU Timeline (Deep Profile off) with the same chart/settings, not another copy
+of the assets. I am leaving the current note and whammy runtime paths untouched
+until that cost and the replacement implementation are confirmed.
+
+### First WPR/WPA CSV export
+
+The first native capture export includes a process-level CPU summary and a GPU
+adapter/process summary. Clone Hero accounts for 15.88% of sampled CPU weight;
+79.29% is attributed to idle threads. This does not show system-wide CPU
+saturation, although one saturated game thread could still limit frame rate.
+The exported CPU `Stack` field is blank for Clone Hero, so this export cannot
+identify which native game methods consumed that CPU. The other sampled
+processes are small individually; for example, WPRUI is 0.34% of weight and
+the visible `equibop.exe` instances together are under 1%.
+
+The GPU export contains only a single `MemoryTransfer` row for the RTX 3060 Ti
+with 29,014.6 microseconds of GPU time and an `Unknown` process. Its 100% is
+the share of this exported table's one row, not 100% GPU utilization. It does
+not establish GPU headroom or identify Clone Hero's graphics workload.
+
+No new ETL capture is needed yet. The existing ETL should be reopened in WPA
+and the Clone Hero CPU row expanded through Thread and Stack before exporting
+again. For the GPU side, export the engine/utilization view with graphics or
+3D engine activity, not just the adapter/process memory-transfer summary. No
+game or mod change is justified by these two summary tables alone.
+
+### 2026-10-23 ETWAnalyzer method export and UI-input lead
+
+The 8 MB `Sloptifine-CPU.csv` is a valid ETWAnalyzer method export for
+Clone Hero PID 7292. It covers 31.1 seconds and contains 21,945 method-address
+rows. Matching the supplied GameAssembly and metadata with Il2CppDumper
+resolves several of the formerly anonymous GameAssembly offsets. This is a
+single trace, with no paired baseline or GPU/presentation table, so it is
+useful for finding active code paths rather than claiming a measured FPS gain.
+
+SlopHero's largest named entries are `Core.OnLateUpdate` (142 ms),
+`Core.OnUpdate` (101 ms), and `Core.OnGUI` (67 ms); the next largest are
+`NativeHudLayout.Apply` (25 ms), `CounterCanvasHud.Refresh` (23 ms),
+`PerformanceOverrides.Apply` (22 ms), and `VisualOverrides.Apply` (21 ms).
+These method times overlap through nested calls and must not be summed as
+exclusive CPU costs. They are consistent with the earlier timed capture:
+SlopHero's managed callbacks are not the dominant lead in this run.
+
+The prominent native lead is the Unity UI mouse-event path. Captured PCs map
+to `EventSystem.Update` (1,610 ms), `StandaloneInputModule.Process`
+(1,484 ms), `StandaloneInputModule.ProcessMouseEvent(int)` (1,451 ms),
+`PointerInputModule.GetMousePointerEventData(int)` (1,394 ms),
+`EventSystem.RaycastAll` (1,358 ms), and `GraphicRaycaster.Raycast`
+(1,105 ms). Unity's shipped UI source confirms the path: the input module
+processes mouse input during `Process`; pointer-data creation calls
+`RaycastAll`; that loops over active raycasters; and a `GraphicRaycaster`
+tests the canvas's registered raycastable graphics. These per-method times
+are inclusive/overlapping profiler attribution, not an additive bill. They
+do show that the mouse/UI path is running frequently during the capture.
+
+The metadata distinguishes Unity's `StandaloneInputModule` from Rewired's
+separate `RewiredStandaloneInputModule`. The observed hot offsets belong to
+Unity's built-in module, so Rewired's `allowMouseInput` property would not
+control this captured path. A narrowly scoped experiment could bypass the
+built-in module's mouse-event handler only while a song is actively playing,
+restoring it when paused or outside gameplay. That would preserve the
+independent controller polling and keyboard/controller UI navigation paths,
+but mouse clicks and hover interactions on gameplay UI would be unavailable
+until pausing. This is now implemented as the default-off Sloptifine option
+`PerformanceSkipGameplayMouseUi` in the Performance tab. It patches only the
+zero-argument `StandaloneInputModule.ProcessMouseEvent()` wrapper, which
+avoids the captured mouse path before it reaches pointer raycasts; the parent
+input module continues into its keyboard/controller navigation. The hook is
+installed only while the setting is enabled and Clone Hero reports active,
+unpaused gameplay. Its existing 20 Hz game-state check controls activation;
+the hook is removed on pause, settings/menu focus, focus loss, transitions,
+scene changes, and shutdown. With the option off, no mouse hook remains
+installed. The preference is included in saved profiles. Instrument polling
+and the 1000 Hz Rewired update are untouched.
+
+The tradeoff is explicit in the menu: mouse clicks and hover interactions on
+gameplay UI are unavailable while a chart is active and return on pause. The
+implementation compiles, but the trace is still a lead rather than an A/B
+result. It does not establish a frame-time gain; that requires a matched run
+with the option off/on and presentation or frame-time measurements.
+
+The trace also attributes 2,116 ms to `Rewired.InputManager_Base.DoUpdate`.
+That is kept intact by design: it is input work, and this profile is no reason
+to change the user's 1000 Hz controller polling. Two GameAssembly `.text`
+addresses (`+0x2FAB159` and `+0x2FAB63D`) receive large inclusive attribution
+but are outside Il2CppDumper's managed-method map. PE unwind data and native
+disassembly show small wrappers around indirect/generic helper code, but no
+reliable source-level identity. I am not attaching hooks or suppressing them
+from an address guess.
+
+Finally, stack-walk collector functions are prominent in the export. They are
+measurement overhead, not Clone Hero work, and the export's inclusive method
+times cannot be used as frame-time percentages. Any future comparison should
+use matched captures and actual PresentMon/GPU timing; another large ETL is
+not needed to justify the mouse-path experiment, but the option's real benefit
+would still need a short A/B after it exists.

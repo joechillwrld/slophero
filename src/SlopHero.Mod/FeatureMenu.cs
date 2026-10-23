@@ -22,6 +22,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> customizeFpsColor = null!;
     private MelonPreferences_Entry<bool> disableHitParticles = null!, disableSustainParticles = null!, disableFretEffects = null!;
     private MelonPreferences_Entry<bool> stopMidiInput = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!, useCanvasCounterHud = null!, freezeComboSmokeScroll = null!;
+    private MelonPreferences_Entry<bool> skipGameplayMouseUi = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
     private readonly VisualOverrides visuals = new();
@@ -31,6 +32,7 @@ public sealed partial class Core
     private readonly OptionalServiceOverrides optionalServices = new();
     private readonly HiddenLeaderboardOverride hiddenLeaderboard = new();
     private readonly ComboSmokeScrollOverride comboSmokeScroll = new();
+    private readonly MouseUiGameplayOverride mouseUiGameplay = new();
     private readonly RuntimeTimings timings = new();
     private string songText = "", editText = "", editLabel = "", editError = "";
     private Action<string>? editApply;
@@ -115,6 +117,7 @@ public sealed partial class Core
         suspendHiddenLeaderboard = preferences.CreateEntry("PerformanceSuspendHiddenLeaderboard", false);
         useCanvasCounterHud = preferences.CreateEntry("PerformanceCanvasCounterHud", false);
         freezeComboSmokeScroll = preferences.CreateEntry("PerformanceFreezeComboSmokeScroll", false);
+        skipGameplayMouseUi = preferences.CreateEntry("PerformanceSkipGameplayMouseUi", false);
         var legacyFreezeLyricsScroll = preferences.CreateEntry("PerformanceFreezeLyricsBackgroundScroll", false);
         if (legacyFreezeLyricsScroll.Value)
         {
@@ -321,13 +324,15 @@ public sealed partial class Core
                 Toggle(stopMidiInput, "Pause drum MIDI polling", x, y + 294);
                 Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to restore)", x, y + 322);
                 Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, y + 350);
-                GUI.Label(new Rect(x + 22, y + 382, 610, 106),
+                Toggle(skipGameplayMouseUi, "Experimental: skip gameplay mouse clicks and hover", x, y + 378);
+                GUI.Label(new Rect(x + 22, y + 410, 610, 104),
                     "Performance toggles start off; April Fools suppression starts on. Fret-effects also pauses " +
                     "its hidden lightning fade scripts. " +
                     "The leaderboard option acts only on the fully hidden offline list. MIDI restores when unchecked; " +
                     "Discord presence needs a game restart to return. Beatline updates require Hide beatlines and " +
-                    "can also suppress its beat effects if April Fools suppression is turned off. " +
-                    "Canvas falls back to the original renderer if it fails.");
+                    "can also suppress its beat effects if April Fools suppression is turned off. Canvas falls back " +
+                    "to the original renderer if it fails. Mouse UI returns on pause; keyboard/controller navigation " +
+                    "and instrument polling are untouched. Mouse actions on gameplay UI are unavailable while playing.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -767,6 +772,7 @@ public sealed partial class Core
             Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
             Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
             Bool("PerformanceFreezeComboSmokeScroll", freezeComboSmokeScroll);
+            Bool("PerformanceSkipGameplayMouseUi", skipGameplayMouseUi);
         }
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
@@ -807,6 +813,7 @@ public sealed partial class Core
         Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput);
         Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
         Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
+        Bool("PerformanceSkipGameplayMouseUi", skipGameplayMouseUi);
         if (values.ContainsKey("PerformanceFreezeComboSmokeScroll"))
             Bool("PerformanceFreezeComboSmokeScroll", freezeComboSmokeScroll);
         else

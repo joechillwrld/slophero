@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.58", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.59", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -102,6 +102,7 @@ public sealed partial class Core : MelonMod
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
         counterCanvas.Clear();
+        mouseUiGameplay.Clear(HarmonyInstance);
         visuals.Clear();
         performance.Clear();
         hiddenLeaderboard.Clear();
@@ -144,6 +145,7 @@ public sealed partial class Core : MelonMod
     {
         SongSpeedControl.ResetMenuCache();
         counterCanvas.Clear();
+        mouseUiGameplay.Clear(HarmonyInstance);
         if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; practiceModeActive = false; }
         settingsOpen = moveHud = hudDragging = false;
         resizeTarget = -1;
@@ -205,6 +207,7 @@ public sealed partial class Core : MelonMod
             {
                 if (moveHud || resizeTarget >= 0) { moveHud = false; resizeTarget = -1; resizeHandle = -1; resizeMoveDragging = false; settingsOpen = true; }
                 else settingsOpen = !settingsOpen;
+                if (settingsOpen || moveHud || resizeTarget >= 0) mouseUiGameplay.Disable(HarmonyInstance);
                 hudDragging = false;
                 nativeMoveTarget = 0;
                 nativeHudDragging = false;
@@ -246,6 +249,7 @@ public sealed partial class Core : MelonMod
                 SavePreferences();
                 UpdateCursor();
             }
+            if (!Application.isFocused && mouseUiGameplay.IsInstalled) mouseUiGameplay.Disable(HarmonyInstance);
             if (capture != null)
             {
                 var binding = InputBinding.Capture();
@@ -306,6 +310,10 @@ public sealed partial class Core : MelonMod
             }
             lastStatsSongPlaying = songPlaying;
             practiceModeActive = ready && game!.globalVariables!.isPracticeEnabled;
+            bool mouseUiGameplayActive = ready && songPlaying && !game!.isPaused && !game.isSongOver
+                && game.coroutinesRunning == 0 && !transition && !settingsOpen && !moveHud
+                && resizeTarget < 0 && Application.isFocused;
+            mouseUiGameplay.Update(HarmonyInstance, skipGameplayMouseUi.Value, mouseUiGameplayActive);
             if (ready) CompletePracticeTransition(game!);
             bool allow = ready && !transition && !settingsOpen && !moveHud && resizeTarget < 0 && Application.isFocused && !game!.isPaused
                 && !game.isSongOver && game.isSongPlaying && game.coroutinesRunning == 0
@@ -403,6 +411,7 @@ public sealed partial class Core : MelonMod
         catch (Exception ex)
         {
             // Disable on a binding failure instead of retrying bad game calls every frame.
+            mouseUiGameplay.Clear(HarmonyInstance);
             compatible = false;
             statsText = "";
             pendingSection = null;
@@ -418,6 +427,7 @@ public sealed partial class Core : MelonMod
     {
         var pause = game.pauseMenu?.GetComponent<PauseMenu>();
         if (pause == null) { Notice("Could not find the game's restart handler."); return; }
+        mouseUiGameplay.Disable(HarmonyInstance);
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
         restartHold.RequireRelease();
@@ -437,6 +447,7 @@ public sealed partial class Core : MelonMod
         pendingSong = game.globalVariables.currentSongEntry.Pointer;
         sourceManager = game.Pointer;
         practiceWaitState = "";
+        mouseUiGameplay.Disable(HarmonyInstance);
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
         restartHold.RequireRelease();
@@ -770,6 +781,7 @@ public sealed partial class Core : MelonMod
 
     public override void OnDeinitializeMelon()
     {
+        mouseUiGameplay.Clear(HarmonyInstance);
         timings.Finish();
         aprilFools.Restore();
         visuals.RestoreBeatRenderers();
