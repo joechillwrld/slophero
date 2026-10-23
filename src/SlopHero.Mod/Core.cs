@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.71", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.72", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -43,7 +43,9 @@ public sealed partial class Core : MelonMod
     private string practiceWaitState = "";
     private double nextStats, nextGameStateRefresh, nextOverridePass, nextOptionalServicePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
     private double nextAprilFoolsPass;
+    private double nextOptionalHookSettingsPass;
     private bool? lastWhammyCapSetting;
+    private bool? lastHighwayPauseSetting;
     private bool aprilFoolsError;
     private bool cheatScannerError;
     private bool gameplayUiEventError;
@@ -114,6 +116,8 @@ public sealed partial class Core : MelonMod
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
         highwayAnimations.Clear(HarmonyInstance);
+        lastHighwayPauseSetting = null;
+        nextOptionalHookSettingsPass = 0;
         if (compatible && gameplay && skipGameplayMouseUi.Value)
             mouseUiGameplay.Update(HarmonyInstance, requested: true, gameplayActive: false);
         if (compatible && gameplay && pauseGameplayUiProcessing.Value)
@@ -123,7 +127,9 @@ public sealed partial class Core : MelonMod
             bool capRequested = throttleWhammyTexture.Value;
             whammyTextureThrottle.Update(HarmonyInstance, capRequested, gameplay);
             lastWhammyCapSetting = capRequested;
-            highwayAnimations.Update(HarmonyInstance, pauseHighwayAnimations.Value, gameplay);
+            bool pauseHighway = pauseHighwayAnimations.Value;
+            highwayAnimations.Update(HarmonyInstance, pauseHighway, gameplay);
+            lastHighwayPauseSetting = pauseHighway;
         }
         visuals.Clear();
         performance.Clear();
@@ -178,6 +184,8 @@ public sealed partial class Core : MelonMod
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
         highwayAnimations.Clear(HarmonyInstance);
+        lastHighwayPauseSetting = null;
+        nextOptionalHookSettingsPass = 0;
         if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; practiceModeActive = false; }
         settingsOpen = moveHud = hudDragging = false;
         resizeTarget = -1;
@@ -310,13 +318,25 @@ public sealed partial class Core : MelonMod
             // Scene transitions already reconcile the hook. While a scene is
             // stable, only a changed preference needs patch work; this path
             // otherwise ran on every unlocked simulation tick.
-            bool capRequested = throttleWhammyTexture.Value;
-            if (lastWhammyCapSetting != capRequested)
+            // These two opt-in Harmony switches only need to react to menu or
+            // profile edits. Poll their preferences at 20 Hz instead of
+            // crossing this check on every unlocked simulation update.
+            if (now >= nextOptionalHookSettingsPass)
             {
-                whammyTextureThrottle.Update(HarmonyInstance, capRequested, gameplay);
-                lastWhammyCapSetting = capRequested;
+                nextOptionalHookSettingsPass = now + .05;
+                bool capRequested = throttleWhammyTexture.Value;
+                if (lastWhammyCapSetting != capRequested)
+                {
+                    whammyTextureThrottle.Update(HarmonyInstance, capRequested, gameplay);
+                    lastWhammyCapSetting = capRequested;
+                }
+                bool pauseHighway = pauseHighwayAnimations.Value;
+                if (lastHighwayPauseSetting != pauseHighway)
+                {
+                    highwayAnimations.Update(HarmonyInstance, pauseHighway, gameplay);
+                    lastHighwayPauseSetting = pauseHighway;
+                }
             }
-            highwayAnimations.Update(HarmonyInstance, pauseHighwayAnimations.Value, gameplay);
             if (transition && now - transitionStarted > 30)
             {
                 pendingSection = null;

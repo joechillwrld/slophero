@@ -1,5 +1,27 @@
 # Performance audit notes
 
+### v0.4.72 source and WPA follow-up
+
+`Core.OnUpdate` was checking the whammy-cap and highway-animation preference
+values on every Clone Hero simulation update, although both are menu/profile
+settings and their hook changes are independent of guitar input. At the
+2,544.6 updates/s seen in the newest solo log, this repeated those two reads
+and comparisons roughly 2,500 times each second. Version 0.4.72 checks them
+at 20 Hz instead, so live changes take effect within 50 ms. Scene changes
+still reconcile immediately. This removes redundant mod work; it is not a
+claim of a measurable FPS increase.
+
+The supplied WPA CPU sample export also maps repeated `GameAssembly.dll`
+samples into Unity UI input paths: `EventSystem`,
+`StandaloneInputModule.ProcessMouseEvent`,
+`PointerInputModule.GetMousePointerEventData`, `GraphicRaycaster`, and
+`RectTransformUtility.RectangleContainsScreenPoint`. This is independent
+support for the existing experimental mouse-UI skip. Rewired's
+`InputManager_Base.OnGUIUpdate` and `ReInput` paths also appear in the sample,
+so the 1000 Hz instrument polling path remains untouched. The export has no
+native symbols for those offsets, and inclusive stack samples do not by
+themselves quantify exclusive CPU time.
+
 ### v0.4.71 online counter source and latest capture
 
 The newest v0.4.70 log is a solo run, so it does not provide evidence about
