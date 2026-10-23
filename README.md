@@ -1,14 +1,19 @@
-# SlopHero 0.4.70 alpha
+# SlopHero 0.4.71 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
 features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.70
-installs the FC ring color hooks only during Gameplay while custom ring colors
-are enabled, removing those Harmony callbacks from the game's setter path
-otherwise. No performance gain is claimed without a matched capture.
+build, compiled against its loader and generated assemblies. Version 0.4.71
+selects the local online counter source by its Rewired controller reference,
+instead of a transient remote-combo flag, and immediately hides the counter HUD
+when its master switch is turned off. It also logs a one-time local-player
+selection message. It leaves audio, note timing, and controller polling alone.
+Version 0.4.70 installs the FC ring color hooks only during Gameplay while
+custom ring colors are enabled, removing those Harmony callbacks from the
+game's setter path otherwise. No performance gain is claimed without a matched
+capture.
 Version 0.4.69 adds a default-off solo-play experiment that pauses the game's highway,
 background-video, and track-fade update while a chart is active. It is visual
 only and may freeze those animations; no performance gain is claimed yet.
@@ -26,7 +31,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.70 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.70-alpha.zip)
+[Download SlopHero v0.4.71 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.71-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

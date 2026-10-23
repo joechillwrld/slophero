@@ -354,7 +354,16 @@ public sealed partial class Core
     {
         bool value = GUI.Toggle(new Rect(x, y, 632, 30), entry.Value, label);
         if (value != entry.Value)
-        { entry.Value = value; preferencesDirty = true; nextStats = 0; }
+        {
+            entry.Value = value;
+            preferencesDirty = true;
+            nextStats = 0;
+            if (ReferenceEquals(entry, showHud) && !value)
+            {
+                counterCanvas.Hide();
+                statsText = "";
+            }
+        }
     }
 
     private GUIStyle? sectionHeaderStyle;

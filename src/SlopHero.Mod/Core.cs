@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.70", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.71", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -476,23 +476,35 @@ public sealed partial class Core : MelonMod
                 {
                     // Scan chart notes only for counter data that is actually
                     // displayed. The song-info HUD doesn't depend on a player.
-                    // Online player arrays can start with a remote guitar.
-                    // Its resolved chart heads and local engine hit counter do
-                    // not describe our run, so use a non-remote input guitar.
+                    // isRemotePlayerPlaying describes remote combo activity,
+                    // not whether this is our player slot. The CHPlayer's
+                    // Rewired Player reference is present for local controllers
+                    // and absent for network-owned remote slots.
+                    bool online;
+                    try
+                    {
+                        var net = CHNetManager.instance;
+                        online = net != null && (int)net.field_Private_ConnectionState_0 != 0;
+                    }
+                    catch { online = true; }
                     var player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled
-                        && !p.isRemotePlayerPlaying && p.inputEnabled
-                        && p.TryCast<GuitarPlayer>() != null && p.engine != null);
-                    if (player != null) localStatsPlayer = player.Pointer;
+                        && p.TryCast<GuitarPlayer>() != null && p.engine != null
+                        && p.player != null && p.player.field_Public_Player_0 != null);
+                    if (player != null)
+                    {
+                        if (localStatsPlayer != player.Pointer)
+                            LoggerInstance.Msg("Counter HUD selected the local controller-backed guitar player.");
+                        localStatsPlayer = player.Pointer;
+                    }
                     else
                     {
                         player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled
-                            && !p.isRemotePlayerPlaying && p.Pointer == localStatsPlayer
-                            && p.TryCast<GuitarPlayer>() != null && p.engine != null);
-                        var net = CHNetManager.instance;
-                        bool online = net != null && (int)net.field_Private_ConnectionState_0 != 0;
+                            && p.Pointer == localStatsPlayer
+                            && p.TryCast<GuitarPlayer>() != null && p.engine != null
+                            && p.player != null && p.player.field_Public_Player_0 != null);
                         if (player == null && !online)
                             player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled
-                                && !p.isRemotePlayerPlaying && p.TryCast<GuitarPlayer>() != null && p.engine != null);
+                                && p.TryCast<GuitarPlayer>() != null && p.engine != null);
                     }
                     if (player == null)
                         statsText = "";

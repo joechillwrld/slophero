@@ -1,5 +1,32 @@
 # Performance audit notes
 
+### v0.4.71 online counter source and latest capture
+
+The newest v0.4.70 log is a solo run, so it does not provide evidence about
+online chart/audio synchronization or network counter correctness. It reports
+2,544.6 simulation Updates/s, p95/p99 Update intervals of 0.58/0.67 ms,
+scheduled-render p95/p99 intervals of 0.97/1.17 ms, and a 0.002 ms average
+SlopHero `OnUpdate`. The counter Canvas sync averaged 0.020 ms over 598 calls;
+its 5.08 ms maximum is a single outlier, and the log notes that this bucket
+does not measure Canvas rendering or GPU work. This does not justify a new
+performance patch or a claim of an FPS gain.
+
+The online counter bug had a clear code-level cause: player selection used
+`isRemotePlayerPlaying`, which Clone Hero updates from remote combo activity
+and which drops back to false when the remote combo resets. The older source
+also has a stable local identity: `CHPlayer.player` (the Rewired controller) is
+present for local players and absent for remote-owned slots. Version 0.4.71
+uses that controller-backed identity for both initial selection and cached
+fallback, then reads the selected guitar engine's existing counters. This
+should prevent remote slots from being mistaken for the local run; online
+verification is still needed. Turning the Counter HUD master switch off now
+hides the Canvas immediately and clears cached display text.
+
+No change here modifies online transport, audio clocks, note scheduling, or
+1000 Hz controller polling. The provided solo log cannot establish the source
+of online-only desync, so those paths remain untouched pending a matching
+online trace or a reproducible paired capture.
+
 ## Sloptifine scope
 
 Sloptifine is the name for SlopHero's performance work. The safe path is
