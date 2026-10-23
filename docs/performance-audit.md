@@ -1,5 +1,113 @@
 # Performance audit notes
 
+## Sloptifine scope
+
+Sloptifine is the name for SlopHero's performance work. The safe path is
+incremental: keep the existing IL2CPP-facing feature controllers, preserve
+their restoration of original game state, and optimize only work shown to be
+active in gameplay. A broad rewrite would put score counters, practice
+transitions, 1000 Hz controller polling, and optional visual hooks at risk
+without evidence that their structure is a bottleneck. Changes should stay
+isolated and reversible, with native gameplay/input methods left alone.
+
+### v0.4.52 live capture and asset follow-up
+
+The latest log confirms v0.4.52 loaded with the matching Clone Hero build and
+completed a 30-second capture without a SlopHero exception or Canvas fallback.
+The optional Canvas counter path was enabled. The capture's one-time snapshot
+found the hidden offline leaderboard at alpha 0 with zero of six entry updates
+eligible, and 48 active guitar input-viewer sprites (zero GHL/drum sprites).
+Ten `CustomFadeProperties`, one `CameraShake`, two `UVScroll`, and one
+`LyricDisplay` components were live. These are now the best concrete visual-only
+objects for continued investigation; their presence alone is not enough reason
+to disable them. The snapshot also found 257 enabled SpriteRenderers under
+active objects, 3 cameras with no render-texture targets, 11 canvases, 3
+animators, 1 active VideoPlayer out of 2, and 1 playing ParticleSystem.
+
+At `renderFrameInterval=2`, Unity ran about 2,371 simulation Updates/s and
+scheduled about 1,186 render callbacks/s. The simulation-Update interval was
+at or below 0.58 ms at p95 and 0.66 ms at p99, with a 36.36 ms maximum. The
+scheduled-render interval was at or below 1.01 ms at p95 and 1.12 ms at p99,
+with a 3.62 ms maximum. This points to mostly steady CPU-side callback cadence
+with one isolated simulation stall; neither stream measures GPU presentation
+or proves an in-game FPS change.
+
+Using the report's rounded averages, the named SlopHero callbacks sum to about
+0.26 CPU seconds over 30 seconds (about 0.9% of one core): Update 0.14 s, HUD
+repaint 0.088 s, visual overrides 0.009 s, performance effects 0.005 s, FC
+rings 0.004 s, and Canvas property synchronization 0.008 s. Nested player/speed
+and score-graphics work is already included in visual overrides. The largest
+reported callback maxima were 0.629 ms for performance effects and 0.611 ms
+for HUD repaint; their means were 0.008 ms and 0.053 ms, respectively. This
+capture is consistent with lower measured mod-side HUD work than the earlier
+IMGUI-heavy captures, but the run
+is not a controlled A/B and the Canvas renderer's GPU cost is not measured.
+The evidence supports keeping the Canvas path available, not claiming a whole-
+game performance gain or enabling it by default yet.
+
+The nine supplied `resources.assets` chunks reassemble to 88,131,400 bytes and
+parse as 24,479 Unity objects, matching the previously recorded inventory.
+They add no live-cost evidence by themselves: most objects are asset or prefab
+templates, and MonoBehaviour script references in this file do not resolve to
+class names. This parsed file has no `MonoScript` objects to bridge those
+references to class names. The fresh runtime snapshot is more useful for
+prioritizing the active candidates above.
+
+Audit correction: I previously described matching component counts as strong
+class-to-path matches. That overstates the evidence. The ten serialized scripts
+under `PracticeSectionMenu/List/Text Mask/Text` happen to match the live
+`CustomFadeProperties` count, but the practice-menu parent is inactive in the
+serialized scene and the supplied assets do not identify those script
+references by class. Likewise, two script references on lyric-background
+objects do not prove they are the two live `UVScroll` instances. The new
+opt-in capture logs actual hierarchy paths for the live candidate classes so
+the next capture can establish those identities directly.
+
+### v0.4.53 lyric scrolling lead
+
+The latest runtime capture found two enabled `UVScroll` components. Native
+inspection at `UVScroll.Update` (RVA `0x144D70`) shows each component advances
+two texture offsets from `Time.deltaTime`, wraps them, then writes the result
+through a `MaterialPropertyBlock` to its SpriteRenderer every simulation tick.
+At the captured 2,371 simulation Updates/s, that is about 4,743 script calls
+and property-block writes each second. This is concrete redundant visual work,
+although the capture cannot measure its CPU time or prove a whole-game FPS
+gain.
+
+Version 0.4.53 adds **F8 → Performance → Freeze lyric background scrolling**,
+off by default. When enabled, it disables only `UVScroll` components directly
+attached to `CurrentLyricBackground` and `nextLyricBackground` below the known
+`HUDCam/Menu Canvas/Lyrics` hierarchy. It does not hide the lyric text or
+background sprites and leaves the base game's background-visibility option
+alone. The mod restores each component's original enabled state when the switch
+turns off or Gameplay ends. It performs no scene search while the switch is off
+and discovers the two components once per song while it is on.
+
+Other leads from the same capture, ranked by what is actually known:
+
+| Candidate | Current evidence | Action |
+| --- | --- | --- |
+| `UVScroll` lyric backgrounds | Two enabled in the capture; each performs per-tick offset and material-property work. | Narrow reversible switch added. Expected gain is small/unknown pending controlled CPU and frame-time comparison. |
+| `CameraShake` | One enabled. Native `Update` returns immediately when its shake-state flag is clear; the heavier path is event-driven while shaking. | Leave alone; no idle hot path established. |
+| `LyricDisplay` | One enabled. Its native `Update` has an early path when there is no current lyric phrase. | Leave alone; disabling it would break an existing lyrics feature and no material cost is shown. |
+| `CustomFadeProperties` | Ten enabled. Native `Update` compares four cached values and returns when unchanged. Scene-path mapping remains unresolved. | Weak lead; avoid suspending text fades until actual live paths and measured cost are known. |
+| `SoftMaskController`, `BlurScaler`, `BeatPulse` | No enabled instances found in this song capture. | Not gameplay targets in this run. |
+| `VideoPlayer` | One of two components enabled in the capture; earlier snapshots did not record whether it was playing. | v0.4.53's capture records active/playing counts. Check for a playing background only if it recurs; the existing game video toggle should remain authoritative. |
+| 3 cameras, 11 canvases, 257 enabled SpriteRenderers, 3 animators | Counts only; they do not measure overdraw, Canvas rebuilds, draw calls, or GPU cost. | Need Unity Profiler/RenderDoc or comparable GPU/CPU profiling before any changes. Avoid disabling scene objects by count alone. |
+
+The opt-in timing capture now logs hierarchy paths for the live camera-shake,
+UV-scroll, lyrics, and custom-fade components, and records whether active video
+players are actually playing. This discovery runs once before the 30-second
+window, not per frame. It is intended to replace object-count guesses with
+component identities in future audits.
+
+The safe rewrite decision is therefore to avoid a wholesale rewrite. The
+current measurements show SlopHero's named callback work is already small
+beside the high-frequency game loop, and the largest remaining uncertainty is
+the cost of the active native visual scripts and GPU/presentation work. Future
+changes should target one measured component at a time, preserve immediate
+restore behavior, and never alter the game's controller polling cadence.
+
 ## Live capture findings and measurement correction
 
 ### v0.4.52 experimental counter Canvas
@@ -22,7 +130,7 @@ Canvas layout, rendering, GPU work, or presentation. A drop in the IMGUI HUD
 bucket therefore cannot by itself prove a game FPS gain. The default render
 path and all note/input/score logic are unchanged.
 
-The opt-in timing snapshot also counts active candidate visual scripts
+The opt-in timing snapshot also counts enabled candidate visual scripts
 (`SoftMaskController`, `BlurScaler`, `CustomFadeProperties`, `BeatPulse`,
 `CameraShake`, `UVScroll`, and `LyricDisplay`), SpriteRenderers, cameras and
 render-texture targets, canvases, animators, video players, and playing particle

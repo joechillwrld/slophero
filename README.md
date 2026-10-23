@@ -1,8 +1,17 @@
-# SlopHero 0.4.52 alpha
+# SlopHero 0.4.53 alpha
+
+**Sloptifine** is the name for SlopHero's performance work: measured, reversible
+optimizations that keep gameplay timing, controller polling, and existing mod
+features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.52 adds an optional Canvas renderer for the counter HUD.** It
+**Version 0.4.53 adds a lyric-background animation optimization.** It
+can pause the two live lyric-background UV updates while leaving the lyrics
+and background sprites visible. The Performance tab keeps this and all other
+optimizations off by default. This is a narrow CPU-side lead; no whole-game FPS
+gain is claimed without a controlled capture. It also retains the optional
+Canvas renderer for the counter HUD. It
 updates retained UI objects only when the counter text, position, or appearance
 changes. The established IMGUI renderer remains the default and handles HUD
 editing; it also takes over if Canvas creation fails. A timing capture now
@@ -12,7 +21,7 @@ for measured limits and current targets.
 
 ## Install
 
-[Download v0.4.52 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.52-alpha.zip?raw=true)
+[Download v0.4.53 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.53-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -286,6 +295,19 @@ An opt-in 30-second timing capture now also logs active counts for visual
 scripts, SpriteRenderers, cameras, canvases, animators, video players, and
 particle systems. Those counts guide future game-side changes; they do not
 disable any native game components.
+
+## 0.4.53 optional lyric-background animation freeze
+
+**F8 → Performance → Freeze lyric background scrolling** is off by default.
+When enabled, SlopHero disables only `UVScroll` components directly attached
+to `CurrentLyricBackground` and `nextLyricBackground` under the Gameplay
+`HUDCam/Menu Canvas/Lyrics` object. It preserves each component's
+original enabled state and restores it when the option is switched off or the
+Gameplay scene ends. The lyrics and background sprites stay visible, and the
+game's own lyric/background visibility options continue to work. Static native
+inspection confirms these two live components advance texture UVs and update a
+material property block on each simulation tick; their actual CPU cost and any
+FPS gain remain unmeasured.
 
 ## 0.4.31 Performance options
 
