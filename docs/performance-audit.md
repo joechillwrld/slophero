@@ -2,31 +2,39 @@
 
 ### 2026-10-23 stack export and source screening
 
-The new `CPU_Usage_(Sampled)_Utilization_by_Process,_Thread,_Stack.csv` is a
-valid stack-bearing WPA export: it contains 113,554 Clone Hero samples and
-113.741 seconds of sampled CPU weight across a 42.28-second capture. It has
-Thread IDs and stacks on 82.5% of Clone Hero rows; 17.5% are `n/a`.
+The ZIP contains a valid stack-bearing export: 303,528 rows overall, including
+113,554 Clone Hero samples with 113,740.986 ms of sampled weight. The CSV has
+only `Process`, `Thread ID`, `Stack`, `Count`, `Weight`, `TimeStamp`, and
+`% Weight` columns. It contains no `Address` or `Thread Name` values. The View
+Editor can show those column names, but the attempted profile did not make the
+fields populate in this export; dragging them around or exporting again is not
+useful for this trace. The gold divider only changes grouping.
 
-Thread 13808 carries 37.066 seconds of weight (32.6% of the process total),
-with stacks passing through UnityPlayer/GameAssembly. It is the busiest
-observed Clone Hero thread; the export does not provide a thread name to prove
-whether it is the main or render thread. Those modules have no resolved
-symbols or addresses in this export. UnityPlayer occurs in 67.2% of all stack weight, GameAssembly in
-8.8%, NVIDIA user driver in 12.6%, and MelonLoader in 1.4%; these stack
-memberships overlap and are not exclusive module costs. The named
-`ComponentSiblingFix` callback accounts for about 183 ms, too little to
-prioritize ahead of the unresolved Unity/game path. Several stacks end in
-Windows ETW stack-walk/unwind functions, so the capture itself also contributes
-measurement work; those are not a game hook target.
+The largest inclusive module attributions are UnityPlayer (67.17%),
+`ntoskrnl.exe` (40.96%), NVIDIA's `nvwgf2umx.dll` (12.58%), GameAssembly
+(8.75%), `version.dll` (8.22%), and D3D11 (7.76%). These percentages overlap
+because one sample stack can contain several modules; they are not exclusive
+CPU shares. Nearly all UnityPlayer and GameAssembly frames are marked
+`<PDB not found>`, so this export does not identify the game's native methods.
+Named D3D11 queue-submit/present calls and Windows synchronization routines
+recur, but their inclusive weights do not prove a GPU bottleneck or that a
+thread spent the full interval blocked. Some samples include ETW stack-walk and
+unwind functions, so measurement overhead is also present in the capture.
 
-The uploaded WPA profile already contains `Address`, `Function`, `Module`, and
-`Thread Name` columns but leaves them hidden. A companion profile at
-`profiling/SloptifineNativeStacks.wpaProfile` exposes those columns alongside
-the existing stack and weight columns, allowing the same ETL to provide the
-instruction addresses needed to map the native hot path. No new recording is
-needed. The address column should be checked in the resulting table before
-export; the current export proves the stack path is correct, not that symbols
-are resolved.
+Thread ID 13808 carries 37.066 seconds of weight (32.59% of Clone Hero's
+sampled total); 26.13% of its own weight includes a GameAssembly frame. The
+export does not identify that thread's role. `n/a` stacks are 19,847 rows and
+17.50% of sampled weight. The resolved `ComponentSiblingFix` path contributes
+182.6 ms (0.16% of total sampled weight), too little to justify a loader patch.
+
+The companion log identifies SlopHero v0.4.73. Its snapshots show the mouse-UI
+hook installed but not suppressed, the cheat scanner already disabled or
+missing, and the broad UI-event hook not suspended; those snapshots do not
+validate these options as active during the timed windows. The managed timing
+bucket reports `OnUpdate` averaging 0.002 ms at about 2,600 calls/s, roughly
+0.5% of one core. That measured callback is a minor target beside the
+unresolved native workload. The export provides broad module/thread context,
+but no new safe native patch target.
 
 The older source adds two ideas that are not safe to patch from source alone.
 `GameManager.Update` calls `NoteAnimator.AnimatorUpdate` every simulation
@@ -39,6 +47,10 @@ refresh menu button hints when the active controller type changes. A low-rate
 menu-only refresh may be safe, though current live instance counts and CPU cost
 are unknown. Both are profiling leads, not claimed wins; gameplay input and
 note timing remain untouched.
+
+For future method-level native attribution, the ETL must supply actual
+per-sample instruction addresses. The saved view profile did not expose them
+in this export, so do not repeat the WPA column changes for this file.
 
 ### v0.4.75 trace findings and mouse-path verification
 
