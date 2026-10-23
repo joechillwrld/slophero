@@ -161,6 +161,37 @@ the 50 ms cadence for actual visual overrides, and the one-second effect
 discovery cadence, unchanged. It is a small, code-level reduction in SlopHero
 work; no whole-game frame-rate gain is claimed without a new matched capture.
 
+### v0.4.56 follow-up and v0.4.57 changes
+
+The new 0.4.56 log loaded without a SlopHero error and recorded 30 performance-
+effect calls during 30 seconds, matching the controller's one-second schedule.
+It also shows the combo-smoke setting enabled while both known local
+`UVScroll` objects remain enabled (`tracked/paused=0/0`). The older capture had
+tracked both, so this is a real regression in discovery conditions to fix. The
+discovery filter required `inputEnabled`; the live game can temporarily report
+that false while the local player's visual hierarchy is already present. The
+0.4.57 search therefore includes enabled nonremote player guitars and compares
+the child transform pointer with the intended multiplier parent. Remote
+players remain excluded.
+
+The 0.4.56 simulation p95/p99 intervals were 0.56/0.63 ms and scheduled-render
+p95/p99 were 0.95/1.03 ms, slightly above the prior run's 0.54/0.60 and
+0.93/1.00 ms. These differences are small and the callback rates are not
+display-FPS measurements. The capture also had isolated 2.37 ms HUD repaint
+and 4.74 ms Canvas-sync maxima; the means were 0.054 and 0.021 ms. The Canvas
+sync spike is not enough to justify changing counter refresh behavior without
+a repeat capture.
+
+The hidden-leaderboard override previously checked online state, canvas
+visibility, and six component states at 60 Hz. Version 0.4.57 performs that
+visual-only poll at 20 Hz, consistent with the other menu overrides; on
+visibility, the six entries resume within 50 ms. This cuts two thirds of those
+mod-side checks while preserving offline-only behavior and prompt restoration.
+The F8 window now follows the user's left-sidebar mockup. Its editable accent
+color is used on the title bar, selected category, and resize outline and is
+included in color themes. The menu remains centered, and its controls have no
+draw/update cost while closed.
+
 The safe rewrite decision is therefore to avoid a wholesale rewrite. The
 current measurements show SlopHero's named callback work is already small
 beside the high-frequency game loop, and the largest remaining uncertainty is

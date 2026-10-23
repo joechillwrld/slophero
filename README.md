@@ -1,4 +1,4 @@
-# SlopHero 0.4.56 alpha
+# SlopHero 0.4.57 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
@@ -6,12 +6,18 @@ features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.56 cleans up the settings menu with consistent checkboxes,
-renames the performance page to Sloptifine, and reduces repeat work from the
-optional performance-effects switches.** Their cached effects are checked at
-the existing one-second interval, and those switches no longer trigger the
-separate visual override pass every 50 ms. Settings still take effect
-immediately, and disabled effects restore their original state. A matched
+**Version 0.4.57 reshapes the settings window into a sidebar and options panel,
+adds an editable accent color, and trims two more performance paths.** The
+accent colors the title bar, selected page, and HUD resize outline; it can be
+typed or adjusted with the existing color sliders and is saved in color themes.
+The hidden offline leaderboard visibility check now runs at 20 Hz instead of
+60 Hz, restoring its six motion components within 50 ms when it appears. The
+combo-smoke switch now finds the active nonremote guitar even while the game
+temporarily reports its input as disabled. Version 0.4.56 also reduced repeat
+work from the optional performance-effects switches: their cached effects are
+checked at the existing one-second interval, and those switches no longer
+trigger the separate visual override pass every 50 ms. Settings still take
+effect immediately, and disabled effects restore their original state. A matched
 0.4.54/0.4.55 capture recorded simulation and scheduled-render callback rates
 about 6% higher with the ten fret-fade scripts paused. That is encouraging
 callback evidence, not a GPU presentation measurement or a whole-game FPS
@@ -26,7 +32,7 @@ targets.
 
 ## Install
 
-[Download v0.4.56 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.56-alpha.zip?raw=true)
+[Download v0.4.57 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.57-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -56,7 +62,7 @@ Backspace removes the last digit; Delete clears the entry; Escape cancels the ed
 game's normal left/right controls to change the value by the configured step (5%
 by default). Set that step on the SlopHero **Controls** page.
 
-F8 has nine pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, and **Sloptifine**. The page buttons use two centered rows so every title stays readable. Boolean options use checkboxes throughout, so their state is visible without extra On/Off text.
+F8 has nine pages: **General**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, and **Sloptifine**. The centered window uses a left category sidebar and a separate options panel. Boolean options use checkboxes throughout. The **Menu accent** color on the Colors page applies to the title bar, selected page, and resize outline; it is included in color themes.
 
 - Click a numeric or color value and type a replacement. Enter or **Apply** saves;
   Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.
@@ -300,6 +306,24 @@ An opt-in 30-second timing capture now also logs active counts for visual
 scripts, SpriteRenderers, cameras, canvases, animators, video players, and
 particle systems. Those counts guide future game-side changes; they do not
 disable any native game components.
+
+## 0.4.57 settings sidebar and performance follow-up
+
+The settings window now uses a left category rail and a separate right-side
+options area. Its purple accent can be edited on the Colors page, shown in the
+color preview, and saved with color themes. The color is applied to the title
+bar, selected page, and resize outlines. The window remains centered and its
+checkboxes and other menu controls are only drawn while F8 is open.
+
+The hidden-offline-leaderboard option now checks visibility at 20 Hz rather
+than 60 Hz, reducing repeated network, canvas, and six-entry checks; the
+entries restore within 50 ms when the list appears. The combo-smoke discovery
+also no longer requires Clone Hero's `inputEnabled` flag during transitions,
+and it checks the parent by IL2CPP object pointer. The 0.4.56 capture showed
+the two live smoke scrollers still enabled with this option on, so this target
+fix is based on that live-path mismatch. The new log's main callback percentiles
+were close to the prior run but slightly slower; isolated 2–5 ms HUD/Canvas
+callback spikes need another capture to determine whether they recur.
 
 ## 0.4.56 optional effect-update reductions and menu cleanup
 

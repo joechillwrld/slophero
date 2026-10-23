@@ -9,13 +9,13 @@ namespace SlopHero.Mod;
 
 public sealed partial class Core
 {
-    private static readonly string[] SettingsPages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Sizing", "Profiles", "Sloptifine" };
+    private static readonly string[] SettingsPages = { "General", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Sizing", "Profiles", "Sloptifine" };
     private MelonPreferences_Entry<bool> showMisses = null!, showHit = null!, showGhosts = null!, showBest = null!;
     private MelonPreferences_Entry<bool> showSong = null!, showTitle = null!, showArtist = null!, showCharter = null!, showSpeed = null!;
     private MelonPreferences_Entry<int> songX = null!, songY = null!, songFont = null!;
     private MelonPreferences_Entry<float> practiceHudX = null!, practiceHudY = null!, fpsHudX = null!, fpsHudY = null!;
     private MelonPreferences_Entry<float> songOpacity = null!;
-    private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!;
+    private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!, menuAccentHex = null!;
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
     private MelonPreferences_Entry<bool> customizeFpsColor = null!;
     private MelonPreferences_Entry<bool> disableHitParticles = null!, disableSustainParticles = null!, disableFretEffects = null!;
@@ -34,6 +34,7 @@ public sealed partial class Core
     private bool replaceEdit, moveSong, editColor;
     private Color editPreview = Color.white;
     private GUIStyle? colorPreviewStyle;
+    private GUIStyle? menuNavStyle, menuHeaderStyle, menuPageTitleStyle;
     private int settingsPage;
     private bool profileDropdownOpen;
     private int profileListStart;
@@ -125,6 +126,7 @@ public sealed partial class Core
         progressColor = preferences.CreateEntry("ProgressColor", "00FFFF");
         scoreColor = preferences.CreateEntry("ScoreTextColor", "FFFFFF");
         InitializeSongSpeedMenu();
+        menuAccentHex = preferences.CreateEntry("MenuAccentColor", "A000FF");
     }
 
     private void DrawSettings()
@@ -136,7 +138,7 @@ public sealed partial class Core
         float scale = Math.Clamp(settingsMenuScale.Value, .85f, 1.4f);
         Matrix4x4 previousMatrix = GUI.matrix;
         float centerX = Screen.width * .5f, centerY = Screen.height * .5f;
-        scale = Math.Min(scale, Math.Min(Math.Max(.5f, (Screen.width - 20f) / 680f), Math.Max(.5f, (Screen.height - 20f) / 660f)));
+        scale = Math.Min(scale, Math.Min(Math.Max(.5f, (Screen.width - 20f) / 900f), Math.Max(.5f, (Screen.height - 20f) / 660f)));
         GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), new Vector2(centerX, centerY));
         try { DrawScaledSettingsPage(scale); }
         finally { GUI.matrix = previousMatrix; }
@@ -144,30 +146,59 @@ public sealed partial class Core
 
     private void DrawScaledSettingsPage(float scale)
     {
-        // Keep the unscaled panel centered in screen coordinates; the GUI matrix
-        // scales around the screen center, so its visible bounds remain centered.
-        float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "Sloptifine · SlopHero 0.4.56 — F8 / Escape to close");
-        // Two rows keep every page title readable. The old single row made
-        // nine narrow tabs that clipped labels such as "Sloptifine".
-        const int tabColumns = 5;
-        float tabWidth = 656f / tabColumns;
-        for (int i = 0; i < SettingsPages.Length; i++)
+        // Keep the centered window, with a left category rail and a separate
+        // options surface modeled on the user's mockup.
+        const float menuWidth = 900, menuHeight = 660, sidebarWidth = 220;
+        float frameX = (Screen.width - menuWidth) / 2f, frameY = (Screen.height - menuHeight) / 2f;
+        float x = frameX + sidebarWidth + 24, y = frameY + 102;
+        Color previousColor = GUI.color, previousBackground = GUI.backgroundColor;
+        try
         {
-            int row = i / tabColumns, column = i % tabColumns;
-            int rowCount = row == 0 ? tabColumns : SettingsPages.Length - tabColumns;
-            float rowOffset = (656f - rowCount * tabWidth) * .5f;
-            Color oldBackground = GUI.backgroundColor;
-            try
+            GUI.color = Color.white;
+            GUI.backgroundColor = new Color(.12f, .12f, .12f, 1);
+            GUI.Box(new Rect(frameX, frameY, menuWidth, menuHeight), "");
+            GUI.backgroundColor = new Color(.09f, .09f, .09f, 1);
+            GUI.Box(new Rect(frameX, frameY, sidebarWidth, menuHeight), "");
+            GUI.backgroundColor = new Color(.34f, .34f, .34f, 1);
+            GUI.Box(new Rect(frameX + sidebarWidth, frameY, menuWidth - sidebarWidth, menuHeight), "");
+
+            menuHeaderStyle ??= new GUIStyle(GUI.skin.box) { fontSize = 21, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            menuHeaderStyle.normal.textColor = Color.white;
+            GUI.backgroundColor = MenuAccentColor();
+            GUI.Box(new Rect(frameX, frameY, sidebarWidth, 54), "Mod Settings", menuHeaderStyle);
+
+            menuNavStyle ??= new GUIStyle(GUI.skin.button) { fontSize = 18, alignment = TextAnchor.MiddleLeft };
+            var navPadding = menuNavStyle.padding;
+            navPadding.left = 14;
+            menuNavStyle.padding = navPadding;
+            menuNavStyle.normal.textColor = Color.white;
+            menuNavStyle.hover.textColor = Color.white;
+            menuPageTitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+            menuPageTitleStyle.normal.textColor = Color.white;
+
+            const float navTop = 66, navRowHeight = 44;
+            for (int i = 0; i < SettingsPages.Length; i++)
             {
-                if (settingsPage == i) GUI.backgroundColor = MenuAccentColor(0);
-                if (GUI.Button(new Rect(x + 12 + rowOffset + column * tabWidth, y + 32 + row * 32, tabWidth - 4, 30), SettingsPages[i])) settingsPage = i;
+                var rect = new Rect(frameX + 8, frameY + navTop + i * navRowHeight, sidebarWidth - 16, navRowHeight - 2);
+                bool selected = settingsPage == i;
+                bool hovered = rect.Contains(Event.current.mousePosition);
+                GUI.backgroundColor = selected ? MenuAccentColor()
+                    : hovered ? Color.Lerp(new Color(.14f, .14f, .14f, 1), MenuAccentColor(), .22f)
+                    : (i % 2 == 0 ? new Color(.14f, .14f, .14f, 1) : new Color(.22f, .22f, .22f, 1));
+                if (GUI.Button(rect, SettingsPages[i], menuNavStyle)) settingsPage = i;
             }
-            finally { GUI.backgroundColor = oldBackground; }
+
+            GUI.backgroundColor = MenuAccentColor();
+            GUI.Box(new Rect(frameX + sidebarWidth, frameY, menuWidth - sidebarWidth, 5), "");
+            GUI.backgroundColor = new Color(.34f, .34f, .34f, 1);
+            GUI.Label(new Rect(frameX + sidebarWidth + 24, frameY + 16, 632, 32), SettingsPages[settingsPage], menuPageTitleStyle);
+            GUI.Label(new Rect(frameX + sidebarWidth + 24, frameY + 52, 632, 22), "Pause to edit. Values save automatically; Escape closes.");
         }
-        x += 24; y += 112;
-        GUI.Label(new Rect(x, y, 632, 25), "Pause to edit. Click values to type. Enter applies; Escape cancels.");
-        y += 34;
+        finally
+        {
+            GUI.color = previousColor;
+            GUI.backgroundColor = previousBackground;
+        }
         switch (settingsPage)
         {
             case 0:
@@ -220,6 +251,7 @@ public sealed partial class Core
                 Hex(starColor, "Stars", x, y + 176); Hex(progressColor, "Star progress bar", x, y + 218);
                 Hex(scoreColor, "Score / accuracy text", x, y + 260);
                 Hex(songProgressColor, "Song progress bar", x, y + 302);
+                Hex(menuAccentHex, "Menu accent", x, y + 344);
                 break;
             case 5:
                 GUI.Label(new Rect(x, y, 540, 28), "Native game HUD. Offsets use the UI canvas's units.");
@@ -256,7 +288,7 @@ public sealed partial class Core
                     var oldBackground = GUI.backgroundColor;
                     try
                     {
-                        if (resizeSelection == i) GUI.backgroundColor = MenuAccentColor(0);
+                        if (resizeSelection == i) GUI.backgroundColor = MenuAccentColor();
                         if (GUI.Button(new Rect(x + rowOffset + column * (buttonWidth + 4), y + 332 + row * 36, buttonWidth, 32), ResizeTargetLabels[i])) resizeSelection = i;
                     }
                     finally { GUI.backgroundColor = oldBackground; }
@@ -529,7 +561,7 @@ public sealed partial class Core
             // is already supported by the game's runtime and gives us the same
             // simple filled rectangles for the outline and handles.
             GUI.color = Color.white;
-            GUI.backgroundColor = MenuAccentColor(0);
+            GUI.backgroundColor = MenuAccentColor();
             const float line = 5;
             GUI.Box(new Rect(rect.xMin, rect.yMin, rect.width, line), "");
             GUI.Box(new Rect(rect.xMin, rect.yMax - line, rect.width, line), "");
@@ -667,7 +699,17 @@ public sealed partial class Core
         }
     }
 
-    private static Color MenuAccentColor(int _) => new(.22f, .48f, .62f, 1);
+    private Color MenuAccentColor()
+    {
+        string hex = string.IsNullOrWhiteSpace(menuAccentHex.Value) ? "A000FF" : menuAccentHex.Value;
+        if (parsedColors.TryGetValue(hex, out var cached)) return cached;
+        Color color;
+        try { color = ParseColor(hex); }
+        catch (FormatException) { color = new Color(.63f, 0, 1, 1); }
+        if (parsedColors.Count > 64) parsedColors.Clear();
+        parsedColors[hex] = color;
+        return color;
+    }
 
     private void SaveProfile(string name, bool colorsOnly)
     {
@@ -717,6 +759,7 @@ public sealed partial class Core
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
         Text("ProgressColor", progressColor); Text("ScoreTextColor", scoreColor); Text("SongProgressColor", songProgressColor); Text("FpsTextColor", fpsTextColor);
+        Text("MenuAccentColor", menuAccentHex);
         if (colorsOnly)
         {
             Float("TextRed", textRed); Float("TextGreen", textGreen); Float("TextBlue", textBlue); Float("BackgroundOpacity", backgroundOpacity); Float("SongBackgroundOpacity", songOpacity);
@@ -763,6 +806,7 @@ public sealed partial class Core
         }
         Hex("SongTextColor", songColor); Hex("FcColor", fcColor); Hex("PerfectFcColor", pfcColor); Hex("StarColor", starColor);
         Hex("ProgressColor", progressColor); Hex("ScoreTextColor", scoreColor); Hex("SongProgressColor", songProgressColor); Hex("FpsTextColor", fpsTextColor);
+        Hex("MenuAccentColor", menuAccentHex);
         return invalid;
     }
 
@@ -955,7 +999,10 @@ public sealed partial class Core
         double now = clock.Elapsed.TotalSeconds;
         if (now >= nextHiddenLeaderboardPass)
         {
-            nextHiddenLeaderboardPass = now + 1d / 60d;
+            // The hidden score-list is visual-only. A 50 ms visibility poll
+            // matches the other menu overrides and avoids checking the group
+            // and its six entries at 60 Hz.
+            nextHiddenLeaderboardPass = now + .05;
             if (!hiddenLeaderboardError && (suspendHiddenLeaderboard.Value || hiddenLeaderboard.NeedsRestore))
             {
                 try { hiddenLeaderboard.Apply(suspendHiddenLeaderboard.Value, now); }

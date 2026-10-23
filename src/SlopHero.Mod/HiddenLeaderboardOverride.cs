@@ -6,7 +6,7 @@ namespace SlopHero.Mod;
 /// <summary>
 /// Optional skip for the six leaderboard motion checks while their parent
 /// score list is fully invisible. Entry data, network requests, and rendering
-/// are left alone. Components are restored on the next 60 Hz visibility check.
+/// are left alone. Components are restored within 50 ms of the list appearing.
 /// </summary>
 internal sealed class HiddenLeaderboardOverride
 {

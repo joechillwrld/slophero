@@ -73,14 +73,16 @@ internal sealed class ComboSmokeScrollOverride
     private void Discover(GameManager? game, double realtime)
     {
         // Run only while the opt-in switch is enabled, and anchor discovery to
-        // the active local input guitar so online opponents remain untouched.
+        // active nonremote guitars so online opponents remain untouched. The
+        // game can keep inputEnabled false during transitions even while the
+        // local guitar's cosmetic hierarchy is already live.
         nextDiscovery = realtime + 2;
         try
         {
             if (game?.playerObjects == null) return;
             foreach (var player in game.playerObjects)
             {
-                if (player == null || !player.enabled || player.isRemotePlayerPlaying || !player.inputEnabled) continue;
+                if (player == null || !player.enabled || player.isRemotePlayerPlaying) continue;
                 var guitar = player.TryCast<GuitarPlayer>();
                 if (guitar == null) continue;
                 var multiplier = guitar.transform.Find("Combo/multiplier");
@@ -88,7 +90,9 @@ internal sealed class ComboSmokeScrollOverride
 
                 foreach (var component in multiplier.GetComponentsInChildren<UVScroll>(true))
                 {
-                    if (component == null || component.transform.parent != multiplier) continue;
+                    if (component == null) continue;
+                    var parent = component.transform.parent;
+                    if (parent == null || parent.Pointer != multiplier.Pointer) continue;
                     string objectName = component.gameObject.name;
                     if (objectName != "smoke_combo_fast" && objectName != "smoke_combo_slow") continue;
                     if (states.ContainsKey(component.Pointer)) continue;
