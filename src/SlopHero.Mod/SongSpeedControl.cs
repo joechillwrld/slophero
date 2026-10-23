@@ -20,6 +20,7 @@ internal static class SongSpeedControl
     private const string UpdateValueMethod = "ʸʾʵʽʳʾʾʻʷʲʽ";
     private static IntPtr speedSettingField;
     private static Il2Cpp.SongOptions? songOptions;
+    private static double nextMenuLookupAt;
     private static bool trackingMenuSpeed;
     private static bool checkedLowSpeedRecovery;
     private static double nextLowSpeedRecoveryAttempt;
@@ -43,10 +44,15 @@ internal static class SongSpeedControl
         KeyCode.Keypad5, KeyCode.Keypad6, KeyCode.Keypad7, KeyCode.Keypad8, KeyCode.Keypad9
     };
 
-    public static bool IsSpeedOptionOpen()
+    public static bool IsSpeedOptionOpen(double now)
     {
         if (songOptions == null || songOptions.Pointer == IntPtr.Zero)
         {
+            // The option is absent on most non-gameplay screens. A scene-wide
+            // GameObject.Find at an unlocked menu FPS can otherwise run
+            // thousands of times per second. Once found, input stays per-frame.
+            if (now < nextMenuLookupAt) return false;
+            nextMenuLookupAt = now + .05;
             var optionsObject = GameObject.Find("SongOptions");
             if (optionsObject == null) return false;
             songOptions = optionsObject.GetComponent<Il2Cpp.SongOptions>();
@@ -58,6 +64,7 @@ internal static class SongSpeedControl
     public static void ResetMenuCache()
     {
         songOptions = null;
+        nextMenuLookupAt = 0;
         trackingMenuSpeed = false;
         checkedLowSpeedRecovery = false;
         nextLowSpeedRecoveryAttempt = 0;
@@ -92,7 +99,7 @@ internal static class SongSpeedControl
             return;
         }
 
-        if (!IsSpeedOptionOpen() || !TryRead(out int current))
+        if (!IsSpeedOptionOpen(now) || !TryRead(out int current))
         {
             if (editingSpeed && speedEntry.TryGetSpeed(out int pendingSpeed))
                 TryWrite(pendingSpeed);

@@ -191,7 +191,12 @@ internal sealed class VisualOverrides
         if (!sides && !strings && !beats && !score && !constantSpeed && hidden.Count == 0 && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
         bool playerPassNeeded = sides != oldSides || strings != oldStrings || beats != oldBeats
             || practiceChanged || constantSpeed != oldConstantSpeed || refreshScoreColors;
-        if (playerPassNeeded || realtime >= nextPlayerPass)
+        bool playerEffectsActive = sides || strings || beats || constantSpeed
+            || hidden.Count != 0 || speeds.Count != 0;
+        // Score-only customization needs the player accuracy text at 5 Hz.
+        // It does not need the otherwise unconditional 10-Hz scan of every
+        // player, neck, and note renderer between color refreshes.
+        if (playerPassNeeded || (playerEffectsActive && realtime >= nextPlayerPass))
         {
             nextPlayerPass = realtime + .1;
             long playerTiming = timings.Begin();

@@ -41,6 +41,7 @@ public sealed partial class Core : MelonMod
     private string practiceWaitState = "";
     private double nextStats, nextOverridePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
     private bool lastStatsSongPlaying;
+    private IntPtr localStatsPlayer;
     private int? pendingSection;
     private IntPtr pendingSong;
     private IntPtr sourceManager;
@@ -109,6 +110,7 @@ public sealed partial class Core : MelonMod
         nextStats = 0;
         finalStatsRefreshUntil = 0;
         lastStatsSongPlaying = false;
+        localStatsPlayer = IntPtr.Zero;
         nextOverridePass = 0;
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
@@ -278,8 +280,23 @@ public sealed partial class Core : MelonMod
                 {
                     // Scan chart notes only for counter data that is actually
                     // displayed. The song-info HUD doesn't depend on a player.
-                    var player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled);
-                    if (player == null || player.TryCast<GuitarPlayer>() == null || player.engine == null)
+                    // Online player arrays can start with a remote guitar.
+                    // Its resolved chart heads and local engine hit counter do
+                    // not describe our run, so use the input-enabled guitar.
+                    var player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled
+                        && p.inputEnabled && p.TryCast<GuitarPlayer>() != null && p.engine != null);
+                    if (player != null) localStatsPlayer = player.Pointer;
+                    else
+                    {
+                        player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled
+                            && p.Pointer == localStatsPlayer && p.TryCast<GuitarPlayer>() != null && p.engine != null);
+                        var net = CHNetManager.instance;
+                        bool online = net != null && (int)net.field_Private_ConnectionState_0 != 0;
+                        if (player == null && !online)
+                            player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled
+                                && p.TryCast<GuitarPlayer>() != null && p.engine != null);
+                    }
+                    if (player == null)
                         statsText = "";
                     else
                     {
@@ -445,7 +462,10 @@ public sealed partial class Core : MelonMod
         GUI.color = Color.white;
         try
         {
-            if ((showHud.Value && gameplay && !string.IsNullOrEmpty(statsText)) || settingsOpen || moveHud || resizeTarget == 0)
+            // The settings page must not force a counter preview after the
+            // master switch is turned off. Only explicit move/resize modes
+            // show a placeholder for a hidden HUD.
+            if (counterHudVisible || nativeMoveTarget != 0 || (moveHud && !moveSong) || resizeTarget == 0)
             {
                 if (nativeMoveTarget != 0) DrawNativeHudMove();
                 else

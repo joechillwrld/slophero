@@ -106,8 +106,14 @@ internal sealed class PerformanceOverrides
             particles.Add(system.Pointer, (system, system.gameObject, system.gameObject.activeSelf));
         try
         {
-            system.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            system.gameObject.SetActive(false);
+            // Pools may reactivate an effect after a hit. Suppress it then,
+            // without restarting and deactivating an already-idle object on
+            // every one-second discovery pass.
+            if (system.gameObject.activeSelf)
+            {
+                system.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                system.gameObject.SetActive(false);
+            }
         }
         catch { }
     }
@@ -115,14 +121,14 @@ internal sealed class PerformanceOverrides
     private void Disable(Animator animator)
     {
         if (!animators.ContainsKey(animator.Pointer)) animators.Add(animator.Pointer, (animator, animator.enabled));
-        try { animator.enabled = false; } catch { }
+        try { if (animator.enabled) animator.enabled = false; } catch { }
         try
         {
             foreach (var renderer in animator.GetComponentsInChildren<Renderer>(true))
             {
                 if (renderer == null) continue;
                 if (!renderers.ContainsKey(renderer.Pointer)) renderers.Add(renderer.Pointer, (renderer, renderer.enabled));
-                renderer.enabled = false;
+                if (renderer.enabled) renderer.enabled = false;
             }
         }
         catch { }
@@ -180,10 +186,14 @@ internal sealed class OptionalServiceOverrides
         bool changed = disableMidi != stopMidi || disableDiscord != disableRichPresence;
         disableMidi = stopMidi;
         disableDiscord = disableRichPresence;
+        // Both switches default off. Skip service discovery entirely until a
+        // user opts in, or a previously suppressed service needs restoring.
+        if (!stopMidi && !disableRichPresence && !discordSuppressedForSession
+            && midi == null && discord == null) return;
         if (!changed && realtime < nextDiscovery) return;
         nextDiscovery = realtime + .5;
 
-        var currentMidi = MIDIInputManager.instance;
+        var currentMidi = stopMidi ? MIDIInputManager.instance : null;
         if (currentMidi != null)
         {
             if (midiPointer != currentMidi.Pointer)
@@ -191,9 +201,15 @@ internal sealed class OptionalServiceOverrides
                 midi = currentMidi; midiPointer = currentMidi.Pointer; midiOriginalEnabled = currentMidi.enabled;
             }
         }
-        if (midi != null) midi.enabled = midiOriginalEnabled && !stopMidi;
+        if (midi != null)
+        {
+            bool shouldEnable = midiOriginalEnabled && !stopMidi;
+            if (midi.enabled != shouldEnable) midi.enabled = shouldEnable;
+        }
+        if (!stopMidi) { midi = null; midiPointer = IntPtr.Zero; }
 
-        var currentDiscord = DiscordController.instance;
+        var currentDiscord = disableRichPresence || discordSuppressedForSession
+            ? DiscordController.instance : null;
         if (currentDiscord != null)
         {
             if (discordPointer != currentDiscord.Pointer)
@@ -208,7 +224,7 @@ internal sealed class OptionalServiceOverrides
             // restart path for an already-created instance. Keep it suppressed
             // for this process; turning the option off takes effect next launch.
             bool shouldEnable = discordOriginalEnabled && !disableRichPresence && !discordSuppressedForSession;
-            discord.enabled = shouldEnable;
+            if (discord.enabled != shouldEnable) discord.enabled = shouldEnable;
         }
     }
 

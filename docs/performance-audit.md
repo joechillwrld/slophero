@@ -1,5 +1,28 @@
 # Performance audit notes
 
+## Unreleased investigation after 0.4.42
+
+The native game reference ZIPs are unavailable in the current workspace, so
+these source changes have passed portable checks and syntax parsing but have
+not yet been compiled against Clone Hero or measured in Windows gameplay.
+
+- When the pre-song speed row is absent, `SongSpeedControl` used to call
+  `GameObject.Find("SongOptions")` on every unlocked menu update. Missing-object
+  discovery is now capped at 20 Hz; once the menu object is found, digit input
+  continues to run every frame so brief presses are not missed.
+- With score colors enabled but no highway or speed overrides, the visual pass
+  still traversed players at 10 Hz between the 5-Hz score-color refreshes.
+  Score-only mode now omits those in-between player traversals.
+- Optional MIDI/Discord service switches used to discover both managers every
+  0.5 seconds even when both switches were off. Default-off mode now skips
+  discovery, while enabled switches and restoration remain active.
+- Enabled particle/effect switches still discover newly created or reactivated
+  effects once per second, but avoid repeating `Stop`, `SetActive(false)`, and
+  `enabled = false` writes to effects that are already suppressed.
+
+These changes remove identifiable work; they do not establish a whole-game FPS
+gain. A controlled in-game timing comparison is needed before claiming one.
+
 This note summarizes what the supplied timing logs and the SlopHero hot paths
 currently establish. The latest `Latest.log` attached with v0.4.33 contains no
 timing capture; it records the settings-page exception described below, so it
