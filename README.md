@@ -1,19 +1,19 @@
-# SlopHero 0.4.48 alpha
+# SlopHero 0.4.49 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.48 corrects the optional performance report.** Older reports
-labeled simulation updates as rendered frames. The report now separates
-simulation intervals, scheduled render intervals, and completed rendered-frame
-count. At capture start it checks live leaderboard and input-viewer state once.
-This is a diagnostic update; no FPS gain is claimed. See the
-[performance audit](docs/performance-audit.md) for the evidence and next targets.
-Version 0.4.47 cached HUD text layout measurements; recent releases also reduced
-effect-discovery work while retaining all HUD, control, and gameplay features.
+**Version 0.4.49 adds an optional offline optimization for hidden leaderboard
+motion checks and improves the timing report.** It skips six invisible entry
+updates while the list is fully hidden, then restores them within about 17 ms
+when the list appears or online play begins. The report separates simulation intervals,
+scheduled render callbacks, and Unity GUI repaint intervals; it does not claim
+GPU timing. See the [performance audit](docs/performance-audit.md) for the
+capture analysis and remaining targets. The HUD, controls, and gameplay
+features remain available.
 
 ## Install
 
-[Download v0.4.48 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.48-alpha.zip?raw=true)
+[Download v0.4.49 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.49-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -247,6 +247,14 @@ persisted sub-10% value to 10% and prevents those values from being applied.
 Typed digits stay visible while being entered, then the mod applies the completed
 speed once after a brief pause or on Enter. This avoids recalculating speed for
 every partial number.
+
+## 0.4.49 hidden leaderboard updates
+
+The Performance tab adds an off-by-default switch that suspends the six
+leaderboard entry motion checks only while their score list is fully invisible
+and Clone Hero is offline. Online score displays and visible entries retain
+the game's original behavior. Full settings profiles now include all
+Performance switches.
 
 ## 0.4.31 Performance options
 

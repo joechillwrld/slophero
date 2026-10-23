@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.48", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.49", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -100,6 +100,9 @@ public sealed partial class Core : MelonMod
         statsText = songText = "";
         visuals.Clear();
         performance.Clear();
+        hiddenLeaderboard.Clear();
+        hiddenLeaderboardError = false;
+        nextHiddenLeaderboardPass = 0;
         nativeHud.Clear();
         resizeTarget = -1;
         resizeHandle = -1;
@@ -145,6 +148,10 @@ public sealed partial class Core : MelonMod
         UpdateCursor();
         statsText = songText = "";
         visuals.Clear();
+        performance.Clear();
+        hiddenLeaderboard.Clear();
+        hiddenLeaderboardError = false;
+        nextHiddenLeaderboardPass = 0;
         nativeHud.Clear();
         nativeHudActive = false;
         rings.Clear();
@@ -158,7 +165,7 @@ public sealed partial class Core : MelonMod
         // Diagnostics are opt-in. A Clone Hero simulation tick may skip
         // rendering, so sample Unity's render decision separately.
         if (timings.Active) timings.SampleUpdate(Time.unscaledDeltaTime * 1000f,
-            OnDemandRendering.willCurrentFrameRender, Time.renderedFrameCount);
+            OnDemandRendering.willCurrentFrameRender);
         long timingStart = timings.Begin();
         try
         {
@@ -455,6 +462,8 @@ public sealed partial class Core : MelonMod
 
     public override void OnGUI()
     {
+        if (timings.Active && Event.current.type == EventType.Repaint)
+            timings.SampleRepaint();
         // Passive HUDs need only the repaint event. Keep full event processing
         // while editing so sliders, typing, and dragging remain responsive.
         bool resizeEditing = resizeTarget >= 0;

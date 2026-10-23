@@ -1,6 +1,6 @@
 # Performance audit notes
 
-## Measurement correction and 0.4.47 capture
+## Live capture findings and measurement correction
 
 Earlier versions labeled `Time.unscaledDeltaTime` samples taken from
 `Core.OnUpdate` as whole-frame times. That was incorrect. Clone Hero can run
@@ -19,22 +19,51 @@ are nested. This is *not* a measure of native game work, GPU cost, or a
 before/after FPS gain. The v0.4.47 HUD cache is not proven faster by this
 capture: repaint average was 0.014 ms in v0.4.46 under different conditions.
 
-The next timing capture records simulation deltas, `OnDemandRendering`'s
-scheduled render callbacks, and the change in `Time.renderedFrameCount`
-separately. Wall-clock gaps between scheduled render callbacks are an estimate
-of CPU render cadence; they are not GPU presentation times. The completed
-render counter cross-checks the number of actual rendered frames. At capture
-start, a one-time live scene snapshot logs whether the leaderboard entries and
-instrument-viewer branches are active. These diagnostics run only during an
-explicitly started 30-second capture; the scene inspection occurs before the
-timer begins.
+The v0.4.48 log shows why `Time.renderedFrameCount` needs special care here:
+with `renderFrameInterval=2`, it advanced at the same 2,330/s rate as the
+simulation Updates, while `OnDemandRendering.willCurrentFrameRender` scheduled
+callbacks at 1,165/s. It is not a useful rendered-frame counter in this game
+configuration. The next report drops that counter and measures Unity GUI
+Repaint callback spacing as a second render-loop signal. Scheduled render and
+GUI Repaint intervals estimate CPU cadence; neither measures GPU presentation.
+The one-time capture snapshot will also count live, enabled input-viewer
+SpriteRenderers by instrument branch.
+
+### v0.4.48 live capture
+
+The latest capture recorded 2,329 simulation Updates/s and
+`renderFrameInterval=2`. Scheduled render callbacks measured 1,164.8/s, with
+p50 <=0.84 ms, p95 <=1.05 ms, p99 <=1.19 ms, and a 5.179 ms maximum. The
+existing HUD repaint bucket ran 1,199.5/s. These are CPU-side callback
+intervals, not a GPU timing result. The 8.933 ms maximum simulation interval
+does not recur in the scheduled-render maximum, so it should not be reported
+as an 8.933 ms rendered-frame hitch.
+
+`Update` averaged 0.004 ms and HUD repaint averaged 0.015 ms. At these rounded
+averages, those two paths account for about 0.82 CPU seconds per 30 seconds,
+or 2.7% of one core. The opt-in performance-effects callback averaged 0.007
+ms across 597 calls. This still leaves native game CPU, graphics-driver, and
+GPU costs unmeasured.
+
+The live snapshot confirmed six `InGameLeaderboardEntry.Update` components
+were eligible to run while their active parent score list had `CanvasGroup`
+alpha 0. The native `Update` checks entry movement and can update its alpha;
+it is not doing network or score formatting itself. Version 0.4.49 adds a
+default-off Performance switch that suspends those six motion checks only
+while the score list is fully invisible and the game is offline. It restores
+their original component states within about 17 ms when the list appears or
+the game connects, and when the switch turns off or the Gameplay scene closes.
+This avoids six native Update
+callbacks per simulation tick in that hidden state; it does not remove their
+draw calls or change online leaderboard behavior. The per-song gain is
+expected to be small.
 
 ### Base-game leads ranked by evidence
 
 | Lead | Current evidence | Decision |
 | --- | --- | --- |
-| Hidden in-game leaderboard | Gameplay serializes six enabled entry scripts beneath `ScoreList`, whose `CanvasGroup.alpha` starts at zero. Native entry `Update` reads its transform and adjusts alpha on motion; the manager skips its formatting path until its state flag and engine pointer are set. | Investigate *live* offline state and the score list's rendering/layout cost. Do not disable it yet: online/leaderboard visibility can change. |
-| Input viewer scene hierarchy | 2,159 GameObjects exist under the viewer, but its native setup toggles instrument branches with `GameObject.SetActive`. Only 46 serialized viewer button scripts occur; their class has no `Update`. | Serialized object count is not a per-frame workload. The game already exposes a viewer setting; keep it functional. |
+| Hidden in-game leaderboard | The v0.4.48 live capture found six enabled entries under an active score list at alpha 0; native `Update` checks movement and adjusts entry alpha. | v0.4.49 offers a default-off, offline-only switch that suspends those checks while fully hidden and restores them before display. It does not remove drawing. |
+| Input viewer scene hierarchy | All three instrument roots reported active in the v0.4.48 snapshot. Its native setup toggles inner instrument containers; the scene has 2,159 GameObjects and 46 serialized viewer button scripts, whose class has no `Update`. | v0.4.49 records the live enabled SpriteRenderer count under each instrument root. Do not duplicate the game's viewer switch or infer draw cost from prefab counts. |
 | FPS text | Native `FrameRate.Update` counts simulation and scheduled render ticks, then formats the label only after `updateInterval` elapses. | No per-tick string-formatting fix to make here. |
 | News and Pong | Neither is present in the Gameplay scene; News has no declared `Update`. | Menu cleanup cannot explain song FPS without evidence that a separate persistent instance remains active. |
 | Note/input/score pipeline | These are required for chart timing and scoring; the user's controller polling must stay at 1000 Hz. | Do not throttle or skip these paths on speculation. |

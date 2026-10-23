@@ -9,32 +9,24 @@ internal sealed class RuntimeTimings
     // 0.01 ms bins through 19.99 ms, plus an overflow bin. Clone Hero can
     // simulate several Updates per rendered frame, so keep these cadences
     // separate instead of presenting Update deltas as display frame times.
-    private readonly int[] updateHistogram = new int[2001], renderHistogram = new int[2001];
-    private long updateSamples, renderSamples, lastRenderTimestamp, observedRenderedFrames;
-    private int lastRenderedFrameCount;
+    private readonly int[] updateHistogram = new int[2001], renderHistogram = new int[2001], repaintHistogram = new int[2001];
+    private long updateSamples, renderSamples, repaintSamples, lastRenderTimestamp, lastRepaintTimestamp;
     private float maxUpdateMs;
-    private double maxRenderMs;
+    private double maxRenderMs, maxRepaintMs;
     private long start, deadline;
     public bool Active => deadline != 0;
     public void Start()
     {
         Array.Clear(total); Array.Clear(maximum); Array.Clear(calls);
-        Array.Clear(updateHistogram); Array.Clear(renderHistogram);
-        updateSamples = renderSamples = lastRenderTimestamp = observedRenderedFrames = 0;
-        lastRenderedFrameCount = -1;
-        maxUpdateMs = 0; maxRenderMs = 0;
+        Array.Clear(updateHistogram); Array.Clear(renderHistogram); Array.Clear(repaintHistogram);
+        updateSamples = renderSamples = repaintSamples = lastRenderTimestamp = lastRepaintTimestamp = 0;
+        maxUpdateMs = 0; maxRenderMs = maxRepaintMs = 0;
         start = Stopwatch.GetTimestamp(); deadline = start + 30 * Stopwatch.Frequency;
         MelonLogger.Msg("Mod timing capture started for 30 seconds. Keep playing the same chart/settings.");
     }
-    public void SampleUpdate(float unscaledDeltaMs, bool willRender, int renderedFrameCount)
+    public void SampleUpdate(float unscaledDeltaMs, bool willRender)
     {
         if (!Active) return;
-        // Unity can run multiple simulation Updates for one rendered frame.
-        // Its completed-frame counter is an independent cross-check on the
-        // number of render callbacks inferred from willCurrentFrameRender.
-        if (lastRenderedFrameCount >= 0 && renderedFrameCount > lastRenderedFrameCount)
-            observedRenderedFrames += renderedFrameCount - lastRenderedFrameCount;
-        lastRenderedFrameCount = renderedFrameCount;
         if (float.IsFinite(unscaledDeltaMs) && unscaledDeltaMs > 0)
         {
             int bin = unscaledDeltaMs >= 20 ? 2000 : (int)(unscaledDeltaMs * 100);
@@ -56,6 +48,23 @@ internal sealed class RuntimeTimings
             }
         }
         lastRenderTimestamp = now;
+    }
+    public void SampleRepaint()
+    {
+        if (!Active) return;
+        long now = Stopwatch.GetTimestamp();
+        if (lastRepaintTimestamp != 0)
+        {
+            double elapsedMs = (now - lastRepaintTimestamp) * 1000d / Stopwatch.Frequency;
+            if (double.IsFinite(elapsedMs) && elapsedMs > 0)
+            {
+                int bin = elapsedMs >= 20 ? 2000 : (int)(elapsedMs * 100);
+                repaintHistogram[bin]++;
+                repaintSamples++;
+                if (elapsedMs > maxRepaintMs) maxRepaintMs = elapsedMs;
+            }
+        }
+        lastRepaintTimestamp = now;
     }
     public long Begin() => Active ? Stopwatch.GetTimestamp() : 0;
     public void End(int bucket, long began)
@@ -85,6 +94,6 @@ internal sealed class RuntimeTimings
             }
             return "n/a";
         }
-        MelonLogger.Msg($"Mod timing capture ({seconds:0.0}s), observed update rate={calls[0] / Math.Max(seconds, .001):0.0}/s; simulation Update deltas: samples={updateSamples}, p50={Percentile(updateHistogram, updateSamples, .50)}, p95={Percentile(updateHistogram, updateSamples, .95)}, p99={Percentile(updateHistogram, updateSamples, .99)}, max={maxUpdateMs:0.000}ms; completed render frames={observedRenderedFrames}, rate={observedRenderedFrames / Math.Max(seconds, .001):0.0}/s; scheduled render intervals: samples={renderSamples}, rate={renderSamples / Math.Max(seconds, .001):0.0}/s, p50={Percentile(renderHistogram, renderSamples, .50)}, p95={Percentile(renderHistogram, renderSamples, .95)}, p99={Percentile(renderHistogram, renderSamples, .99)}, max={maxRenderMs:0.000}ms; {Describe(0, "Update")}; {Describe(1, "FC rings")}; {Describe(2, "Visual overrides")}; {Describe(4, "Player/speed overrides")}; {Describe(5, "Score graphics")}; {Describe(6, "Performance effects")}; {Describe(3, "HUD repaint")}. Inner visual timings are subsets of Visual overrides. Scheduled render intervals measure CPU callback spacing, not GPU presentation time.");
+        MelonLogger.Msg($"Mod timing capture ({seconds:0.0}s), observed update rate={calls[0] / Math.Max(seconds, .001):0.0}/s; simulation Update deltas: samples={updateSamples}, p50={Percentile(updateHistogram, updateSamples, .50)}, p95={Percentile(updateHistogram, updateSamples, .95)}, p99={Percentile(updateHistogram, updateSamples, .99)}, max={maxUpdateMs:0.000}ms; scheduled render callbacks: samples={renderSamples}, rate={renderSamples / Math.Max(seconds, .001):0.0}/s, p50={Percentile(renderHistogram, renderSamples, .50)}, p95={Percentile(renderHistogram, renderSamples, .95)}, p99={Percentile(renderHistogram, renderSamples, .99)}, max={maxRenderMs:0.000}ms; Unity GUI repaint callbacks: samples={repaintSamples}, rate={repaintSamples / Math.Max(seconds, .001):0.0}/s, p50={Percentile(repaintHistogram, repaintSamples, .50)}, p95={Percentile(repaintHistogram, repaintSamples, .95)}, p99={Percentile(repaintHistogram, repaintSamples, .99)}, max={maxRepaintMs:0.000}ms; {Describe(0, "Update")}; {Describe(1, "FC rings")}; {Describe(2, "Visual overrides")}; {Describe(4, "Player/speed overrides")}; {Describe(5, "Score graphics")}; {Describe(6, "Performance effects")}; {Describe(3, "HUD repaint")}. Inner visual timings are subsets of Visual overrides. Scheduled render and GUI repaint intervals measure CPU callback spacing, not GPU presentation time.");
     }
 }
