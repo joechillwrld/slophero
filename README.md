@@ -1,8 +1,8 @@
-# SlopHero 0.4.46 alpha
+# SlopHero 0.4.47 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.46 reduces repeated discovery work in the optional effect-suppression settings.** Player-neck particle and animator hierarchies are cached per gameplay session, and renderer children are cached per animator. It still checks cached effects once per second and refreshes discovery every five seconds to catch newly added effects. The 30-second timing capture now reports this path separately as `Performance effects`, so a Windows before/after capture can show its cost. This targeted reduction has not yet been measured in gameplay. Version 0.4.45 restores every-update polling for SlopHero's restart and practice shortcuts. Clone Hero's own note input remains untouched. Version 0.4.43 targeted online counters, the Counter HUD switch, and other unnecessary mod work; earlier features are described below.
+**Version 0.4.47 caches HUD text layout measurements between repaint events.** Counter line counts and song-info wrapping are recalculated only when their text, font size, or available width changes. The HUD still draws on Unity's normal repaint events, and input polling is unchanged. Version 0.4.46 caches optional effect-suppression discovery per gameplay session; the latest capture measured that callback at 0.008 ms average. Version 0.4.45 restores every-update polling for SlopHero's restart and practice shortcuts. Clone Hero's own note input remains untouched. Version 0.4.43 targeted online counters, the Counter HUD switch, and other unnecessary mod work; earlier features are described below.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.46 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.46-alpha.zip?raw=true)
+[Download v0.4.47 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.47-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

@@ -124,6 +124,32 @@ every game update again. Other established lower-frequency HUD and visual
 refreshes are unchanged. There is no measured FPS benefit to claim for this
 rollback; future work should target a demonstrated bottleneck.
 
+## 0.4.47 HUD text layout cache
+
+The v0.4.46 capture measured HUD repaint at 0.014 ms average across 35,576
+calls in 30 seconds. Passive counters and song info were recalculating text
+height/wrapping for every repaint even though their strings update at most five
+times per second. Version 0.4.47 caches those measurements by immutable text
+instance and the font/width values that affect layout. It does not throttle
+repaints or change draw visibility, so Unity still receives each normal HUD
+repaint. This reduces repeated managed layout work; the expected gain is small
+and needs a matched capture before it can be quantified.
+
+## 0.4.46 Windows capture
+
+The supplied v0.4.46 log recorded 69,855 frame samples over 30 seconds at about
+2,328 updates/s, with p50 <=0.47 ms, p95 <=0.59 ms, p99 <=0.68 ms, and a
+7.737 ms maximum. `Performance effects` averaged 0.008 ms across 597 calls
+(about 4.8 ms of measured CPU work for the entire capture), with a 0.582 ms
+maximum. HUD repaint averaged 0.014 ms; `OnUpdate` averaged 0.004 ms. There
+were no SlopHero runtime errors. These values show low steady callback cost,
+not an attributable whole-game FPS gain.
+
+The log also records a preferences save 0.761 seconds after the timing capture
+started, while the largest `OnUpdate` took 6.714 ms and the largest whole frame
+took 7.737 ms. The timing report does not timestamp those maxima, so the save
+is a plausible source of the isolated hitch but not a confirmed cause.
+
 ## 0.4.46 effect-discovery cache
 
 When the optional hit-particle, sustain-particle, or fret-effect suppression

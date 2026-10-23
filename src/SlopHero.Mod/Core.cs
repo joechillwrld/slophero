@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.46", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.47", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -48,6 +48,8 @@ public sealed partial class Core : MelonMod
     private GUIStyle? hudStyle;
     private int styledHudFont = -1;
     private Color styledHudColor;
+    private string? measuredHudText;
+    private int measuredHudFont = -1, measuredHudHeight;
     private bool hudRenderFailed, hudRenderErrorLogged, settingsRenderErrorLogged, guiErrorLogged;
 
     public override void OnInitializeMelon()
@@ -536,9 +538,15 @@ public sealed partial class Core : MelonMod
         if (styledHudFont != size) { hudStyle.fontSize = size; styledHudFont = size; }
         if (styledHudColor != color) { hudStyle.normal.textColor = color; styledHudColor = color; }
         int width = Math.Max(240, size * 12 + 24);
-        int lines = 1;
-        for (int i = 0; i < text.Length; i++) if (text[i] == '\n') lines++;
-        int height = (int)(size * 1.25f) * lines + 20;
+        if (!ReferenceEquals(measuredHudText, text) || measuredHudFont != size)
+        {
+            int lines = 1;
+            for (int i = 0; i < text.Length; i++) if (text[i] == '\n') lines++;
+            measuredHudText = text;
+            measuredHudFont = size;
+            measuredHudHeight = (int)(size * 1.25f) * lines + 20;
+        }
+        int height = measuredHudHeight;
         var position = HudLayout.ClampPosition(hudX.Value, hudY.Value, width, height, Screen.width, Screen.height);
         Rect rect = new(position.X, position.Y, width, height);
         Color previousBackground = GUI.backgroundColor;

@@ -49,6 +49,8 @@ public sealed partial class Core
     private int styledSongFont = -1;
     private Color styledSongColor;
     private string styledSongHex = "";
+    private string? measuredSongText;
+    private int measuredSongFont = -1, measuredSongWidth, measuredSongHeight;
 
     private void InitializeFeatures()
     {
@@ -129,7 +131,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.46 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.47 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
         // nine narrow tabs that clipped labels such as "Performance".
         const int tabColumns = 5;
@@ -852,18 +854,25 @@ public sealed partial class Core
             styledSongHex = songColor.Value;
         }
         int width = Math.Min(520, Screen.width);
-        int charsPerLine = Math.Max(8, (int)((width - 24) / (size * .6f)));
-        int lineCount = 0, currentLineLength = 0;
-        for (int i = 0; i <= text.Length; i++)
+        if (!ReferenceEquals(measuredSongText, text) || measuredSongFont != size || measuredSongWidth != width)
         {
-            if (i == text.Length || text[i] == '\n')
+            int charsPerLine = Math.Max(8, (int)((width - 24) / (size * .6f)));
+            int lineCount = 0, currentLineLength = 0;
+            for (int i = 0; i <= text.Length; i++)
             {
-                lineCount += Math.Max(1, (currentLineLength + charsPerLine - 1) / charsPerLine);
-                currentLineLength = 0;
+                if (i == text.Length || text[i] == '\n')
+                {
+                    lineCount += Math.Max(1, (currentLineLength + charsPerLine - 1) / charsPerLine);
+                    currentLineLength = 0;
+                }
+                else currentLineLength++;
             }
-            else currentLineLength++;
+            measuredSongText = text;
+            measuredSongFont = size;
+            measuredSongWidth = width;
+            measuredSongHeight = (int)(size * 1.35f) * lineCount + 20;
         }
-        int height = (int)(size * 1.35f) * lineCount + 20;
+        int height = measuredSongHeight;
         var p = HudLayout.ClampPosition(songX.Value, songY.Value, width, height, Screen.width, Screen.height);
         var rect = new Rect(p.X, p.Y, width, height);
         var old = GUI.backgroundColor;
