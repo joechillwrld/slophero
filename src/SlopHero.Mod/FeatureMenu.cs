@@ -9,7 +9,7 @@ namespace SlopHero.Mod;
 
 public sealed partial class Core
 {
-    private static readonly string[] SettingsPages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Sizing", "Profiles", "Performance" };
+    private static readonly string[] SettingsPages = { "Controls", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Sizing", "Profiles", "Sloptifine" };
     private MelonPreferences_Entry<bool> showMisses = null!, showHit = null!, showGhosts = null!, showBest = null!;
     private MelonPreferences_Entry<bool> showSong = null!, showTitle = null!, showArtist = null!, showCharter = null!, showSpeed = null!;
     private MelonPreferences_Entry<int> songX = null!, songY = null!, songFont = null!;
@@ -147,9 +147,9 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.55 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "Sloptifine · SlopHero 0.4.56 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
-        // nine narrow tabs that clipped labels such as "Performance".
+        // nine narrow tabs that clipped labels such as "Sloptifine".
         const int tabColumns = 5;
         float tabWidth = 656f / tabColumns;
         for (int i = 0; i < SettingsPages.Length; i++)
@@ -269,23 +269,23 @@ public sealed partial class Core
                 DrawProfiles(x, y);
                 break;
             case 8:
-                Toggle(disableHitParticles, "Stop note-hit particle simulation", x, y);
-                Toggle(disableSustainParticles, "Stop sustain particle simulation", x, y + 42);
-                Toggle(disableFretEffects, "Stop fret flames, sparks, and lightning", x, y + 84);
-                Toggle(stopMidiInput, "Pause drum MIDI input polling", x, y + 126);
-                Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to re-enable)", x, y + 168);
-                Toggle(suspendHiddenLeaderboard, "Skip hidden offline leaderboard motion checks", x, y + 210);
-                Toggle(useCanvasCounterHud, "Try Canvas renderer for counters (experimental)", x, y + 252);
-                Toggle(freezeComboSmokeScroll, "Pause combo smoke scrolling (smoke remains visible)", x, y + 294);
-                GUI.Label(new Rect(x, y + 338, 632, 140),
-                    "Independent, optional switches. Effect switches stop their components, not just their drawing. " +
-                    "The fret-effects switch also pauses fade scripts attached to its hidden lightning objects. " +
-                    "They do not change notes, scoring, or timing. MIDI restores immediately when switched off. " +
-                    "The leaderboard switch skips six motion checks only while the offline list is fully hidden; " +
-                    "online play and visible leaderboards are left alone. Canvas counters use the original renderer " +
-                    "in the editor or if Canvas fails. The smoke switch pauses only the local guitar's two combo-smoke " +
-                    "UV animations while leaving the smoke visible. " +
-                    "All changes restore when switched off or when gameplay ends. Discord presence needs a restart to restore.");
+                SectionHeader("Visual effects", x, y);
+                Toggle(disableHitParticles, "Skip note-hit particles", x, y + 26);
+                Toggle(disableSustainParticles, "Skip sustain particles", x, y + 58);
+                Toggle(disableFretEffects, "Disable fret flames, sparks, and lightning", x, y + 90);
+                Toggle(freezeComboSmokeScroll, "Pause combo-smoke animation (smoke stays visible)", x, y + 122);
+                GUI.Label(new Rect(x + 22, y + 154, 610, 38),
+                    "These switches affect effects only; notes, scoring, input, and timing are unchanged.");
+
+                SectionHeader("Services and HUD", x, y + 205);
+                Toggle(suspendHiddenLeaderboard, "Skip motion checks for the hidden offline leaderboard", x, y + 231);
+                Toggle(stopMidiInput, "Pause drum MIDI polling", x, y + 263);
+                Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to restore)", x, y + 295);
+                Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, y + 327);
+                GUI.Label(new Rect(x + 22, y + 362, 610, 105),
+                    "All switches start off. Fret-effects also pauses its hidden lightning fade scripts. " +
+                    "The leaderboard option acts only on the fully hidden offline list. MIDI restores when unchecked; " +
+                    "Discord presence needs a game restart to return. Canvas falls back to the original renderer if it fails.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -293,8 +293,16 @@ public sealed partial class Core
 
     private void Toggle(MelonPreferences_Entry<bool> entry, string label, float x, float y)
     {
-        if (GUI.Button(new Rect(x, y, 540, 32), $"{label}: {(entry.Value ? "On" : "Off")}"))
-        { entry.Value = !entry.Value; preferencesDirty = true; nextStats = 0; }
+        bool value = GUI.Toggle(new Rect(x, y, 632, 30), entry.Value, label);
+        if (value != entry.Value)
+        { entry.Value = value; preferencesDirty = true; nextStats = 0; }
+    }
+
+    private GUIStyle? sectionHeaderStyle;
+    private void SectionHeader(string text, float x, float y)
+    {
+        sectionHeaderStyle ??= new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold };
+        GUI.Label(new Rect(x, y, 632, 24), text, sectionHeaderStyle);
     }
 
     private void BeginNativeHudMove(int target)
@@ -934,6 +942,7 @@ public sealed partial class Core
     }
 
     private bool visualError;
+    private bool performanceError;
     private bool hiddenLeaderboardError;
     private bool comboSmokeScrollError;
     private double nextHiddenLeaderboardPass;
@@ -984,11 +993,15 @@ public sealed partial class Core
         bool nativeHudPending = !nativeHudError && (nativeHudRequested || nativeHudActive);
         bool visualRequested = hideSides.Value || hideStrings.Value || hideBeats.Value || tintScore.Value;
         bool practiceSpeedRequested = lockSpeed.Value && practiceModeActive;
-        bool performanceRequested = disableHitParticles.Value || disableSustainParticles.Value || disableFretEffects.Value;
+        bool disableHits = disableHitParticles.Value;
+        bool disableSustains = disableSustainParticles.Value;
+        bool disableFrets = disableFretEffects.Value;
+        bool performanceApplyDue = !performanceError
+            && performance.IsApplyDue(disableHits, disableSustains, disableFrets, now);
         bool comboSmokeRequested = !comboSmokeScrollError && (freezeComboSmokeScroll.Value || comboSmokeScroll.NeedsRestore);
         bool visualPending = !visualError && (visualRequested || practiceSpeedRequested || visuals.NeedsUpdate
-            || tintFc.Value || rings.NeedsUpdate || performanceRequested || performance.NeedsUpdate);
-        if (!nativeHudPending && !visualPending && !comboSmokeRequested) return;
+            || tintFc.Value || rings.NeedsUpdate);
+        if (!nativeHudPending && !visualPending && !comboSmokeRequested && !performanceApplyDue) return;
 
         // Avoid GameManager/IL2CPP property reads at the unlocked update rate.
         // All HUD and visual changes refresh at 5–20 Hz, so resolving the
@@ -1051,16 +1064,21 @@ public sealed partial class Core
                 }
             }
         }
+        if (performanceApplyDue)
+        {
+            long performanceTiming = timings.Begin();
+            try { performance.Apply(game, disableHits, disableSustains, disableFrets, now); }
+            catch (Exception ex)
+            {
+                performance.Clear();
+                performanceError = true;
+                LoggerInstance.Warning($"Performance effects optimization stopped; original effect states were restored: {ex.Message}");
+            }
+            finally { timings.End(6, performanceTiming); }
+        }
         if (!visualPending) return;
         try
         {
-            long performanceTiming = timings.Begin();
-            try
-            {
-                performance.Apply(game, disableHitParticles.Value, disableSustainParticles.Value,
-                    disableFretEffects.Value, now);
-            }
-            finally { timings.End(6, performanceTiming); }
             Color Read(MelonPreferences_Entry<string> e)
             {
                 if (parsedColors.TryGetValue(e.Value, out var cached)) return cached;

@@ -1,4 +1,4 @@
-# SlopHero 0.4.55 alpha
+# SlopHero 0.4.56 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
@@ -6,24 +6,27 @@ features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.55 keeps the corrected combo-smoke switch and skips ten
-unchanged fret-lightning fade scripts while the existing fret-effects switch
-is hiding those effects.** It restores the scripts when fret effects are
-enabled again. The Performance tab keeps optional switches off by default.
-These are narrow CPU-side leads; no whole-game FPS gain is claimed without a
-controlled capture. Version 0.4.53's smoke switch searched the wrong hierarchy
-and matched nothing; 0.4.54 corrected it. It also retains the optional
-Canvas renderer for the counter HUD. It
+**Version 0.4.56 cleans up the settings menu with consistent checkboxes,
+renames the performance page to Sloptifine, and reduces repeat work from the
+optional performance-effects switches.** Their cached effects are checked at
+the existing one-second interval, and those switches no longer trigger the
+separate visual override pass every 50 ms. Settings still take effect
+immediately, and disabled effects restore their original state. A matched
+0.4.54/0.4.55 capture recorded simulation and scheduled-render callback rates
+about 6% higher with the ten fret-fade scripts paused. That is encouraging
+callback evidence, not a GPU presentation measurement or a whole-game FPS
+claim. Version 0.4.53's smoke switch searched the wrong hierarchy and matched
+nothing; 0.4.54 corrected it. Sloptifine keeps optional switches off by
+default. It also retains the optional Canvas renderer for the counter HUD. It
 updates retained UI objects only when the counter text, position, or appearance
 changes. The established IMGUI renderer remains the default and handles HUD
-editing; it also takes over if Canvas creation fails. A timing capture now
-records which candidate visual scripts and render components are active during
-a song. No FPS gain is claimed yet. See the [performance audit](docs/performance-audit.md)
-for measured limits and current targets.
+editing; it also takes over if Canvas creation fails. See the
+[performance audit](docs/performance-audit.md) for measured limits and current
+targets.
 
 ## Install
 
-[Download v0.4.55 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.55-alpha.zip?raw=true)
+[Download v0.4.56 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.56-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -53,7 +56,7 @@ Backspace removes the last digit; Delete clears the entry; Escape cancels the ed
 game's normal left/right controls to change the value by the configured step (5%
 by default). Set that step on the SlopHero **Controls** page.
 
-F8 has nine pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, and **Performance**. The page buttons use two centered rows so every title stays readable.
+F8 has nine pages: **Controls**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, and **Sloptifine**. The page buttons use two centered rows so every title stays readable. Boolean options use checkboxes throughout, so their state is visible without extra On/Off text.
 
 - Click a numeric or color value and type a replacement. Enter or **Apply** saves;
   Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.
@@ -260,7 +263,7 @@ every partial number.
 
 ## 0.4.49 hidden leaderboard updates
 
-The Performance tab adds an off-by-default switch that suspends the six
+The Sloptifine tab adds an off-by-default switch that suspends the six
 leaderboard entry motion checks only while their score list is fully invisible
 and Clone Hero is offline. Online score displays and visible entries retain
 the game's original behavior. Full settings profiles now include all
@@ -283,7 +286,7 @@ may be recognized up to 50 ms later.
 
 ## 0.4.52 optional Canvas counter HUD and visual snapshot
 
-**F8 → Performance → Try Canvas renderer for counters** is off by default.
+**F8 → Sloptifine → Try Canvas renderer for counters** is off by default.
 When on, a separate, noninteractive Unity Canvas displays the counter HUD
 during gameplay. Counter values retain their 5 Hz refresh; the Canvas receives
 position, color, opacity, and text changes at most 20 times per second. The
@@ -298,16 +301,21 @@ scripts, SpriteRenderers, cameras, canvases, animators, video players, and
 particle systems. Those counts guide future game-side changes; they do not
 disable any native game components.
 
-## 0.4.55 optional effect-update reductions
+## 0.4.56 optional effect-update reductions and menu cleanup
 
-The **Fret flames/sparks** Performance switch now also pauses the ten
+Every Boolean setting now uses a checkbox instead of an On/Off button. The
+Sloptifine page groups visual effects separately from services and HUD options.
+These controls render only while the settings panel is open; no overlay or
+menu work is added to the normal gameplay update loop.
+
+The **Fret flames/sparks** Sloptifine switch now also pauses the ten
 `CustomFadeProperties` components observed on the guitar's `Fret_*/lightning`
 and `lightning_white` objects. They do no visible work while those effects are
 hidden. Their enabled states restore with the existing switch; note timing,
 scoring, and input are unaffected. This builds on the exact live paths and
 switch state in the supplied capture.
 
-**F8 → Performance → Pause combo smoke scrolling** is off by default. When
+**F8 → Sloptifine → Pause combo smoke scrolling** is off by default. When
 enabled, SlopHero targets only `smoke_combo_fast` and `smoke_combo_slow` beneath
 the local guitar's `Combo/multiplier` object. It pauses their `UVScroll`
 components while leaving the smoke renderers visible; remote players are not
@@ -326,7 +334,7 @@ cost or measure GPU presentation.
 
 ## 0.4.31 Performance options
 
-The new Performance tab offers five independent switches, all off by default:
+The original Performance tab offered five independent switches, all off by default:
 note-hit particles, sustain particles, fret flames/sparks/lightning, drum MIDI
 input polling, and Discord Rich Presence. The effect switches deactivate their
 effect objects to stop their simulation, rather than only hiding their drawing.

@@ -40,6 +40,18 @@ internal sealed class PerformanceOverrides
 
     public bool NeedsUpdate => hitParticles || sustainParticles || fretEffects
         || particles.Count != 0 || animators.Count != 0 || fretFades.Count != 0 || renderers.Count != 0;
+
+    public bool IsApplyDue(bool disableHitParticles, bool disableSustainParticles,
+        bool disableFretEffects, double realtime)
+    {
+        bool changed = hitParticles != disableHitParticles || sustainParticles != disableSustainParticles
+            || fretEffects != disableFretEffects;
+        if (changed) return true;
+        if (!NeedsUpdate) return false;
+        if (!disableHitParticles && !disableSustainParticles && !disableFretEffects) return true;
+        return realtime >= nextScan;
+    }
+
     public int PausedFretFadeCount
     {
         get

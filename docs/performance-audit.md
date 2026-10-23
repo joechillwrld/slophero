@@ -99,7 +99,7 @@ Other leads from the same capture, ranked by what is actually known:
 | Combo-smoke `UVScroll` | Two enabled local objects, with live hierarchy paths confirmed. Native `Update` advances texture offsets and writes a material property block on simulation ticks. | Reversible, default-off switch added. Actual CPU and frame-time gain remain unmeasured. |
 | `CameraShake` | One enabled. Native `Update` returns immediately when its shake-state flag is clear; the heavier path is event-driven while shaking. | Leave alone; no idle hot path established. |
 | `LyricDisplay` | One enabled. Its native `Update` has an early path when there is no current lyric phrase. | Leave alone; disabling it would break lyrics, and no material cost is shown. |
-| `CustomFadeProperties` | Ten enabled beneath guitar fret-lightning objects even with fret effects disabled. Native `Update` compares four cached values and returns when unchanged. | v0.4.55 pauses only these scripts while the user has already hidden fret effects; state restores with that switch. Likely small; measure before claiming a gain. |
+| `CustomFadeProperties` | Ten enabled beneath guitar fret-lightning objects before v0.4.55; the newer capture confirms 0/10 while fret effects are disabled. Native `Update` compares four cached values and returns when unchanged. | v0.4.55 pauses only these scripts while the user has already hidden fret effects; state restores with that switch. New callback data is encouraging, though GPU cost remains unknown. |
 | `SoftMaskController`, `BlurScaler`, `BeatPulse` | No enabled instances found in this song capture. | Not gameplay targets in this run. |
 | `VideoPlayer` | Latest capture finds one enabled of two and zero playing; an older run had one playing. | The existing game video toggle should remain authoritative. |
 | 3 cameras, 11 canvases, 257 enabled SpriteRenderers, 3 animators | Counts only; they do not measure overdraw, Canvas rebuilds, draw calls, or GPU cost. | Need Unity Profiler/RenderDoc or comparable GPU/CPU profiling before any changes. Avoid disabling scene objects by count alone. |
@@ -110,7 +110,7 @@ players are playing. It discovers these once before the 30-second window, not
 per frame. These paths replace the previous unsupported lyric-background
 guess with direct runtime evidence.
 
-### v0.4.54 confirmation and v0.4.55 fret-fade suppression
+### v0.4.54 confirmation and v0.4.55 fret-fade result
 
 The next runtime log confirms that 0.4.54 engaged the intended effect:
 `comboSmokeTracked/paused=2/2`, while the scene snapshot reports
@@ -124,14 +124,42 @@ simulation interval is still about 39.6 ms, close to the earlier 39.3 ms
 outlier. The report's scheduled-render interval is callback spacing, not GPU
 presentation time.
 
-That same run has `disableFretEffects=true` while all ten
+The 0.4.54 run has `disableFretEffects=true` while all ten
 `CustomFadeProperties` components remain enabled on the five `Fret_*` lightning
 and white-lightning objects. Version 0.4.55 extends the existing fret-effects
 switch to pause only those ten components while their visual effects are
 disabled, restoring their original enabled state with the switch. This avoids
 changing visible gameplay or introducing another setting. The components'
-native update has a cached-value early return, so the likely savings are small;
-they will be measurable only in a repeated capture after this build.
+native update has a cached-value early return, so the expected savings were
+uncertain.
+
+The first 0.4.55 capture confirms the extension worked: `customFade=0/10` and
+`fretFadeScriptsPausedByMod=10`, with all the same visual switches still
+enabled and `renderFrameInterval=2`, `configuredSpeed=100%`. Against the
+previous 30-second 0.4.54 run with matching logged settings, observed
+simulation Updates increased from 2,394/s to 2,536/s (+5.9%), and scheduled
+render callbacks increased from 1,197/s to 1,268/s (+5.9%). Simulation p95/p99
+intervals improved from 0.58/0.66 ms to 0.54/0.60 ms; scheduled-render
+p95/p99 improved from 1.01/1.14 ms to 0.93/1.00 ms. The similar setup and
+matching 30-second windows make this the strongest comparison so far and
+support the user's observed improvement. The max simulation interval stayed
+near 39 ms, so this change did not remove the rare hitch. These are Unity
+callback rates and CPU intervals, not a GPU or display-presentation measure.
+
+The F8 menu now calls this page **Sloptifine** and uses native GUI checkboxes
+for boolean options on every settings page. The checkbox controls render only
+while the settings panel is open; they add no work to gameplay updates.
+
+Version 0.4.56 also separates the optional particle/fret-effect controller
+from the general visual-override dispatcher. Before this change, any enabled
+effect switch kept the general visual pass active at 20 Hz, even though the
+effect controller itself only rescanned cached player effects once per second.
+The controller now runs immediately when a switch changes and otherwise only
+at that existing one-second scan interval. Its work no longer triggers FC-ring
+and score-visual refreshes when those features are otherwise idle. This leaves
+the 50 ms cadence for actual visual overrides, and the one-second effect
+discovery cadence, unchanged. It is a small, code-level reduction in SlopHero
+work; no whole-game frame-rate gain is claimed without a new matched capture.
 
 The safe rewrite decision is therefore to avoid a wholesale rewrite. The
 current measurements show SlopHero's named callback work is already small

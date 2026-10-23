@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.55", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.56", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -117,6 +117,7 @@ public sealed partial class Core : MelonMod
         nativeHudActive = false;
         rings.Clear();
         visualError = false;
+        performanceError = false;
         nextStats = 0;
         nextGameStateRefresh = 0;
         finalStatsRefreshUntil = 0;
@@ -164,6 +165,7 @@ public sealed partial class Core : MelonMod
         nativeHudActive = false;
         rings.Clear();
         visualError = false;
+        performanceError = false;
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
     }
