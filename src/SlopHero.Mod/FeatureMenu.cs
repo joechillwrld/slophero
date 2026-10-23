@@ -21,6 +21,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> disableAprilFools = null!;
     private MelonPreferences_Entry<bool> customizeFpsColor = null!;
     private MelonPreferences_Entry<bool> disableHitParticles = null!, disableSustainParticles = null!, disableFretEffects = null!;
+    private MelonPreferences_Entry<bool> disableStarProgressParticles = null!;
     private MelonPreferences_Entry<bool> stopMidiInput = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!, useCanvasCounterHud = null!, freezeComboSmokeScroll = null!;
     private MelonPreferences_Entry<bool> skipGameplayMouseUi = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
@@ -33,6 +34,7 @@ public sealed partial class Core
     private readonly HiddenLeaderboardOverride hiddenLeaderboard = new();
     private readonly ComboSmokeScrollOverride comboSmokeScroll = new();
     private readonly MouseUiGameplayOverride mouseUiGameplay = new();
+    private readonly StarProgressParticleOverride starProgressParticles = new();
     private readonly RuntimeTimings timings = new();
     private string songText = "", editText = "", editLabel = "", editError = "";
     private Action<string>? editApply;
@@ -112,6 +114,7 @@ public sealed partial class Core
         disableHitParticles = preferences.CreateEntry("PerformanceDisableHitParticles", false);
         disableSustainParticles = preferences.CreateEntry("PerformanceDisableSustainParticles", false);
         disableFretEffects = preferences.CreateEntry("PerformanceDisableFretEffects", false);
+        disableStarProgressParticles = preferences.CreateEntry("PerformanceDisableStarProgressParticles", false);
         stopMidiInput = preferences.CreateEntry("PerformanceStopMidiInput", false);
         disableDiscordPresence = preferences.CreateEntry("PerformanceDisableDiscordPresence", false);
         suspendHiddenLeaderboard = preferences.CreateEntry("PerformanceSuspendHiddenLeaderboard", false);
@@ -225,7 +228,7 @@ public sealed partial class Core
                             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
                             || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                         SongSpeedControl.TryRead(out int speedSetting);
-                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, pausedFretFadeScripts={performance.PausedFretFadeCount}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, mouseUiSkip={skipGameplayMouseUi.Value}[hook={mouseUiGameplay.IsInstalled}], nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret/starProgress)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}/{disableStarProgressParticles.Value}[starSuppressed={starProgressParticles.IsSuppressed}], pausedFretFadeScripts={performance.PausedFretFadeCount}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, mouseUiSkip={skipGameplayMouseUi.Value}[hook={mouseUiGameplay.IsInstalled}], nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                         LogGameplaySnapshot();
                         timings.Start();
                     }
@@ -313,21 +316,22 @@ public sealed partial class Core
                 Toggle(disableHitParticles, "Skip note-hit particles", x, y + 26);
                 Toggle(disableSustainParticles, "Skip sustain particles", x, y + 56);
                 Toggle(disableFretEffects, "Disable fret flames, sparks, and lightning", x, y + 86);
-                Toggle(freezeComboSmokeScroll, "Pause combo-smoke animation (smoke stays visible)", x, y + 116);
-                Toggle(pauseHiddenBeatlineUpdates, "Skip beatline updates while hidden", x, y + 146);
-                Toggle(disableAprilFools, "Disable April Fools / NoteBomber chaos and Pong", x, y + 176);
-                GUI.Label(new Rect(x + 22, y + 206, 610, 28),
+                Toggle(disableStarProgressParticles, "Skip star-progress burst particles", x, y + 116);
+                Toggle(freezeComboSmokeScroll, "Pause combo-smoke animation (smoke stays visible)", x, y + 146);
+                Toggle(pauseHiddenBeatlineUpdates, "Skip beatline updates while hidden", x, y + 176);
+                Toggle(disableAprilFools, "Disable April Fools / NoteBomber chaos and Pong", x, y + 206);
+                GUI.Label(new Rect(x + 22, y + 236, 610, 28),
                     "Live toggle; turn off here to restore the game's joke modes.");
 
-                SectionHeader("Services and HUD", x, y + 240);
-                Toggle(suspendHiddenLeaderboard, "Skip motion checks for the hidden offline leaderboard", x, y + 266);
-                Toggle(stopMidiInput, "Pause drum MIDI polling", x, y + 294);
-                Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to restore)", x, y + 322);
-                Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, y + 350);
-                Toggle(skipGameplayMouseUi, "Experimental: skip gameplay mouse clicks and hover", x, y + 378);
-                GUI.Label(new Rect(x + 22, y + 410, 610, 104),
+                SectionHeader("Services and HUD", x, y + 270);
+                Toggle(suspendHiddenLeaderboard, "Skip motion checks for the hidden offline leaderboard", x, y + 296);
+                Toggle(stopMidiInput, "Pause drum MIDI polling", x, y + 324);
+                Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to restore)", x, y + 352);
+                Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, y + 380);
+                Toggle(skipGameplayMouseUi, "Experimental: skip gameplay mouse clicks and hover", x, y + 408);
+                GUI.Label(new Rect(x + 22, y + 440, 610, 104),
                     "Performance toggles start off; April Fools suppression starts on. Fret-effects also pauses " +
-                    "its hidden lightning fade scripts. " +
+                    "its hidden lightning fade scripts. The star-progress option suppresses only its burst effect. " +
                     "The leaderboard option acts only on the fully hidden offline list. MIDI restores when unchecked; " +
                     "Discord presence needs a game restart to return. Beatline updates require Hide beatlines and " +
                     "can also suppress its beat effects if April Fools suppression is turned off. Canvas falls back " +
@@ -769,6 +773,7 @@ public sealed partial class Core
             Bool("DisableAprilFoolsContent", disableAprilFools);
             Bool("PerformanceDisableHitParticles", disableHitParticles); Bool("PerformanceDisableSustainParticles", disableSustainParticles);
             Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput);
+            Bool("PerformanceDisableStarProgressParticles", disableStarProgressParticles);
             Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
             Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
             Bool("PerformanceFreezeComboSmokeScroll", freezeComboSmokeScroll);
@@ -811,6 +816,7 @@ public sealed partial class Core
         Bool("DisableAprilFoolsContent", disableAprilFools);
         Bool("PerformanceDisableHitParticles", disableHitParticles); Bool("PerformanceDisableSustainParticles", disableSustainParticles);
         Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput);
+        Bool("PerformanceDisableStarProgressParticles", disableStarProgressParticles);
         Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
         Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
         Bool("PerformanceSkipGameplayMouseUi", skipGameplayMouseUi);
@@ -1008,6 +1014,7 @@ public sealed partial class Core
 
     private bool visualError;
     private bool performanceError;
+    private bool starProgressError;
     private bool hiddenLeaderboardError;
     private bool comboSmokeScrollError;
     private double nextHiddenLeaderboardPass;
@@ -1067,15 +1074,29 @@ public sealed partial class Core
         bool disableFrets = disableFretEffects.Value;
         bool performanceApplyDue = !performanceError
             && performance.IsApplyDue(disableHits, disableSustains, disableFrets, now);
+        bool starProgressApplyDue = !starProgressError
+            && starProgressParticles.IsApplyDue(disableStarProgressParticles.Value, now);
         bool comboSmokeRequested = !comboSmokeScrollError && (freezeComboSmokeScroll.Value || comboSmokeScroll.NeedsRestore);
         bool visualPending = !visualError && (visualRequested || practiceSpeedRequested || visuals.NeedsUpdate
             || tintFc.Value || rings.NeedsUpdate);
-        if (!nativeHudPending && !visualPending && !comboSmokeRequested && !performanceApplyDue) return;
+        if (!nativeHudPending && !visualPending && !comboSmokeRequested && !performanceApplyDue && !starProgressApplyDue) return;
 
         // Avoid GameManager/IL2CPP property reads at the unlocked update rate.
         // All HUD and visual changes refresh at 5–20 Hz, so resolving the
         // manager at the same cadence is sufficient.
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
+        if (starProgressApplyDue)
+        {
+            long starParticleTiming = timings.Begin();
+            try { starProgressParticles.Apply(game, disableStarProgressParticles.Value, now); }
+            catch (Exception ex)
+            {
+                starProgressParticles.Clear();
+                starProgressError = true;
+                LoggerInstance.Warning($"Star-progress particle optimization stopped; the original particle state was restored: {ex.Message}");
+            }
+            finally { timings.End(6, starParticleTiming); }
+        }
         if (comboSmokeRequested)
         {
             try { comboSmokeScroll.Apply(freezeComboSmokeScroll.Value, game, now); }

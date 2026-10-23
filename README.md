@@ -1,43 +1,21 @@
-# SlopHero 0.4.58 alpha
+# SlopHero 0.4.62 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
 features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.58 adds a live switch that disables the April Fools/NoteBomber
-chaos and Pong joke, enabled by default, plus an optional beatline-update
-optimization. It can pause the beatline renderer while SlopHero hides
-beatlines, avoiding its per-frame updates. Version 0.4.57 reshaped the settings
-window into a sidebar and options panel, added an editable accent color, and
-trimmed two more performance paths. The accent colors the title bar, selected
-page, and HUD resize outline; it can be typed or adjusted with the existing
-color sliders and is saved in color themes.
-The hidden offline leaderboard visibility check now runs at 20 Hz instead of
-60 Hz, restoring its six motion components within 50 ms when it appears. The
-combo-smoke switch now finds the active nonremote guitar even while the game
-temporarily reports its input as disabled. Version 0.4.56 also reduced repeat
-work from the optional performance-effects switches: their cached effects are
-checked at the existing one-second interval, and those switches no longer
-trigger the separate visual override pass every 50 ms. Settings still take
-effect immediately, and disabled effects restore their original state. A matched
-0.4.54/0.4.55 capture recorded simulation and scheduled-render callback rates
-about 6% higher with the ten fret-fade scripts paused. That is encouraging
-callback evidence, not a GPU presentation measurement or a whole-game FPS
-claim. Version 0.4.53's smoke switch searched the wrong hierarchy and matched
-nothing; 0.4.54 corrected it. Sloptifine performance switches stay off by
-default; the separate April Fools suppression starts on. It also retains the
-optional Canvas renderer for the counter HUD. It updates retained UI objects
-only when the counter text, position, or appearance
-changes. The established IMGUI renderer remains the default and handles HUD
-editing; it also takes over if Canvas creation fails. See the
-[performance audit](docs/performance-audit.md) for measured limits and current
-targets.
+build, compiled against its loader and generated assemblies. Version 0.4.62 adds
+a separate, default-off option to suppress the star-progress particle burst.
+It leaves the star bar, score, note timing, and controller polling alone. The
+experimental gameplay mouse-UI option remains default-off; keyboard/controller
+navigation and the 1000 Hz instrument polling are untouched. Performance
+options restore captured game state when disabled or when gameplay ends. See
+the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download v0.4.58 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.58-alpha.zip?raw=true)
+[Download v0.4.62 ZIP](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.62-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

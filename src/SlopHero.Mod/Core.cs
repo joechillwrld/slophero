@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.61", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.62", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -107,6 +107,7 @@ public sealed partial class Core : MelonMod
             mouseUiGameplay.Update(HarmonyInstance, requested: true, gameplayActive: false);
         visuals.Clear();
         performance.Clear();
+        starProgressParticles.Clear();
         hiddenLeaderboard.Clear();
         comboSmokeScroll.Clear();
         hiddenLeaderboardError = false;
@@ -123,6 +124,7 @@ public sealed partial class Core : MelonMod
         rings.Clear();
         visualError = false;
         performanceError = false;
+        starProgressError = false;
         nextStats = 0;
         nextGameStateRefresh = 0;
         finalStatsRefreshUntil = 0;
@@ -162,6 +164,7 @@ public sealed partial class Core : MelonMod
         statsText = songText = "";
         visuals.Clear();
         performance.Clear();
+        starProgressParticles.Clear();
         hiddenLeaderboard.Clear();
         comboSmokeScroll.Clear();
         hiddenLeaderboardError = false;
@@ -172,6 +175,7 @@ public sealed partial class Core : MelonMod
         rings.Clear();
         visualError = false;
         performanceError = false;
+        starProgressError = false;
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
     }
@@ -788,6 +792,7 @@ public sealed partial class Core : MelonMod
         aprilFools.Restore();
         visuals.RestoreBeatRenderers();
         performance.Clear();
+        starProgressParticles.Clear();
         comboSmokeScroll.Clear();
         counterCanvas.Clear();
         optionalServices.Restore();

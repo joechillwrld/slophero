@@ -961,3 +961,48 @@ times cannot be used as frame-time percentages. Any future comparison should
 use matched captures and actual PresentMon/GPU timing; another large ETL is
 not needed to justify the mouse-path experiment, but the option's real benefit
 would still need a short A/B after it exists.
+
+### v0.4.61 runtime verification and particle lead
+
+The new `Latest.log` confirms v0.4.61 against Clone Hero 1.1.0.6142. The
+experimental mouse-UI hook installed on Gameplay scene load, before the
+30-second timing capture, and reports `mouseUiSkip=True[hook=True]`. The log
+contains no SlopHero exception. Its single Il2CppInterop `Class::Init` warning
+is emitted during loader startup and is not attributed to SlopHero.
+
+During the capture, simulation Update deltas were at or below 0.54 ms at p95
+and 0.63 ms at p99; scheduled-render callbacks were at or below 0.94/1.07 ms
+at p95/p99. One simulation interval reached 40.121 ms, while the longest
+scheduled-render callback interval was 6.593 ms. This is not a controlled
+comparison with mouse processing enabled, and these callback intervals are
+not PresentMon frame times. The hook's activation and lifecycle are verified;
+its performance benefit is not.
+
+The one-shot runtime snapshot confirms the existing visual suspensions engaged:
+the hidden offline leaderboard had zero of six eligible entry updates, all ten
+fret-fade scripts and both combo-smoke `UVScroll` components were paused, and
+the viewer had 48 active guitar sprites with no GHL or drum sprites. One
+`CameraShake`, one lyric component, and one particle system were active. The
+supplied Gameplay scene identifies that particle system as
+`HUDCam/HUD/Star/Particle System`: it is a non-looping, non-autoplay two-second
+burst with a 40-particle cap. This points to the star-progress burst effect,
+not an always-running emitter. The scene data and one runtime snapshot do not
+measure its CPU/GPU cost, so this is only a small visual-effects candidate.
+After the user approved it, v0.4.62 adds a separate default-off
+`PerformanceDisableStarProgressParticles` option. It targets the live
+`GameManager.starProgress.starParticles` reference only, stops and clears its
+particles, then deactivates that dedicated particle-system GameObject. It
+checks for replacement or re-enabled instances at 1 Hz only while opted in and
+restores the object's original active state when switched off or when the
+Gameplay scene ends. The star bar and score state remain untouched. No frame
+gain is claimed; the 40-particle cap makes this a small, reversible visual
+effect option rather than a high-yield optimization.
+
+The Canvas counter synchronization averaged 0.019 ms across 598 calls, with a
+single 4.898 ms maximum. `CounterCanvasHud.Refresh` only assigns text when the
+display string changes, but changing text can trigger Unity/TMP canvas work
+outside the measured property-sync scope. The isolated maximum does not prove
+that a canvas rebuild caused the 40 ms simulation gap. A Unity Profiler capture
+showing `Canvas.BuildBatch`, TMP mesh generation, and the main thread would be
+needed before changing the retained HUD path. No controller polling or note
+timing was changed during this review.
