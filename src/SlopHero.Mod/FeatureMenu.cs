@@ -17,6 +17,8 @@ public sealed partial class Core
     private MelonPreferences_Entry<float> songOpacity = null!;
     private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!, menuAccentHex = null!;
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
+    private MelonPreferences_Entry<bool> pauseHiddenBeatlineUpdates = null!;
+    private MelonPreferences_Entry<bool> disableAprilFools = null!;
     private MelonPreferences_Entry<bool> customizeFpsColor = null!;
     private MelonPreferences_Entry<bool> disableHitParticles = null!, disableSustainParticles = null!, disableFretEffects = null!;
     private MelonPreferences_Entry<bool> stopMidiInput = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!, useCanvasCounterHud = null!, freezeComboSmokeScroll = null!;
@@ -25,6 +27,7 @@ public sealed partial class Core
     private readonly VisualOverrides visuals = new();
     private readonly RingColors rings = new();
     private readonly PerformanceOverrides performance = new();
+    private readonly AprilFoolsOverrides aprilFools = new();
     private readonly OptionalServiceOverrides optionalServices = new();
     private readonly HiddenLeaderboardOverride hiddenLeaderboard = new();
     private readonly ComboSmokeScrollOverride comboSmokeScroll = new();
@@ -99,6 +102,8 @@ public sealed partial class Core
         hideSides = preferences.CreateEntry("HideHighwaySides", false);
         hideStrings = preferences.CreateEntry("HideFretStrings", false);
         hideBeats = preferences.CreateEntry("HideBeatlines", false);
+        pauseHiddenBeatlineUpdates = preferences.CreateEntry("PerformancePauseHiddenBeatlineUpdates", false);
+        disableAprilFools = preferences.CreateEntry("DisableAprilFoolsContent", true);
         tintFc = preferences.CreateEntry("CustomizeFcRings", false);
         tintScore = preferences.CreateEntry("CustomizeScoreColors", false);
         lockSpeed = preferences.CreateEntry("ConstantPracticeNoteSpeed", false);
@@ -217,7 +222,7 @@ public sealed partial class Core
                             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
                             || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                         SongSpeedControl.TryRead(out int speedSetting);
-                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, pausedFretFadeScripts={performance.PausedFretFadeCount}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, pausedFretFadeScripts={performance.PausedFretFadeCount}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                         LogGameplaySnapshot();
                         timings.Start();
                     }
@@ -303,21 +308,26 @@ public sealed partial class Core
             case 8:
                 SectionHeader("Visual effects", x, y);
                 Toggle(disableHitParticles, "Skip note-hit particles", x, y + 26);
-                Toggle(disableSustainParticles, "Skip sustain particles", x, y + 58);
-                Toggle(disableFretEffects, "Disable fret flames, sparks, and lightning", x, y + 90);
-                Toggle(freezeComboSmokeScroll, "Pause combo-smoke animation (smoke stays visible)", x, y + 122);
-                GUI.Label(new Rect(x + 22, y + 154, 610, 38),
-                    "These switches affect effects only; notes, scoring, input, and timing are unchanged.");
+                Toggle(disableSustainParticles, "Skip sustain particles", x, y + 56);
+                Toggle(disableFretEffects, "Disable fret flames, sparks, and lightning", x, y + 86);
+                Toggle(freezeComboSmokeScroll, "Pause combo-smoke animation (smoke stays visible)", x, y + 116);
+                Toggle(pauseHiddenBeatlineUpdates, "Skip beatline updates while hidden", x, y + 146);
+                Toggle(disableAprilFools, "Disable April Fools / NoteBomber chaos and Pong", x, y + 176);
+                GUI.Label(new Rect(x + 22, y + 206, 610, 28),
+                    "Live toggle; turn off here to restore the game's joke modes.");
 
-                SectionHeader("Services and HUD", x, y + 205);
-                Toggle(suspendHiddenLeaderboard, "Skip motion checks for the hidden offline leaderboard", x, y + 231);
-                Toggle(stopMidiInput, "Pause drum MIDI polling", x, y + 263);
-                Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to restore)", x, y + 295);
-                Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, y + 327);
-                GUI.Label(new Rect(x + 22, y + 362, 610, 105),
-                    "All switches start off. Fret-effects also pauses its hidden lightning fade scripts. " +
+                SectionHeader("Services and HUD", x, y + 240);
+                Toggle(suspendHiddenLeaderboard, "Skip motion checks for the hidden offline leaderboard", x, y + 266);
+                Toggle(stopMidiInput, "Pause drum MIDI polling", x, y + 294);
+                Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to restore)", x, y + 322);
+                Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, y + 350);
+                GUI.Label(new Rect(x + 22, y + 382, 610, 106),
+                    "Performance toggles start off; April Fools suppression starts on. Fret-effects also pauses " +
+                    "its hidden lightning fade scripts. " +
                     "The leaderboard option acts only on the fully hidden offline list. MIDI restores when unchecked; " +
-                    "Discord presence needs a game restart to return. Canvas falls back to the original renderer if it fails.");
+                    "Discord presence needs a game restart to return. Beatline updates require Hide beatlines and " +
+                    "can also suppress its beat effects if April Fools suppression is turned off. " +
+                    "Canvas falls back to the original renderer if it fails.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -750,6 +760,8 @@ public sealed partial class Core
             Float("PracticeHudOffsetX", practiceHudX); Float("PracticeHudOffsetY", practiceHudY); Float("FpsHudOffsetX", fpsHudX); Float("FpsHudOffsetY", fpsHudY);
             Float("SettingsMenuScale", settingsMenuScale); Float("ScoreHudScale", scoreHudScale); Float("InputViewerScale", inputViewerScale); Float("StarPowerHudScale", starPowerHudScale); Float("PracticeHudScale", practiceHudScale); Float("FpsHudScale", fpsHudScale);
             Bool("HideHighwaySides", hideSides); Bool("HideFretStrings", hideStrings); Bool("HideBeatlines", hideBeats); Bool("ConstantPracticeNoteSpeed", lockSpeed);
+            Bool("PerformancePauseHiddenBeatlineUpdates", pauseHiddenBeatlineUpdates);
+            Bool("DisableAprilFoolsContent", disableAprilFools);
             Bool("PerformanceDisableHitParticles", disableHitParticles); Bool("PerformanceDisableSustainParticles", disableSustainParticles);
             Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput);
             Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
@@ -789,6 +801,8 @@ public sealed partial class Core
         Int("SongHudX", songX, 0, Math.Max(0, Screen.width)); Int("SongHudY", songY, 0, Math.Max(0, Screen.height)); Int("SongFontSize", songFont, 14, 48); Float("SongBackgroundOpacity", songOpacity, 0, 1);
         Float("PracticeHudOffsetX", practiceHudX, -1500, 1500); Float("PracticeHudOffsetY", practiceHudY, -1500, 1500); Float("FpsHudOffsetX", fpsHudX, -1500, 1500); Float("FpsHudOffsetY", fpsHudY, -1500, 1500);
         Bool("HideHighwaySides", hideSides); Bool("HideFretStrings", hideStrings); Bool("HideBeatlines", hideBeats); Bool("ConstantPracticeNoteSpeed", lockSpeed);
+        Bool("PerformancePauseHiddenBeatlineUpdates", pauseHiddenBeatlineUpdates);
+        Bool("DisableAprilFoolsContent", disableAprilFools);
         Bool("PerformanceDisableHitParticles", disableHitParticles); Bool("PerformanceDisableSustainParticles", disableSustainParticles);
         Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput);
         Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
@@ -1038,7 +1052,8 @@ public sealed partial class Core
             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
             || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
         bool nativeHudPending = !nativeHudError && (nativeHudRequested || nativeHudActive);
-        bool visualRequested = hideSides.Value || hideStrings.Value || hideBeats.Value || tintScore.Value;
+        bool pauseHiddenBeats = hideBeats.Value && pauseHiddenBeatlineUpdates.Value;
+        bool visualRequested = hideSides.Value || hideStrings.Value || hideBeats.Value || pauseHiddenBeats || tintScore.Value;
         bool practiceSpeedRequested = lockSpeed.Value && practiceModeActive;
         bool disableHits = disableHitParticles.Value;
         bool disableSustains = disableSustainParticles.Value;
@@ -1139,13 +1154,14 @@ public sealed partial class Core
                 tintFc.Value ? Read(pfcColor) : Color.white);
             timings.End(1, ringTiming);
             long visualTiming = timings.Begin();
-            visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value,
+            visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value, pauseHiddenBeats,
                 tintScore.Value, Read(starColor), Read(progressColor), Read(scoreColor), Read(songProgressColor), lockSpeed.Value,
                 now, timings);
             timings.End(2, visualTiming);
         }
         catch (Exception ex)
         {
+            visuals.RestoreBeatRenderers();
             visualError = true;
             LoggerInstance.Error($"Visual overrides paused after an error; counters and controls remain available: {ex}");
             Notice("Visual overrides stopped after an error. Send Latest.log.");

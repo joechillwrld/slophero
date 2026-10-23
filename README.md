@@ -1,4 +1,4 @@
-# SlopHero 0.4.57 alpha
+# SlopHero 0.4.58 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
@@ -6,10 +6,14 @@ features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.57 reshapes the settings window into a sidebar and options panel,
-adds an editable accent color, and trims two more performance paths.** The
-accent colors the title bar, selected page, and HUD resize outline; it can be
-typed or adjusted with the existing color sliders and is saved in color themes.
+**Version 0.4.58 adds a live switch that disables the April Fools/NoteBomber
+chaos and Pong joke, enabled by default, plus an optional beatline-update
+optimization. It can pause the beatline renderer while SlopHero hides
+beatlines, avoiding its per-frame updates. Version 0.4.57 reshaped the settings
+window into a sidebar and options panel, added an editable accent color, and
+trimmed two more performance paths. The accent colors the title bar, selected
+page, and HUD resize outline; it can be typed or adjusted with the existing
+color sliders and is saved in color themes.
 The hidden offline leaderboard visibility check now runs at 20 Hz instead of
 60 Hz, restoring its six motion components within 50 ms when it appears. The
 combo-smoke switch now finds the active nonremote guitar even while the game
@@ -22,9 +26,10 @@ effect immediately, and disabled effects restore their original state. A matched
 about 6% higher with the ten fret-fade scripts paused. That is encouraging
 callback evidence, not a GPU presentation measurement or a whole-game FPS
 claim. Version 0.4.53's smoke switch searched the wrong hierarchy and matched
-nothing; 0.4.54 corrected it. Sloptifine keeps optional switches off by
-default. It also retains the optional Canvas renderer for the counter HUD. It
-updates retained UI objects only when the counter text, position, or appearance
+nothing; 0.4.54 corrected it. Sloptifine performance switches stay off by
+default; the separate April Fools suppression starts on. It also retains the
+optional Canvas renderer for the counter HUD. It updates retained UI objects
+only when the counter text, position, or appearance
 changes. The established IMGUI renderer remains the default and handles HUD
 editing; it also takes over if Canvas creation fails. See the
 [performance audit](docs/performance-audit.md) for measured limits and current
@@ -32,7 +37,7 @@ targets.
 
 ## Install
 
-[Download v0.4.57 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.57-alpha.zip?raw=true)
+[Download v0.4.58 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.58-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -306,6 +311,36 @@ An opt-in 30-second timing capture now also logs active counts for visual
 scripts, SpriteRenderers, cameras, canvases, animators, video players, and
 particle systems. Those counts guide future game-side changes; they do not
 disable any native game components.
+
+## 0.4.58 April Fools suppression and beatline-update optimization
+
+The new default-on **Disable April Fools / NoteBomber chaos and Pong** switch
+forces the current game's shared joke-mode flags off and deactivates active
+`PongersGame` objects without destroying them. Turning it off restores the
+state the game had before SlopHero suppressed it; shutdown also restores it.
+The current generated assembly has no `GlobalVariables.isAprilFools` field,
+so this uses its present `BaseMenu.HAVEFUN`, `GlobalVariables.isNoteBomber`, and
+`PongersGame` hooks. The game uses `HAVEFUN` for related NoteBomber effects, so
+those are suppressed too while the option is on.
+
+The optional **Skip beatline updates while hidden** switch avoids a per-frame
+beat scan only when beatlines are hidden. It remains off by default and can
+suppress beat-triggered effects if the April Fools switch is turned off.
+
+## Beatline update optimization
+
+**F8 → Sloptifine → Skip beatline updates while hidden** is off by default and
+requires **Hide beatlines** to be enabled. It suspends the beatline renderer
+while its visuals are hidden, then restores its original enabled state when
+the switch is turned off or the scene changes. The older source reference
+shows that this renderer performs per-frame beat scans and transform/color
+updates; it also drives April Fools beat-triggered effects. If April Fools
+suppression is turned off, this optimization can suppress those effects too.
+This is a code-path reduction awaiting an in-game comparison, not a measured
+FPS claim.
+
+The older source dump and current-version verification limits are recorded in
+the [performance audit](docs/performance-audit.md).
 
 ## 0.4.57 settings sidebar and performance follow-up
 

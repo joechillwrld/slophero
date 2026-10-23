@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.57", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.58", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -42,6 +42,8 @@ public sealed partial class Core : MelonMod
     private string status = "Starting...", statsText = "";
     private string practiceWaitState = "";
     private double nextStats, nextGameStateRefresh, nextOverridePass, nextOptionalServicePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
+    private double nextAprilFoolsPass;
+    private bool aprilFoolsError;
     private bool lastStatsSongPlaying;
     private IntPtr localStatsPlayer;
     private int? pendingSection;
@@ -180,6 +182,17 @@ public sealed partial class Core : MelonMod
         try
         {
             double now = clock.Elapsed.TotalSeconds;
+            if (compatible && !aprilFoolsError && now >= nextAprilFoolsPass)
+            {
+                nextAprilFoolsPass = now + .1;
+                try { aprilFools.Apply(disableAprilFools.Value, now); }
+                catch (Exception ex)
+                {
+                    aprilFools.Restore();
+                    aprilFoolsError = true;
+                    LoggerInstance.Warning($"April Fools suppression stopped safely after a game binding error: {ex.Message}");
+                }
+            }
             // MIDI and Discord service toggles do not participate in guitar
             // input or note timing. Poll them at 10 Hz instead of once for
             // every simulation tick on high-refresh/unlocked configurations.
@@ -758,6 +771,8 @@ public sealed partial class Core : MelonMod
     public override void OnDeinitializeMelon()
     {
         timings.Finish();
+        aprilFools.Restore();
+        visuals.RestoreBeatRenderers();
         performance.Clear();
         comboSmokeScroll.Clear();
         counterCanvas.Clear();

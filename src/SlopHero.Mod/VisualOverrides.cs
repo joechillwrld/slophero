@@ -9,6 +9,7 @@ internal sealed class VisualOverrides
 {
     private readonly Dictionary<IntPtr, (SpriteRenderer Renderer, Color Original)> colors = new();
     private readonly Dictionary<IntPtr, (Renderer Renderer, bool Original)> hidden = new();
+    private readonly Dictionary<IntPtr, (BeatRenderer Renderer, bool Original)> suspendedBeatRenderers = new();
     private readonly Dictionary<IntPtr, ScrollSpeedCompensation> speeds = new();
     private readonly PracticeClockRate practiceClockRate = new();
     private readonly Dictionary<IntPtr, (Il2CppTMPro.TextMeshProUGUI Text, Color Original)> texts = new();
@@ -26,9 +27,22 @@ internal sealed class VisualOverrides
     private double nextPracticeClockSample;
     private readonly HashSet<IntPtr> hiddenPlayers = new();
     private bool fullSongSpeedSyncPending = true;
-    public bool HasOverrides => hidden.Count != 0 || colors.Count != 0 || speeds.Count != 0 || texts.Count != 0;
+    public bool HasOverrides => hidden.Count != 0 || suspendedBeatRenderers.Count != 0
+        || colors.Count != 0 || speeds.Count != 0 || texts.Count != 0;
     public bool NeedsUpdate => fullSongSpeedSyncPending || HasOverrides;
-    public void Clear() { colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); starFaceSprites.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = oldConstantSpeed = false; practiceClockSampling = false; nextPracticeClockSample = 0; nextScoreColorRefresh = nextPlayerPass = 0; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null; }
+    public void RestoreBeatRenderers()
+    {
+        foreach (var state in suspendedBeatRenderers.Values)
+        {
+            try { if (state.Renderer != null) state.Renderer.enabled = state.Original; } catch { }
+        }
+        suspendedBeatRenderers.Clear();
+    }
+    public void Clear()
+    {
+        RestoreBeatRenderers();
+        colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); starFaceSprites.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = oldConstantSpeed = false; practiceClockSampling = false; nextPracticeClockSample = 0; nextScoreColorRefresh = nextPlayerPass = 0; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null;
+    }
     private SpriteRenderer[] Sprites(GameObject go)
     {
         if (!spriteChildren.TryGetValue(go.Pointer, out var result))
@@ -80,6 +94,26 @@ internal sealed class VisualOverrides
             r.enabled = false;
         }
         else if (hidden.Remove(r.Pointer, out var old)) r.enabled = old.Original;
+    }
+
+    // Hiding beatline sprites alone still leaves BeatRenderer's per-frame scan,
+    // transform updates, and color writes running. Suspend that renderer while
+    // the user has hidden beatlines, preserving its initial enabled state. The
+    // old source also used Update for April Fools beat triggers; this remains
+    // an explicit opt-in setting and that side effect is called out in the UI.
+    private void SuspendBeatRenderer(BeatRenderer? renderer, bool suspend)
+    {
+        if (renderer == null) return;
+        if (suspend)
+        {
+            if (!suspendedBeatRenderers.ContainsKey(renderer.Pointer))
+                suspendedBeatRenderers.Add(renderer.Pointer, (renderer, renderer.enabled));
+            if (renderer.enabled) renderer.enabled = false;
+        }
+        else if (suspendedBeatRenderers.Remove(renderer.Pointer, out var old) && old.Renderer != null)
+        {
+            old.Renderer.enabled = old.Original;
+        }
     }
     private void Tint(SpriteRenderer? r, bool enabled, Color color)
     {
@@ -138,7 +172,7 @@ internal sealed class VisualOverrides
         return value;
     }
 
-    public void Apply(GameManager game, bool sides, bool strings, bool beats,
+    public void Apply(GameManager game, bool sides, bool strings, bool beats, bool pauseHiddenBeatlineUpdates,
         bool score, Color stars, Color progress, Color scoreText, Color songProgressColor, bool constantSpeed,
         double realtime, RuntimeTimings timings)
     {
@@ -188,7 +222,8 @@ internal sealed class VisualOverrides
         }
         if (!practiceNow && fullSongSpeedSyncPending)
             fullSongSpeedSyncPending = !SyncFullSongSpeed(game);
-        if (!sides && !strings && !beats && !score && !constantSpeed && hidden.Count == 0 && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
+        if (!sides && !strings && !beats && !score && !constantSpeed && hidden.Count == 0
+            && suspendedBeatRenderers.Count == 0 && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
         bool playerPassNeeded = sides != oldSides || strings != oldStrings || beats != oldBeats
             || practiceChanged || constantSpeed != oldConstantSpeed || refreshScoreColors;
         bool playerEffectsActive = sides || strings || beats || constantSpeed
@@ -206,6 +241,7 @@ internal sealed class VisualOverrides
                 {
                     if (p == null || !p.enabled || p.TryCast<GuitarPlayer>() == null || p.engine == null) continue;
                     var b = p.beatRenderer;
+                    SuspendBeatRenderer(b, beats && pauseHiddenBeatlineUpdates);
                     bool newPlayer = !hiddenPlayers.Contains(p.Pointer);
                     if (newPlayer || sides != oldSides || strings != oldStrings || beats != oldBeats)
                     {

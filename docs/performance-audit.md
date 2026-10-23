@@ -743,3 +743,63 @@ CPU render, UI layout, GPU, and driver time on Windows. The leaderboard is a
 specific native-work candidate only if its entries and canvas remain active
 while hidden in live offline play. Any claimed FPS improvement needs a matched
 chart, speed, HUD visibility, settings, resolution, and capture duration.
+
+## Older source dump archaeology
+
+The source dump at [opseclevelarchivesrc](https://github.com/joechillwrld/opseclevelarchivesrc), commit
+`0f0b459df2bc9ba1087a0cf79ba4c3eb52120890`, is a Unity 2019.4 project with
+311 C# files. It is an architecture reference, not the source for Clone Hero
+1.1.0.6142. The current generated IL2CPP assembly still contains corresponding
+types such as `BeatRenderer`, `GuitarNoteRenderer`, `SongOptions`,
+`MIDIInputManager`, `GHLFretAnimator`, and `PongersGame`; matching type names do
+not establish that their current method bodies still match this dump.
+
+One target was specific enough for a guarded optimization. In the old source,
+`BeatRenderer.Update` calls `RenderBeats` every frame. That method scans upcoming
+beats and rewrites pooled objects' active states, transforms, and colors.
+SlopHero's existing **Hide beatlines** option hid their renderers but left this
+work running. Version 0.4.58 adds a separate, default-off **Skip beatline
+updates while hidden** switch. It suspends the component only while beatlines
+are hidden, remembers the original enabled state, and restores it when either
+switch turns off or the scene changes. The old implementation also fired
+April-Fools camera shake and roll effects from `RenderBeats`; the separate
+April Fools switch suppresses those effects by default. No in-game frame-time
+result is available yet; this is a targeted CPU-work reduction, not an FPS
+claim.
+
+The current metadata does not expose the old `GlobalVariables.isAprilFools`
+field. It does expose `BaseMenu.HAVEFUN`, `GlobalVariables.isNoteBomber`, and
+`PongersGame`, alongside the AprilFools cheat name and its April 1 prompt text.
+Version 0.4.58 adds a default-on, reversible **Disable April Fools / NoteBomber
+chaos and Pong** option: it clears the two current shared joke flags and
+deactivates active Pong minigame objects, preserving their original states for
+restoration. The shared `HAVEFUN` flag also drives NoteBomber effects, so those
+are suppressed too while enabled. This is a targeted content fix; it does not
+claim a gameplay-FPS gain.
+
+The supplied current 1.1.0.6142 IL2CPP dump narrows the other leads, but does
+not expose enough method bodies to justify changing them:
+
+- The old guitar renderer ran a 200 Hz whammy-texture updater, including a CPU
+  path with `Texture2D.SetPixels` and `Apply`. In the current generated dump,
+  `GuitarNoteRenderer` is a thin subclass of generic
+  `BaseGuitarNoteRenderer`; neither type exposes the old updater name or
+  whammy-texture fields. The native methods are obfuscated, so the 200 Hz
+  cadence and texture upload path cannot be confirmed from this dump. Changing
+  a guessed call rate could damage whammy-tail rendering without reducing work.
+- The old note renderer used `yield`-based `GetNextBitPos` and range helpers in
+  hot loops. The current dump has an `Update` on the generic base renderer but
+  no matching helper names or renderer-owned iterator-state-machine types. That
+  is evidence the old allocation pattern is not directly present; it does not
+  reveal the current native loop body. No scoring-sensitive replacement is
+  warranted from this evidence.
+
+The old `GHLFret_Animator.Update` is empty, and the current generated
+`GHLFretAnimator` declares no `Update` override, so there is no current callback
+to remove. The old `Gameplay ideas.txt` also contains draft concepts for
+randomized party modifiers, a speed-changing multiplayer race, and sight-read
+FC achievements. These are design leads from the dump, not existing features
+or agreed requirements. It also reveals secret song-options menus behind fret
+button sequences and an April-Fools flag toggled by a cheat. The current
+assembly's joke-mode fields and `PongersGame` type enabled a current-version
+suppression hook without changing note scoring or song timing.
