@@ -2,6 +2,40 @@
 
 ## Live capture findings and measurement correction
 
+### v0.4.50 follow-up capture (30 seconds)
+
+The new log loaded v0.4.50 with the same reported settings as the v0.4.49
+capture. The hidden leaderboard remains suspended while its list is invisible
+(alpha 0; zero of six entry updates eligible), and the guitar viewer still
+reports 48 enabled sprites while GHL/drums report none. No SlopHero runtime
+exception appears in the log.
+
+This run observed 2,342 simulation Updates/s and 1,171 scheduled-render and
+GUI-repaint callbacks/s. The prior capture recorded about 2,300 and 1,150/s.
+The p50/p95/p99 callback intervals changed only slightly: simulation
+0.46/0.64/0.73 ms, scheduled render 0.83/1.06/1.22 ms, and GUI repaint
+0.82/1.06/1.23 ms. The new maxima were 9.034 ms for simulation, 8.459 ms for
+scheduled render, and 8.184 ms for repaint. Those maxima appear across all
+three callback streams, consistent with one shared scheduling delay, but the
+log cannot identify its source. The percentile cadence remains much steadier
+than those isolated maxima suggest.
+
+Rounded named SlopHero callback costs sum to about 0.84 CPU seconds over the
+30-second run, roughly 2.8% of one core: Update 0.004 ms across 70,277 calls,
+HUD repaint 0.015 ms across 36,350 calls, performance effects 0.008 ms across
+597 calls, visual overrides 0.012 ms across 597 calls, and separate FC-ring
+work 0.004 ms across 597 calls. Player/speed and score-graphics timings are
+subsets of visual overrides. The HUD repaint is still the largest named
+aggregate, but the cost is only around half a second per 30-second capture.
+
+The v0.4.50 change moved MIDI/Discord service-manager calls to 10 Hz, but the
+`Update` average remains 0.004 ms at the report's three-decimal precision.
+This capture therefore does not resolve or prove a gain from that change.
+The observed rate and interval differences from v0.4.49 are small enough to
+come from ordinary run-to-run variation; this was not a controlled A/B test.
+The capture also still measures callback spacing rather than GPU presentation
+or whole-game FPS.
+
 ### v0.4.49 live capture (30 seconds)
 
 The newly supplied log confirms the v0.4.49 build loaded against the matching
