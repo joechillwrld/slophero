@@ -1067,11 +1067,87 @@ The user approved a default-off whammy experiment. v0.4.63 adds a narrowly
 scoped hook for `Texture2D.Apply()` on the object the game assigns to the exact
 `_GlobalWhammyTexture` shader property. While gameplay is active, it permits at
 most one upload every 5 ms (200 Hz) and suppresses closer repeats. The hook is
-installed only while the option is enabled, and the log reports the observed
-texture type plus allowed/skipped upload counts. This targets the old CPU
-texture fallback; it does not hook compute dispatch or affect the GPU
-`RenderTexture` path. Enabling it before loading a song allows the assignment to
-be captured. The experiment leaves Texture2D writes, whammy input, controller
-polling, audio, chart timing, and scoring unchanged. Its actual benefit and
-whether the current build uses that CPU path remain unmeasured, so users should
-compare matched traces and leave it off if the game reports a RenderTexture.
+Texture assignment tracking stays active while the option is enabled so the
+target is known before a chart starts. The global `Texture2D.Apply` prefix is
+installed only in Gameplay and is removed on scene exit, avoiding per-upload
+hook work in menus and other scenes. The hot prefix compares cached native
+object pointers instead of Unity's overloaded object equality on every upload
+callback. It does not hook compute dispatch or alter whammy input, controller
+polling, audio, chart timing, or scoring. The pointer comparison's CPU effect
+and the cap's net benefit remain unmeasured.
+
+### v0.4.63 paired online report
+
+The supplied logs do not capture the same runtime state. The user's log loads
+SlopHero 0.4.63 and ClonZones 2.0.0 on Windows 10 with MelonLoader 0.8.0; the
+friend's log loads SlopHero 0.4.62 on Windows 11 with MelonLoader 0.7.3. Both
+target Clone Hero 1.1.0.6142. The friend's file contains startup and preference
+save lines only; it has no Gameplay scene, timing capture, connection state, or
+counter readings. The user's file has many scene transitions and one 30-second
+timing capture, but no online/connection marker or live counter values. Neither
+file can establish which runtime state produced the audio/chart mismatch.
+
+The user reports the mismatch occurred online only, and both players saw it.
+That makes an offline practice-speed issue unlikely. `VisualOverrides` applies
+constant note-speed compensation only when the game's practice flag is set.
+Version 0.4.63's only gameplay hook added after 0.4.62 is the optional
+`_GlobalWhammyTexture` upload cap; it intercepts matching `Texture2D.Apply`
+calls and does not write the chart clock, audio, note state, network state, or
+controller input. The friend did not have that hook in 0.4.62, so it cannot by
+itself explain a desync seen by both players. The files do not prove the base
+game is at fault; they simply contain no network/audio timing evidence to
+locate the cause.
+
+The user capture records `renderFrameInterval=2`, simulation updates at
+2499.5/s, and scheduled render callbacks at 1249.7/s. These callback rates are
+not display-present measurements; the render interval is a game setting, not a
+SlopHero write. Its p95/p99 simulation intervals are at or below 0.56/0.63 ms,
+and scheduled-render intervals at or below 0.96/1.08 ms. SlopHero's measured
+Update average is 0.002 ms; visual overrides average 0.015 ms, and the
+performance-effects pass averages 0.079 ms across 60 calls. This points to low
+mod-side CPU cost during this capture, but the capture does not compare online
+and solo or measure audio/network timing. The prior WPA trace's largest
+identified mod-adjacent CPU path was Unity mouse UI raycasting; the user's
+current settings report that optional path active. Rewired polling remains
+untouched to preserve the requested 1000 Hz controller rate.
+
+The online counter selects an enabled, input-enabled, nonremote GuitarPlayer
+and reads that player's native engine hit/ghost fields plus its chart heads.
+The same selector is present in 0.4.62. Since the friend's file has no runtime
+state, it cannot show whether Clone Hero exposes those engine counters as
+player-local or session-aggregated in online play. Changing the selector or
+reconstructing multiplayer misses without that evidence risks presenting a
+different wrong value; solo correctness does not validate the network engine
+case.
+
+The 0.4.63 log also exposed a telemetry contradiction: IL2CPP reports the
+captured global texture's wrapper type as `Texture`, while the allowed/skipped
+counts show 699,401 matching `Texture2D.Apply` calls (407,309 allowed and
+292,092 skipped). The wrapper type was incorrectly treated as proof that the
+cap could not match. The runtime message now reports that wrapper type as
+inconclusive and reports actual Apply matches separately; timing settings also
+include the cap toggle and hook state. This correction changes diagnostics
+only, not throttle behavior.
+
+### Whammy/raycast follow-up
+
+The whammy tracker records global texture assignments while enabled, including
+assignments made in the pre-song menu. Scene-load handling installs the cap
+before Gameplay's first normal frame update. On scene exit it removes the
+global `Texture2D.Apply` prefix but keeps the low-frequency assignment tracker
+active while the preference remains enabled. This avoids adding a Harmony call
+to unrelated texture uploads in menus without losing the selected texture.
+Inside the hot prefix, cached `Il2CppObjectBase.Pointer` identity replaces
+Unity object `!=`, avoiding overloaded Unity-object comparisons on every upload
+candidate. The cached `Texture` wrapper remains strongly referenced while the
+tracker is active. The 200 Hz cap itself is unchanged, and no benchmark yet
+quantifies this per-call reduction.
+
+The mouse experiment already skips the measured Unity `StandaloneInputModule`
+mouse handler before pointer-data creation and raycasting when the chart is
+active; it remains default-off and has no effect on keyboard/controller
+navigation or Rewired polling. A broader `EventSystem.RaycastAll` bypass would
+also suppress raycasts requested by non-mouse UI code, so the trace does not
+justify broadening the patch. The next useful performance comparison is a
+matched WPA capture with the mouse option off and on, keeping chart, scene,
+resolution, and frame multiplier the same.

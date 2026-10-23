@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.63", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.64", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -105,6 +105,8 @@ public sealed partial class Core : MelonMod
         mouseUiGameplay.Clear(HarmonyInstance);
         if (compatible && gameplay && skipGameplayMouseUi.Value)
             mouseUiGameplay.Update(HarmonyInstance, requested: true, gameplayActive: false);
+        if (compatible)
+            whammyTextureThrottle.Update(HarmonyInstance, throttleWhammyTexture.Value, gameplay);
         visuals.Clear();
         performance.Clear();
         starProgressParticles.Clear();

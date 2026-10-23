@@ -1,24 +1,24 @@
-# SlopHero 0.4.63 alpha
+# SlopHero 0.4.64 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
 features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.63 adds
-a default-off experiment that caps duplicate CPU whammy texture uploads at
-200 Hz. It only targets the named whammy `Texture2D`; GPU compute rendering is
-unchanged. The hook installs only while enabled, and the log reports the
-captured texture type and skipped upload count. Enable it before loading a
-song; compare matched captures and leave it off if the log reports a
-`RenderTexture`. Earlier versions also added a separate option to suppress the
+build, compiled against its loader and generated assemblies. Version 0.4.64
+keeps the default-off 200 Hz CPU whammy-texture cap scoped to active Gameplay,
+uses native pointer identity in its hot upload check, and corrects the log so
+IL2CPP wrapper type is not mistaken for the actual upload path. Texture
+assignment tracking lets the cap recognize the target before a song starts;
+GPU compute rendering remains untouched. Enable the option before loading a
+song. Earlier versions also added a separate option to suppress the
 star-progress particle burst. The star bar, score, note timing, keyboard and
 controller navigation, and 1000 Hz instrument polling remain untouched. See
 the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download v0.4.63 ZIP](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.63-alpha.zip)
+[Download v0.4.64 ZIP](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.64-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
