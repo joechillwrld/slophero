@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.43", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.44", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -40,6 +40,7 @@ public sealed partial class Core : MelonMod
     private string status = "Starting...", statsText = "";
     private string practiceWaitState = "";
     private double nextStats, nextOverridePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
+    private double nextGameplayPass;
     private bool lastStatsSongPlaying;
     private IntPtr localStatsPlayer;
     private int? pendingSection;
@@ -112,6 +113,7 @@ public sealed partial class Core : MelonMod
         lastStatsSongPlaying = false;
         localStatsPlayer = IntPtr.Zero;
         nextOverridePass = 0;
+        nextGameplayPass = 0;
         restartHold.RequireRelease();
         practiceHold.RequireRelease();
         if (!gameplay && sceneName != "Loading") pendingSection = null;
@@ -159,7 +161,6 @@ public sealed partial class Core : MelonMod
         try
         {
             double now = clock.Elapsed.TotalSeconds;
-            optionalServices.Apply(stopMidiInput.Value, disableDiscordPresence.Value, now);
             if (Input.GetKeyDown(KeyCode.F8))
             {
                 if (moveHud || resizeTarget >= 0) { moveHud = false; resizeTarget = -1; resizeHandle = -1; resizeMoveDragging = false; settingsOpen = true; }
@@ -220,6 +221,16 @@ public sealed partial class Core : MelonMod
             }
             if (compatible && !settingsOpen && !moveHud && !gameplay)
                 SongSpeedControl.ProcessSelectedSpeedInput(songSpeedStep.Value, now);
+            // F8, Escape, binding capture, and the pre-song digit editor above
+            // still handle every frame. Gameplay controls are hold-based and
+            // the HUD samples at 5 Hz, so avoid the costly GameManager/IL2CPP
+            // reads on the thousands of extra unlocked updates in between.
+            if (compatible && gameplay)
+            {
+                if (now < nextGameplayPass) return;
+                nextGameplayPass = now + 1d / 120;
+            }
+            optionalServices.Apply(stopMidiInput.Value, disableDiscordPresence.Value, now);
             if (!compatible) return;
             if (transition && now - transitionStarted > 30)
             {

@@ -1,5 +1,16 @@
 # Performance audit notes
 
+## 0.4.44 gameplay update cadence
+
+The v0.4.43 capture below observed roughly 2,317 `OnUpdate` calls per second,
+while hold-based song controls and `GameManager` readiness checks were repeated
+on every call. Version 0.4.44 leaves one-frame key events, binding capture,
+menu speed typing, and frame-timing samples on that path. It limits the heavier
+gameplay-state and hold checks to 120 Hz; existing counter and visual refresh
+cadences are unchanged. A hold shortcut may act up to about 8 ms later than
+before. Its configured hold threshold defaults to 750 ms. A matched Windows
+capture is needed to measure the actual frame-time effect.
+
 ## v0.4.43 Windows capture
 
 The user reported smoother, more consistent play with v0.4.43. The 30-second
@@ -75,9 +86,11 @@ speedup claim.
 
 ## Current hot paths
 
-- `Core.OnUpdate` runs at the game's unlocked update rate. The measured average
-  is about 4 microseconds per call. Chart-stat formatting and note scans are
-  gated to 5 Hz and are skipped when their fields are hidden.
+- `Core.OnUpdate` is invoked at the game's unlocked update rate. The v0.4.43
+  measured average was about 4 microseconds per call; v0.4.44 gates gameplay
+  state and hold checks to 120 Hz while keeping one-frame input events live.
+  Chart-stat formatting and note scans remain gated to 5 Hz and are skipped
+  when their fields are hidden.
 - The custom counter HUD draws one combined background/text control per repaint.
   The measured average was about 15 microseconds. It is now the largest steady
   SlopHero callback in the latest measured capture; replacing it with a more complex
