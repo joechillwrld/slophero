@@ -1,5 +1,45 @@
 # Performance audit notes
 
+### 2026-10-23 stack export and source screening
+
+The new `CPU_Usage_(Sampled)_Utilization_by_Process,_Thread,_Stack.csv` is a
+valid stack-bearing WPA export: it contains 113,554 Clone Hero samples and
+113.741 seconds of sampled CPU weight across a 42.28-second capture. It has
+Thread IDs and stacks on 82.5% of Clone Hero rows; 17.5% are `n/a`.
+
+Thread 13808 carries 37.066 seconds of weight (32.6% of the process total),
+with stacks passing through UnityPlayer/GameAssembly. It is the busiest
+observed Clone Hero thread; the export does not provide a thread name to prove
+whether it is the main or render thread. Those modules have no resolved
+symbols or addresses in this export. UnityPlayer occurs in 67.2% of all stack weight, GameAssembly in
+8.8%, NVIDIA user driver in 12.6%, and MelonLoader in 1.4%; these stack
+memberships overlap and are not exclusive module costs. The named
+`ComponentSiblingFix` callback accounts for about 183 ms, too little to
+prioritize ahead of the unresolved Unity/game path. Several stacks end in
+Windows ETW stack-walk/unwind functions, so the capture itself also contributes
+measurement work; those are not a game hook target.
+
+The uploaded WPA profile already contains `Address`, `Function`, `Module`, and
+`Thread Name` columns but leaves them hidden. A companion profile at
+`profiling/SloptifineNativeStacks.wpaProfile` exposes those columns alongside
+the existing stack and weight columns, allowing the same ETL to provide the
+instruction addresses needed to map the native hot path. No new recording is
+needed. The address column should be checked in the resulting table before
+export; the current export proves the stack path is correct, not that symbols
+are resolved.
+
+The older source adds two ideas that are not safe to patch from source alone.
+`GameManager.Update` calls `NoteAnimator.AnimatorUpdate` every simulation
+update; the old method advances two animation clocks and counters despite the
+separate animation-FPS settings. The current generated assembly still contains
+the `NoteAnimator` type, but this stack export cannot tell whether that code is
+hot or recover its current method address. `ButtonTipIcons.Update` also scans
+the player list and polls `GetAnyButton` once per icon per frame, but only to
+refresh menu button hints when the active controller type changes. A low-rate
+menu-only refresh may be safe, though current live instance counts and CPU cost
+are unknown. Both are profiling leads, not claimed wins; gameplay input and
+note timing remain untouched.
+
 ### v0.4.75 trace findings and mouse-path verification
 
 The supplied CPU export covers about 31 seconds. Its largest identified
