@@ -930,6 +930,15 @@ implementation compiles, but the trace is still a lead rather than an A/B
 result. It does not establish a frame-time gain; that requires a matched run
 with the option off/on and presentation or frame-time measurements.
 
+The first v0.4.59 runtime log showed that lookup failing closed with
+`StandaloneInputModule.ProcessMouseEvent()` unresolved. Inspection of the
+generated UnityEngine.UI wrapper confirmed the method exists with the expected
+zero-argument signature, but Il2CppInterop exposes it as `Public` through
+reflection even though Unity declares it protected. The initial lookup asked
+only for non-public methods. v0.4.60 searches both visibility flags; this fixes
+the resolution error, while actual in-game activation still needs confirmation
+from the next runtime log.
+
 The trace also attributes 2,116 ms to `Rewired.InputManager_Base.DoUpdate`.
 That is kept intact by design: it is input work, and this profile is no reason
 to change the user's 1000 Hz controller polling. Two GameAssembly `.text`

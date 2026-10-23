@@ -48,8 +48,10 @@ internal sealed class MouseUiGameplayOverride
             var uiAssembly = AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => string.Equals(a.GetName().Name, "UnityEngine.UI", StringComparison.Ordinal));
             var moduleType = uiAssembly?.GetType("UnityEngine.EventSystems.StandaloneInputModule", throwOnError: false);
+            // Il2CppInterop exposes some protected Unity members as public
+            // reflection methods, so search both visibility flags.
             target = moduleType?.GetMethod("ProcessMouseEvent",
-                BindingFlags.Instance | BindingFlags.NonPublic,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
                 binder: null, types: Type.EmptyTypes, modifiers: null);
             if (target == null)
                 throw new MissingMethodException("UnityEngine.EventSystems.StandaloneInputModule.ProcessMouseEvent()");
