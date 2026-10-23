@@ -1,8 +1,8 @@
-# SlopHero 0.4.42 alpha
+# SlopHero 0.4.43 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.42 fixes late-hit miss totals.** The live HUD now calculates misses from judged chart heads minus the game's native hit counter, matching the results screen's counting rule. A late hit can no longer remain cached as a miss. The HUD briefly refreshes more often when playback ends so final ghost and hit values can catch up with the native practice panel. Version 0.4.41 fixed the practice-stats outline and move controls. Earlier changes and the five optional Performance switches are described below.
+**Version 0.4.43 targets online counters and unnecessary mod work.** The counter HUD chooses the local, input-enabled guitar instead of the first player in the online array; if it cannot identify one, it hides the counters instead of showing a remote player's misses. The Counter HUD master switch now hides the box even while F8 is open. This release also reduces absent-menu searches, score-only player scans, default-off service polling, and repeated writes to suppressed effects. These changes have not yet been measured for FPS gains in Windows gameplay. Version 0.4.42 fixed late-hit miss totals. Earlier changes and the five optional Performance switches are described below.
 Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
 It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
 when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
@@ -18,7 +18,7 @@ percentage equals the renderer's effective rate.**
 
 ## Install
 
-[Download v0.4.42 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.42-alpha.zip?raw=true)
+[Download v0.4.43 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.43-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -592,8 +592,10 @@ controls. Each rendering-error category logs once per session instead of floodin
 
 Counters normally refresh up to five times per second, with a brief faster
 refresh when playback ends. They reset when the engine, chart,
-practice range, or song attempt changes. The first enabled guitar player's HUD
-is shown; per-player multiplayer overlays and drum HUDs are outside this build.
+practice range, or song attempt changes. Online, SlopHero selects the locally
+controlled guitar and hides the counter HUD if it cannot identify one. Solo
+play retains the first enabled guitar as a fallback; per-player multiplayer
+overlays and drum HUDs are outside this build.
 
 ## First in-game check
 

@@ -6,7 +6,7 @@ using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.42", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.43", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -282,19 +282,21 @@ public sealed partial class Core : MelonMod
                     // displayed. The song-info HUD doesn't depend on a player.
                     // Online player arrays can start with a remote guitar.
                     // Its resolved chart heads and local engine hit counter do
-                    // not describe our run, so use the input-enabled guitar.
+                    // not describe our run, so use a non-remote input guitar.
                     var player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled
-                        && p.inputEnabled && p.TryCast<GuitarPlayer>() != null && p.engine != null);
+                        && !p.isRemotePlayerPlaying && p.inputEnabled
+                        && p.TryCast<GuitarPlayer>() != null && p.engine != null);
                     if (player != null) localStatsPlayer = player.Pointer;
                     else
                     {
                         player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled
-                            && p.Pointer == localStatsPlayer && p.TryCast<GuitarPlayer>() != null && p.engine != null);
+                            && !p.isRemotePlayerPlaying && p.Pointer == localStatsPlayer
+                            && p.TryCast<GuitarPlayer>() != null && p.engine != null);
                         var net = CHNetManager.instance;
                         bool online = net != null && (int)net.field_Private_ConnectionState_0 != 0;
                         if (player == null && !online)
                             player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled
-                                && p.TryCast<GuitarPlayer>() != null && p.engine != null);
+                                && !p.isRemotePlayerPlaying && p.TryCast<GuitarPlayer>() != null && p.engine != null);
                     }
                     if (player == null)
                         statsText = "";

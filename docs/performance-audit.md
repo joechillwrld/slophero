@@ -1,10 +1,9 @@
 # Performance audit notes
 
-## Unreleased investigation after 0.4.42
+## 0.4.43 targeted changes
 
-The native game reference ZIPs are unavailable in the current workspace, so
-these source changes have passed portable checks and syntax parsing but have
-not yet been compiled against Clone Hero or measured in Windows gameplay.
+The mod compiles against the user's re-uploaded v1.1.0.6142 IL2CPP and
+MelonLoader references. Windows gameplay measurements are still needed.
 
 - When the pre-song speed row is absent, `SongSpeedControl` used to call
   `GameObject.Find("SongOptions")` on every unlocked menu update. Missing-object
