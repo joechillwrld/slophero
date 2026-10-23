@@ -1,24 +1,19 @@
-# SlopHero 0.4.47 alpha
+# SlopHero 0.4.48 alpha
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.47 caches HUD text layout measurements between repaint events.** Counter line counts and song-info wrapping are recalculated only when their text, font size, or available width changes. The HUD still draws on Unity's normal repaint events, and input polling is unchanged. Version 0.4.46 caches optional effect-suppression discovery per gameplay session; the latest capture measured that callback at 0.008 ms average. Version 0.4.45 restores every-update polling for SlopHero's restart and practice shortcuts. Clone Hero's own note input remains untouched. Version 0.4.43 targeted online counters, the Counter HUD switch, and other unnecessary mod work; earlier features are described below.
-Version 0.4.17 adds in-game profile renaming. Version 0.4.16 adds on-the-fly full settings profiles and reusable color themes.
-It also removes per-repaint text measurement allocations. Version 0.4.15 fixes FPS row color/position targeting, restores score colors reliably
-when disabled, and reduces repeated static-visual scans. Version 0.4.14 adds movable
-practice stats and FPS HUDs, optional FPS text coloring,
-and skips inactive native HUD polling. It also skips counter sampling when both
-SlopHero HUDs are hidden. Version 0.4.13 caps custom score-color checks at 60 Hz. Version 0.4.12 adds
-opt-in timing detail for visual overrides. Version 0.4.11
-removes resolved test diagnostics. Version 0.4.10 reduces
-repeated work in custom star coloring. Version 0.4.9
-reduces idle frame work in the mod. Version 0.4.8 compensates
-from the measured gameplay clock rate rather than assuming the practice
-percentage equals the renderer's effective rate.**
+**Version 0.4.48 corrects the optional performance report.** Older reports
+labeled simulation updates as rendered frames. The report now separates
+simulation intervals, scheduled render intervals, and completed rendered-frame
+count. At capture start it checks live leaderboard and input-viewer state once.
+This is a diagnostic update; no FPS gain is claimed. See the
+[performance audit](docs/performance-audit.md) for the evidence and next targets.
+Version 0.4.47 cached HUD text layout measurements; recent releases also reduced
+effect-discovery work while retaining all HUD, control, and gameplay features.
 
 ## Install
 
-[Download v0.4.47 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.47-alpha.zip?raw=true)
+[Download v0.4.48 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.48-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

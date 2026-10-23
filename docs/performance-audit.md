@@ -1,5 +1,53 @@
 # Performance audit notes
 
+## Measurement correction and 0.4.47 capture
+
+Earlier versions labeled `Time.unscaledDeltaTime` samples taken from
+`Core.OnUpdate` as whole-frame times. That was incorrect. Clone Hero can run
+multiple simulation Updates for one render, so the 2,320/s sample rate in the
+latest log measures the *simulation* cadence, not display FPS or GPU frame
+time. This also changes how the older captures below must be read wherever
+they say “frame” or “whole frame”: their histograms are simulation-Update
+intervals. The named mod callback timings remain valid CPU measurements.
+
+The v0.4.47 log measured 69,622 simulation Updates in 30 seconds, while the
+counter HUD drew on 36,996 GUI repaint calls. The Update callback averaged
+0.004 ms and HUD repaint averaged 0.017 ms. Using those rounded averages,
+their combined measured cost is about 0.91 CPU seconds per 30 seconds, around
+3% of one core; other visual/effect buckets add only a small amount and some
+are nested. This is *not* a measure of native game work, GPU cost, or a
+before/after FPS gain. The v0.4.47 HUD cache is not proven faster by this
+capture: repaint average was 0.014 ms in v0.4.46 under different conditions.
+
+The next timing capture records simulation deltas, `OnDemandRendering`'s
+scheduled render callbacks, and the change in `Time.renderedFrameCount`
+separately. Wall-clock gaps between scheduled render callbacks are an estimate
+of CPU render cadence; they are not GPU presentation times. The completed
+render counter cross-checks the number of actual rendered frames. At capture
+start, a one-time live scene snapshot logs whether the leaderboard entries and
+instrument-viewer branches are active. These diagnostics run only during an
+explicitly started 30-second capture; the scene inspection occurs before the
+timer begins.
+
+### Base-game leads ranked by evidence
+
+| Lead | Current evidence | Decision |
+| --- | --- | --- |
+| Hidden in-game leaderboard | Gameplay serializes six enabled entry scripts beneath `ScoreList`, whose `CanvasGroup.alpha` starts at zero. Native entry `Update` reads its transform and adjusts alpha on motion; the manager skips its formatting path until its state flag and engine pointer are set. | Investigate *live* offline state and the score list's rendering/layout cost. Do not disable it yet: online/leaderboard visibility can change. |
+| Input viewer scene hierarchy | 2,159 GameObjects exist under the viewer, but its native setup toggles instrument branches with `GameObject.SetActive`. Only 46 serialized viewer button scripts occur; their class has no `Update`. | Serialized object count is not a per-frame workload. The game already exposes a viewer setting; keep it functional. |
+| FPS text | Native `FrameRate.Update` counts simulation and scheduled render ticks, then formats the label only after `updateInterval` elapses. | No per-tick string-formatting fix to make here. |
+| News and Pong | Neither is present in the Gameplay scene; News has no declared `Update`. | Menu cleanup cannot explain song FPS without evidence that a separate persistent instance remains active. |
+| Note/input/score pipeline | These are required for chart timing and scoring; the user's controller polling must stay at 1000 Hz. | Do not throttle or skip these paths on speculation. |
+
+The supplied Unity scene is a static snapshot. It has 1,755 SpriteRenderers,
+but only 357 are enabled under active parents in that snapshot, 322 beneath
+the input-viewer hierarchy before runtime instrument selection. A count of
+serialized renderers therefore cannot justify removing all of them. Those 357
+enabled renderers reference just two material pointers in the scene snapshot,
+so even the pre-selection count does not imply 357 separate draw calls. Large
+Geometry Dash speedup examples do not establish a comparable Clone Hero
+bottleneck; the next large gain must follow a measured CPU or GPU hot path.
+
 ## Base-game investigation after 0.4.45
 
 The v0.4.44 Windows capture measured roughly 2,289 game updates/s. SlopHero's
@@ -110,10 +158,11 @@ online leaderboard behavior. No SlopHero binary was built for this inspection.
 
 The v0.4.44 capture used the same mod settings as v0.4.43 except that its
 configured speed was 110% instead of 150%. It measured about 2,289 updates/s,
-with frame p50 <=0.47 ms, p95 <=0.65 ms, p99 <=0.76 ms, and a 9.832 ms maximum.
+with simulation-Update interval p50 <=0.47 ms, p95 <=0.65 ms, p99 <=0.76 ms,
+and a 9.832 ms maximum.
 `OnUpdate` fell from roughly 0.004 ms to 0.001 ms per call, while FC rings,
 visual overrides, score graphics, and HUD repaint stayed similar. The
-whole-frame percentiles were slightly worse, and the unmatched speed setting
+simulation-Update interval percentiles were slightly worse, and the unmatched speed setting
 prevents attributing that change to the mod. The user's experience was similar
 or slightly worse. No SlopHero runtime errors were logged.
 
@@ -137,7 +186,7 @@ and needs a matched capture before it can be quantified.
 
 ## 0.4.46 Windows capture
 
-The supplied v0.4.46 log recorded 69,855 frame samples over 30 seconds at about
+The supplied v0.4.46 log recorded 69,855 simulation-Update samples over 30 seconds at about
 2,328 updates/s, with p50 <=0.47 ms, p95 <=0.59 ms, p99 <=0.68 ms, and a
 7.737 ms maximum. `Performance effects` averaged 0.008 ms across 597 calls
 (about 4.8 ms of measured CPU work for the entire capture), with a 0.582 ms
@@ -146,7 +195,7 @@ were no SlopHero runtime errors. These values show low steady callback cost,
 not an attributable whole-game FPS gain.
 
 The log also records a preferences save 0.761 seconds after the timing capture
-started, while the largest `OnUpdate` took 6.714 ms and the largest whole frame
+started, while the largest `OnUpdate` took 6.714 ms and the largest simulation interval
 took 7.737 ms. The timing report does not timestamp those maxima, so the save
 is a plausible source of the isolated hitch but not a confirmed cause.
 
@@ -181,7 +230,7 @@ capture is needed to measure the actual frame-time effect.
 ## v0.4.43 Windows capture
 
 The user reported smoother, more consistent play with v0.4.43. The 30-second
-capture in the supplied `Latest.log` recorded 69,512 frame samples at about
+capture in the supplied `Latest.log` recorded 69,512 simulation-Update samples at about
 2,317 updates/s, with p50 <=0.46 ms, p95 <=0.64 ms, p99 <=0.73 ms, and a
 3.695 ms maximum. SlopHero logged no runtime errors. Its `OnUpdate` callback
 averaged 0.004 ms across 69,512 calls; HUD repaint averaged 0.013 ms across
@@ -191,7 +240,7 @@ must not be added to that total.
 
 The user also reduced the simulated-frame multiplier, which changes displayed
 FPS. The apparent ~200 FPS difference is therefore not an optimization gain.
-The capture is useful as a frame-pacing baseline, but it is not a matched
+The capture is useful as a simulation-cadence baseline, but it is not a matched
 before/after benchmark and cannot assign the reported improvement to one edit.
 
 ## 0.4.43 targeted changes
@@ -231,21 +280,21 @@ the override callback averaged 0.014 ms, score graphics 0.030 ms (inside the
 override callback), and the main mod `Update` 0.004 ms. The counter HUD repaint
 averaged 0.015 ms across 28,961 repaints, about 965 repaints per second.
 
-The broad frame-time sample in the same capture had p99 at or below 0.69 ms and
+The simulation-Update interval sample in the same capture had p99 at or below 0.69 ms and
 one 85.845 ms maximum. The largest recorded mod callbacks were 0.142 ms for
 `Update`, 0.601 ms for visual overrides, and 0.556 ms for HUD repaint. These
-measurements do not prove what caused the isolated frame spike, but they do not
+measurements do not prove what caused the isolated simulation gap, but they do not
 show a mod callback of comparable duration. Earlier v0.4.31 captures also had
-frame maxima above 120 ms, so that spike pattern predates the 20 Hz change.
-Frame timings are whole-frame samples; callback timings cover only the named
-mod methods and should not be conflated with total game CPU/GPU time.
+simulation-interval maxima above 120 ms, so that spike pattern predates the
+20 Hz change. These interval samples are not full render or GPU timings;
+callback timings cover only the named mod methods.
 
 Using the rounded averages from that v0.4.32 capture, the non-overlapping
 `Update`, visual-dispatch, and HUD repaint buckets account for approximately
 0.77 CPU-seconds in the 30-second sample, or about 2.6% of one fully occupied
 CPU core. This is an estimate from rounded callback averages, not a profiler
 measurement of total process cost. The steady callbacks are small; the large
-frame maximum is the more important unresolved symptom. Across the paired
+simulation gap is the more important unresolved symptom. Across the paired
 v0.4.31 and v0.4.32 captures, dispatch frequency is the clearest comparison:
 about 2,303–2,598 entries/s before versus 19.8/s after. Those logs are not a
 controlled A/B for total FPS, so they do not support an exact whole-game
@@ -318,7 +367,10 @@ do not prove those effects are active during a given song.
 ## Next optimization target
 
 The custom HUD repaint remains the largest measured mod callback by aggregate
-time, while the long frame spikes remain outside the measured callback maxima.
-The base-game candidates above need scene-presence and native-work evidence
-before changing them. Any claimed FPS improvement needs a matched chart,
-speed, HUD visibility, settings, resolution, and capture duration.
+time, but its measured steady cost is small. Large simulation gaps remain
+outside the measured callback maxima. The highest-value next step is to
+establish actual rendered-frame pacing and, if it is poor, profile Unity's
+CPU render, UI layout, GPU, and driver time on Windows. The leaderboard is a
+specific native-work candidate only if its entries and canvas remain active
+while hidden in live offline play. Any claimed FPS improvement needs a matched
+chart, speed, HUD visibility, settings, resolution, and capture duration.

@@ -5,8 +5,9 @@ using MelonLoader;
 using MelonLoader.Utils;
 using SlopHero.Core;
 using UnityEngine;
+using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.47", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.48", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -154,9 +155,10 @@ public sealed partial class Core : MelonMod
 
     public override void OnUpdate()
     {
-        // Frame timing is diagnostic only. Avoid reading Unity's frame clock
-        // and sampling it on every update when no capture is running.
-        if (timings.Active) timings.SampleFrame(Time.unscaledDeltaTime * 1000f);
+        // Diagnostics are opt-in. A Clone Hero simulation tick may skip
+        // rendering, so sample Unity's render decision separately.
+        if (timings.Active) timings.SampleUpdate(Time.unscaledDeltaTime * 1000f,
+            OnDemandRendering.willCurrentFrameRender, Time.renderedFrameCount);
         long timingStart = timings.Begin();
         try
         {

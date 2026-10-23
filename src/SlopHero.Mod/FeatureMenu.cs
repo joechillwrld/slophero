@@ -2,6 +2,7 @@ using System.Globalization;
 using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace SlopHero.Mod;
 
@@ -131,7 +132,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.47 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.48 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
         // nine narrow tabs that clipped labels such as "Performance".
         const int tabColumns = 5;
@@ -170,7 +171,8 @@ public sealed partial class Core
                             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
                             || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                         SongSpeedControl.TryRead(out int speedSetting);
-                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LogGameplaySnapshot();
                         timings.Start();
                     }
                     else Notice("Start a song before capturing mod timings.");
@@ -1004,6 +1006,38 @@ public sealed partial class Core
             LoggerInstance.Error($"Visual overrides paused after an error; counters and controls remain available: {ex}");
             Notice("Visual overrides stopped after an error. Send Latest.log.");
         }
+    }
+
+    private void LogGameplaySnapshot()
+    {
+        // Read once before the opt-in timer starts. Serialized scene state
+        // cannot tell us whether these candidate objects stay live in a song.
+        try
+        {
+            var root = GameObject.Find("HUDCam");
+            if (root == null) return;
+            var scoreList = root.transform.Find("Leaderboard/Canvas/ScoreList");
+            if (scoreList != null)
+            {
+                var group = scoreList.GetComponent<CanvasGroup>();
+                var entries = scoreList.GetComponentsInChildren<Il2Cpp.InGameLeaderboardEntry>(true);
+                int running = 0;
+                foreach (var entry in entries)
+                    if (entry != null && entry.enabled && entry.gameObject.activeInHierarchy) running++;
+                LoggerInstance.Msg($"Gameplay snapshot: leaderboard score-list active={scoreList.gameObject.activeInHierarchy}, alpha={(group == null ? "unknown" : group.alpha.ToString("0.###", CultureInfo.InvariantCulture))}, entry Updates eligible={running}/{entries.Length}.");
+            }
+            var viewer = root.transform.Find("Input Viewer");
+            if (viewer != null)
+            {
+                static string Active(Transform parent, string name)
+                {
+                    var branch = parent.Find(name);
+                    return branch == null ? "missing" : branch.gameObject.activeInHierarchy.ToString();
+                }
+                LoggerInstance.Msg($"Gameplay snapshot: input-viewer branches active guitar/GHL/drums={Active(viewer, "Guitar Input Viewer")}/{Active(viewer, "GHL Input Viewer")}/{Active(viewer, "Drums Input Viewer")}.");
+            }
+        }
+        catch (Exception ex) { LoggerInstance.Warning($"Gameplay snapshot unavailable: {ex.Message}"); }
     }
 
 }
