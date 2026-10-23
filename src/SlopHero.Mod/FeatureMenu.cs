@@ -147,7 +147,7 @@ public sealed partial class Core
         // Keep the unscaled panel centered in screen coordinates; the GUI matrix
         // scales around the screen center, so its visible bounds remain centered.
         float x = (Screen.width - 680) / 2f, y = (Screen.height - 660) / 2f;
-        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.54 — F8 / Escape to close");
+        GUI.Box(new Rect(x, y, 680, 660), "SlopHero 0.4.55 — F8 / Escape to close");
         // Two rows keep every page title readable. The old single row made
         // nine narrow tabs that clipped labels such as "Performance".
         const int tabColumns = 5;
@@ -186,7 +186,7 @@ public sealed partial class Core
                             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
                             || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                         SongSpeedControl.TryRead(out int speedSetting);
-                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, perfEffects(hit/sustain/fret)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}, pausedFretFadeScripts={performance.PausedFretFadeCount}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                         LogGameplaySnapshot();
                         timings.Start();
                     }
@@ -279,6 +279,7 @@ public sealed partial class Core
                 Toggle(freezeComboSmokeScroll, "Pause combo smoke scrolling (smoke remains visible)", x, y + 294);
                 GUI.Label(new Rect(x, y + 338, 632, 140),
                     "Independent, optional switches. Effect switches stop their components, not just their drawing. " +
+                    "The fret-effects switch also pauses fade scripts attached to its hidden lightning objects. " +
                     "They do not change notes, scoring, or timing. MIDI restores immediately when switched off. " +
                     "The leaderboard switch skips six motion checks only while the offline list is fully hidden; " +
                     "online play and visible leaderboards are left alone. Canvas counters use the original renderer " +
@@ -1139,7 +1140,7 @@ public sealed partial class Core
                 catch { return "unavailable"; }
             }
             LoggerInstance.Msg($"Gameplay snapshot: visual scripts enabled/found-active-objects: softMask={Count<Il2Cpp.SoftMaskController>()}, blurScaler={Count<Il2Cpp.BlurScaler>()}, customFade={Count<Il2Cpp.CustomFadeProperties>()}, beatPulse={Count<Il2Cpp.BeatPulse>()}, cameraShake={Count<Il2Cpp.CameraShake>()}, uvScroll={Count<Il2Cpp.UVScroll>()}, lyrics={Count<Il2Cpp.LyricDisplay>()}.");
-            LoggerInstance.Msg($"Gameplay snapshot: live visual script paths: cameraShake={LivePaths<Il2Cpp.CameraShake>()}; uvScroll={LivePaths<Il2Cpp.UVScroll>()}; lyrics={LivePaths<Il2Cpp.LyricDisplay>()}; customFade={LivePaths<Il2Cpp.CustomFadeProperties>()}; comboSmokeTracked/pausedByMod={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}.");
+            LoggerInstance.Msg($"Gameplay snapshot: live visual script paths: cameraShake={LivePaths<Il2Cpp.CameraShake>()}; uvScroll={LivePaths<Il2Cpp.UVScroll>()}; lyrics={LivePaths<Il2Cpp.LyricDisplay>()}; customFade={LivePaths<Il2Cpp.CustomFadeProperties>()}; comboSmokeTracked/pausedByMod={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}; fretFadeScriptsPausedByMod={performance.PausedFretFadeCount}.");
             var sprites = UnityEngine.Object.FindObjectsOfType<SpriteRenderer>();
             int enabledSprites = 0;
             foreach (var sprite in sprites)

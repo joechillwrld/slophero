@@ -1,4 +1,4 @@
-# SlopHero 0.4.54 alpha
+# SlopHero 0.4.55 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
@@ -6,13 +6,13 @@ features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build. Compiled against your installed loader and generated assemblies.
-**Version 0.4.54 corrects the combo-smoke animation switch using paths from a
-live gameplay capture.** It pauses the local guitar's two combo-smoke UV
-updates while leaving the smoke visible. The Performance tab keeps this and
-all other optimizations off by default. This is a narrow CPU-side lead; no
-whole-game FPS gain is claimed without a controlled capture. Version 0.4.53
-looked under the wrong hierarchy, so its lyric-background switch matched
-nothing. It also retains the optional
+**Version 0.4.55 keeps the corrected combo-smoke switch and skips ten
+unchanged fret-lightning fade scripts while the existing fret-effects switch
+is hiding those effects.** It restores the scripts when fret effects are
+enabled again. The Performance tab keeps optional switches off by default.
+These are narrow CPU-side leads; no whole-game FPS gain is claimed without a
+controlled capture. Version 0.4.53's smoke switch searched the wrong hierarchy
+and matched nothing; 0.4.54 corrected it. It also retains the optional
 Canvas renderer for the counter HUD. It
 updates retained UI objects only when the counter text, position, or appearance
 changes. The established IMGUI renderer remains the default and handles HUD
@@ -23,7 +23,7 @@ for measured limits and current targets.
 
 ## Install
 
-[Download v0.4.54 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.54-alpha.zip?raw=true)
+[Download v0.4.55 ZIP](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.55-alpha.zip?raw=true)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -298,7 +298,14 @@ scripts, SpriteRenderers, cameras, canvases, animators, video players, and
 particle systems. Those counts guide future game-side changes; they do not
 disable any native game components.
 
-## 0.4.54 optional combo-smoke animation pause
+## 0.4.55 optional effect-update reductions
+
+The **Fret flames/sparks** Performance switch now also pauses the ten
+`CustomFadeProperties` components observed on the guitar's `Fret_*/lightning`
+and `lightning_white` objects. They do no visible work while those effects are
+hidden. Their enabled states restore with the existing switch; note timing,
+scoring, and input are unaffected. This builds on the exact live paths and
+switch state in the supplied capture.
 
 **F8 → Performance → Pause combo smoke scrolling** is off by default. When
 enabled, SlopHero targets only `smoke_combo_fast` and `smoke_combo_slow` beneath

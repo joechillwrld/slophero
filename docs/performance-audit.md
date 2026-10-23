@@ -99,9 +99,9 @@ Other leads from the same capture, ranked by what is actually known:
 | Combo-smoke `UVScroll` | Two enabled local objects, with live hierarchy paths confirmed. Native `Update` advances texture offsets and writes a material property block on simulation ticks. | Reversible, default-off switch added. Actual CPU and frame-time gain remain unmeasured. |
 | `CameraShake` | One enabled. Native `Update` returns immediately when its shake-state flag is clear; the heavier path is event-driven while shaking. | Leave alone; no idle hot path established. |
 | `LyricDisplay` | One enabled. Its native `Update` has an early path when there is no current lyric phrase. | Leave alone; disabling it would break lyrics, and no material cost is shown. |
-| `CustomFadeProperties` | Ten enabled beneath guitar fret-lightning objects. Native `Update` compares four cached values and returns when unchanged. | Weak lead; avoid suspending fret effects until profiling shows meaningful cost. |
+| `CustomFadeProperties` | Ten enabled beneath guitar fret-lightning objects even with fret effects disabled. Native `Update` compares four cached values and returns when unchanged. | v0.4.55 pauses only these scripts while the user has already hidden fret effects; state restores with that switch. Likely small; measure before claiming a gain. |
 | `SoftMaskController`, `BlurScaler`, `BeatPulse` | No enabled instances found in this song capture. | Not gameplay targets in this run. |
-| `VideoPlayer` | One of two components enabled in the capture; one was playing. | The existing game video toggle should remain authoritative. |
+| `VideoPlayer` | Latest capture finds one enabled of two and zero playing; an older run had one playing. | The existing game video toggle should remain authoritative. |
 | 3 cameras, 11 canvases, 257 enabled SpriteRenderers, 3 animators | Counts only; they do not measure overdraw, Canvas rebuilds, draw calls, or GPU cost. | Need Unity Profiler/RenderDoc or comparable GPU/CPU profiling before any changes. Avoid disabling scene objects by count alone. |
 
 The opt-in timing capture logs hierarchy paths for live camera-shake,
@@ -109,6 +109,29 @@ UV-scroll, lyrics, and custom-fade components, and records whether active video
 players are playing. It discovers these once before the 30-second window, not
 per frame. These paths replace the previous unsupported lyric-background
 guess with direct runtime evidence.
+
+### v0.4.54 confirmation and v0.4.55 fret-fade suppression
+
+The next runtime log confirms that 0.4.54 engaged the intended effect:
+`comboSmokeTracked/paused=2/2`, while the scene snapshot reports
+`uvScroll=0/2` and no active `UVScroll` paths. The option is enabled in this
+capture. The 30-second run recorded simulation p95/p99 intervals of
+0.58/0.66 ms and scheduled-render p95/p99 intervals of 1.01/1.14 ms. Compared
+with the earlier 0.4.53 capture, those intervals are modestly lower, but the
+older run had a different duration and the switch in 0.4.53 did not touch the
+smoke components. Treat this as encouraging but non-causal; the maximum
+simulation interval is still about 39.6 ms, close to the earlier 39.3 ms
+outlier. The report's scheduled-render interval is callback spacing, not GPU
+presentation time.
+
+That same run has `disableFretEffects=true` while all ten
+`CustomFadeProperties` components remain enabled on the five `Fret_*` lightning
+and white-lightning objects. Version 0.4.55 extends the existing fret-effects
+switch to pause only those ten components while their visual effects are
+disabled, restoring their original enabled state with the switch. This avoids
+changing visible gameplay or introducing another setting. The components'
+native update has a cached-value early return, so the likely savings are small;
+they will be measurable only in a repeated capture after this build.
 
 The safe rewrite decision is therefore to avoid a wholesale rewrite. The
 current measurements show SlopHero's named callback work is already small

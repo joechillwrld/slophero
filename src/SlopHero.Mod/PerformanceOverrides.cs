@@ -12,21 +12,26 @@ namespace SlopHero.Mod;
 /// </summary>
 internal sealed class PerformanceOverrides
 {
+    private static readonly string[] FretColors = { "Orange", "Blue", "Yellow", "Red", "Green" };
+    private static readonly string[] FretLightningObjects = { "lightning_white", "lightning" };
     private readonly record struct ParticleEffect(ParticleSystem Component, bool IsHit, bool IsSustain);
     private sealed class NeckEffects
     {
-        public NeckEffects(ParticleEffect[] particles, Animator[] animators)
+        public NeckEffects(ParticleEffect[] particles, Animator[] animators, CustomFadeProperties[] fretFades)
         {
             Particles = particles;
             Animators = animators;
+            FretFades = fretFades;
         }
 
         public ParticleEffect[] Particles { get; }
         public Animator[] Animators { get; }
+        public CustomFadeProperties[] FretFades { get; }
     }
 
     private readonly Dictionary<IntPtr, (ParticleSystem Component, GameObject Object, bool Active)> particles = new();
     private readonly Dictionary<IntPtr, (Animator Component, bool Enabled)> animators = new();
+    private readonly Dictionary<IntPtr, (CustomFadeProperties Component, bool Enabled)> fretFades = new();
     private readonly Dictionary<IntPtr, (Renderer Component, bool Enabled)> renderers = new();
     private readonly Dictionary<IntPtr, NeckEffects> neckEffects = new();
     private readonly Dictionary<IntPtr, Renderer[]> animatorRenderers = new();
@@ -34,7 +39,17 @@ internal sealed class PerformanceOverrides
     private double nextScan, nextDiscovery;
 
     public bool NeedsUpdate => hitParticles || sustainParticles || fretEffects
-        || particles.Count != 0 || animators.Count != 0 || renderers.Count != 0;
+        || particles.Count != 0 || animators.Count != 0 || fretFades.Count != 0 || renderers.Count != 0;
+    public int PausedFretFadeCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (var state in fretFades.Values)
+                try { if (state.Enabled && state.Component != null && !state.Component.enabled) count++; } catch { }
+            return count;
+        }
+    }
 
     public void Clear()
     {
@@ -74,7 +89,7 @@ internal sealed class PerformanceOverrides
             if (player == null || !player.enabled || player.neckController == null) continue;
             var neck = player.neckController;
             if (discover || !neckEffects.TryGetValue(neck.Pointer, out var effects))
-                neckEffects[neck.Pointer] = effects = Discover(neck);
+                neckEffects[neck.Pointer] = effects = Discover(player, neck);
 
             foreach (var effect in effects.Particles)
             {
@@ -86,15 +101,23 @@ internal sealed class PerformanceOverrides
             }
 
             if (disableFretEffects)
+            {
                 foreach (var effectAnimator in effects.Animators)
                     if (effectAnimator != null) Disable(effectAnimator);
+                foreach (var fretFade in effects.FretFades)
+                    if (fretFade != null) Disable(fretFade);
+            }
             else
+            {
                 foreach (var animatorToRestore in effects.Animators)
                     if (animatorToRestore != null) Restore(animatorToRestore);
+                foreach (var fretFadeToRestore in effects.FretFades)
+                    if (fretFadeToRestore != null) Restore(fretFadeToRestore);
+            }
         }
     }
 
-    private static NeckEffects Discover(BaseNeckController neck)
+    private static NeckEffects Discover(BasePlayer player, BaseNeckController neck)
     {
         var particles = new List<ParticleEffect>();
         foreach (var system in neck.GetComponentsInChildren<ParticleSystem>(true))
@@ -106,7 +129,28 @@ internal sealed class PerformanceOverrides
             particles.Add(new ParticleEffect(system, isHit, isSustain));
         }
 
-        return new NeckEffects(particles.ToArray(), EffectAnimators(neck).ToArray());
+        var fretFades = new List<CustomFadeProperties>();
+        var guitar = player.TryCast<GuitarPlayer>();
+        if (guitar != null)
+        {
+            // Runtime capture shows these fade scripts attached to the exact
+            // fret lightning objects. They have no visible work while the
+            // existing fret-effects option has hidden their effect objects.
+            foreach (string fretName in FretColors)
+            {
+                var fret = guitar.transform.Find($"Fret_{fretName}");
+                if (fret == null) continue;
+                foreach (string lightningName in FretLightningObjects)
+                {
+                    var lightning = fret.Find(lightningName);
+                    if (lightning == null) continue;
+                    var fade = lightning.GetComponent<CustomFadeProperties>();
+                    if (fade != null) fretFades.Add(fade);
+                }
+            }
+        }
+
+        return new NeckEffects(particles.ToArray(), EffectAnimators(neck).ToArray(), fretFades.ToArray());
     }
 
     private static IEnumerable<Animator> EffectAnimators(BaseNeckController neck)
@@ -171,6 +215,12 @@ internal sealed class PerformanceOverrides
         catch { }
     }
 
+    private void Disable(CustomFadeProperties fade)
+    {
+        if (!fretFades.ContainsKey(fade.Pointer)) fretFades.Add(fade.Pointer, (fade, fade.enabled));
+        try { if (fade.enabled) fade.enabled = false; } catch { }
+    }
+
     private void Restore(ParticleSystem system)
     {
         if (!particles.Remove(system.Pointer, out var state)) return;
@@ -186,6 +236,12 @@ internal sealed class PerformanceOverrides
             if (renderer != null) Restore(renderer);
     }
 
+    private void Restore(CustomFadeProperties fade)
+    {
+        if (fretFades.Remove(fade.Pointer, out var state))
+            try { state.Component.enabled = state.Enabled; } catch { }
+    }
+
     private void Restore(Renderer renderer)
     {
         if (renderers.Remove(renderer.Pointer, out var state))
@@ -198,9 +254,11 @@ internal sealed class PerformanceOverrides
             try { state.Object.SetActive(state.Active); } catch { }
         foreach (var state in animators.Values)
             try { state.Component.enabled = state.Enabled; } catch { }
+        foreach (var state in fretFades.Values)
+            try { state.Component.enabled = state.Enabled; } catch { }
         foreach (var state in renderers.Values)
             try { state.Component.enabled = state.Enabled; } catch { }
-        particles.Clear(); animators.Clear(); renderers.Clear();
+        particles.Clear(); animators.Clear(); fretFades.Clear(); renderers.Clear();
         neckEffects.Clear(); animatorRenderers.Clear();
         nextScan = nextDiscovery = 0;
     }
