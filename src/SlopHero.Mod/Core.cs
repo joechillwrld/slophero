@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.69", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.70", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -93,7 +93,6 @@ public sealed partial class Core : MelonMod
         if (compatible)
         {
             LoggerInstance.Msg(status);
-            try { rings.Install(HarmonyInstance); } catch (Exception ex) { LoggerInstance.Error($"FC hooks unavailable; frame overrides remain active: {ex}"); }
         }
         else LoggerInstance.Warning(status);
         LoggerInstance.Msg("F8: SlopHero settings. Default: hold R to restart, hold P to practice the current section.");
@@ -135,6 +134,8 @@ public sealed partial class Core : MelonMod
         comboSmokeScrollError = false;
         nextHiddenLeaderboardPass = 0;
         nativeHud.Clear();
+        rings.Clear(HarmonyInstance);
+        if (compatible && gameplay) rings.SetHookState(HarmonyInstance, tintFc.Value);
         resizeTarget = -1;
         resizeHandle = -1;
         resizeMoveDragging = false;
@@ -142,7 +143,6 @@ public sealed partial class Core : MelonMod
         nativeHudDragging = false;
         nativeHudError = false;
         nativeHudActive = false;
-        rings.Clear();
         visualError = false;
         performanceError = false;
         starProgressError = false;
@@ -200,7 +200,7 @@ public sealed partial class Core : MelonMod
         nextHiddenLeaderboardPass = 0;
         nativeHud.Clear();
         nativeHudActive = false;
-        rings.Clear();
+        rings.Clear(HarmonyInstance);
         visualError = false;
         performanceError = false;
         starProgressError = false;
@@ -906,6 +906,7 @@ public sealed partial class Core : MelonMod
         mouseUiGameplay.Clear(HarmonyInstance);
         gameplayUiEvents.Clear(HarmonyInstance);
         highwayAnimations.Clear(HarmonyInstance);
+        rings.Clear(HarmonyInstance);
         whammyTextureThrottle.LogSummary();
         whammyTextureThrottle.Clear(HarmonyInstance);
         timings.Finish();

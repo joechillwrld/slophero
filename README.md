@@ -1,12 +1,15 @@
-# SlopHero 0.4.69 alpha
+# SlopHero 0.4.70 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
 features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.69
-adds a default-off solo-play experiment that pauses the game's highway,
+build, compiled against its loader and generated assemblies. Version 0.4.70
+installs the FC ring color hooks only during Gameplay while custom ring colors
+are enabled, removing those Harmony callbacks from the game's setter path
+otherwise. No performance gain is claimed without a matched capture.
+Version 0.4.69 adds a default-off solo-play experiment that pauses the game's highway,
 background-video, and track-fade update while a chart is active. It is visual
 only and may freeze those animations; no performance gain is claimed yet.
 Version 0.4.68 added live state reporting for the cheat-scanner pause option,
@@ -23,7 +26,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.69 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.69-alpha.zip)
+[Download SlopHero v0.4.70 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.70-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

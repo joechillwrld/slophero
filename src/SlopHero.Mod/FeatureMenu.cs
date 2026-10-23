@@ -1060,6 +1060,9 @@ public sealed partial class Core
         }
         if (now < nextOverridePass) return;
         nextOverridePass = now + .05;
+        // FC color postfixes are needed only while the customization is on.
+        // Keep their Harmony hooks out of the game's setter path otherwise.
+        rings.SetHookState(HarmonyInstance, tintFc.Value);
 
         if (useCanvasCounterHud.Value || counterCanvas.HasObjects)
         {

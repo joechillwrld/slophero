@@ -1469,3 +1469,20 @@ notes, timing, audio, score, or input. The hook is installed only when the
 option is enabled. The capture confirms the target and scope, not a performance
 gain; compare the same solo chart with the option off and on before treating it
 as an optimization.
+
+### v0.4.70 FC ring hook gating
+
+`RingColors` previously installed four Harmony postfixes at mod startup even
+when `CustomizeFcRings` was false. v0.4.70 installs those hooks only in the
+Gameplay scene while custom ring colors are enabled, and unpatches them when
+the option is turned off or the scene exits. The existing ring-color update
+still restores captured vanilla values when customization is disabled. This
+removes optional callbacks from the game's desaturate setters for players who
+leave custom rings off; the CPU benefit is plausible but not measured.
+
+The WPA profile supplied with the recent trace exported only collapsed process
+totals: its `Thread ID` and `Stack` columns were blank for Clone Hero. The same
+ETL can provide the missing attribution by expanding the Clone Hero process
+and its highest-weight threads in the WPA CPU Usage (Sampled) table, then
+copying that expanded table. See `windows-performance-capture.md`; no new game
+files or ETL capture are needed for this step.

@@ -23,20 +23,72 @@ internal sealed class RingColors
     private int hueId, saturationId;
     private Color fc, perfect;
     private bool enabled, callbackFailed;
+    private bool hooksInstalled, hookInstallFailed;
+    private readonly List<MethodInfo> hookTargets = new();
     private long nextDiscovery, nextRefresh;
     internal static RingColors? Active;
     public bool NeedsUpdate => enabled || rings.Count != 0;
 
-    public void Install(HarmonyLib.Harmony harmony)
+    public void SetHookState(HarmonyLib.Harmony harmony, bool requested)
     {
-        Active = this;
-        var hue = new HarmonyMethod(typeof(RingColors).GetMethod(nameof(HueWritten), BindingFlags.NonPublic | BindingFlags.Static));
-        foreach (string name in new[] { "Method_Public_Void_0", "Method_Public_Void_1", "Method_Public_Void_2" })
-            harmony.Patch(typeof(DesaturateSprite).GetMethod(name), postfix: hue);
-        harmony.Patch(typeof(DesaturateSprite).GetMethod("Method_Public_Void_Single_0"),
-            postfix: new HarmonyMethod(typeof(RingColors).GetMethod(nameof(SaturationWritten), BindingFlags.NonPublic | BindingFlags.Static)));
+        if (!requested)
+        {
+            UninstallHooks(harmony);
+            hookInstallFailed = false;
+            return;
+        }
+        if (hooksInstalled || hookInstallFailed) return;
+
+        try
+        {
+            Active = this;
+            var hue = new HarmonyMethod(typeof(RingColors).GetMethod(
+                nameof(HueWritten), BindingFlags.NonPublic | BindingFlags.Static)!);
+            foreach (string name in new[] { "Method_Public_Void_0", "Method_Public_Void_1", "Method_Public_Void_2" })
+            {
+                var target = typeof(DesaturateSprite).GetMethod(name,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                    ?? throw new MissingMethodException(typeof(DesaturateSprite).FullName, name);
+                harmony.Patch(target, postfix: hue);
+                hookTargets.Add(target);
+            }
+
+            var saturationTarget = typeof(DesaturateSprite).GetMethod("Method_Public_Void_Single_0",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                ?? throw new MissingMethodException(typeof(DesaturateSprite).FullName, "Method_Public_Void_Single_0");
+            harmony.Patch(saturationTarget, postfix: new HarmonyMethod(typeof(RingColors).GetMethod(
+                nameof(SaturationWritten), BindingFlags.NonPublic | BindingFlags.Static)!));
+            hookTargets.Add(saturationTarget);
+            hooksInstalled = true;
+            MelonLoader.MelonLogger.Msg("FC ring color hooks installed while custom colors are enabled.");
+        }
+        catch (Exception ex)
+        {
+            UninstallHooks(harmony);
+            hookInstallFailed = true;
+            MelonLoader.MelonLogger.Warning($"FC ring color hooks unavailable; vanilla ring colors remain active: {ex.Message}");
+        }
     }
-    public void Clear() { rings.Clear(); enabled = false; callbackFailed = false; nextDiscovery = nextRefresh = 0; }
+
+    public void Clear(HarmonyLib.Harmony harmony)
+    {
+        UninstallHooks(harmony);
+        rings.Clear(); enabled = false; callbackFailed = false; hookInstallFailed = false;
+        nextDiscovery = nextRefresh = 0;
+    }
+
+    private void UninstallHooks(HarmonyLib.Harmony harmony)
+    {
+        enabled = false;
+        if (ReferenceEquals(Active, this)) Active = null;
+        foreach (var target in hookTargets)
+        {
+            try { harmony.Unpatch(target, HarmonyPatchType.All, harmony.Id); }
+            catch (Exception ex) { MelonLoader.MelonLogger.Warning($"FC ring hook cleanup failed; its callback is disabled: {ex.Message}"); }
+        }
+        hookTargets.Clear();
+        hooksInstalled = false;
+    }
     private static void HueWritten(DesaturateSprite __instance) => Active?.Written(__instance, true);
     private static void SaturationWritten(DesaturateSprite __instance) => Active?.Written(__instance, false);
     private void Written(DesaturateSprite component, bool hue)

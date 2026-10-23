@@ -73,6 +73,17 @@ The exporter writes the profile's tables into the output folder. If
 **Windows Performance Toolkit**. The ETL stays on the PC; share only the
 resulting CSV files.
 
+### If the CSV has blank Thread and Stack values
+
+Do not record another ETL or rerun WPAExporter. Open the existing ETL and
+select the **CPU Usage (Sampled)** table. In its table grid, expand the
+**Clone Hero.exe** row, then expand the game's highest-weight thread rows until
+the individual stack frames appear beneath them. Right-click the expanded grid
+and choose **Copy Table**, then paste into a text file and save it as `.txt`. Keep
+the Clone Hero rows and verify the **Thread ID** and **Stack** columns contain
+values. The earlier process-only CSVs have those columns but contain only
+collapsed process totals, so they cannot identify the native caller.
+
 ## Optional presentation trace
 
 PresentMon can record per-present frame times alongside the CPU trace. Use its
