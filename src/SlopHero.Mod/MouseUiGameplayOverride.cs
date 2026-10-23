@@ -6,8 +6,8 @@ namespace SlopHero.Mod;
 
 /// <summary>
 /// Optional experiment that skips Unity's built-in mouse UI path while a
-/// chart is actively playing. This deliberately leaves Process() itself
-/// running so its touch and keyboard/controller navigation paths still work.
+/// chart is actively playing. This patches the int overload called directly
+/// by Process(), leaving touch and keyboard/controller navigation intact.
 /// </summary>
 internal sealed class MouseUiGameplayOverride
 {
@@ -18,6 +18,7 @@ internal sealed class MouseUiGameplayOverride
     private bool suppressMouse;
 
     internal bool IsInstalled => installed;
+    internal bool IsSuppressed => installed && suppressMouse;
 
     internal void Update(HarmonyLib.Harmony harmony, bool requested, bool gameplayActive)
     {
@@ -47,8 +48,9 @@ internal sealed class MouseUiGameplayOverride
     {
         try
         {
-            // Resolve the zero-argument wrapper: Process() calls this before
-            // continuing into the separate keyboard/controller navigation.
+            // Unity's Process() calls ProcessMouseEvent(int) directly. The
+            // zero-argument overload is only a forwarding wrapper and is not
+            // on the hot path measured in the WPA trace.
             var uiAssembly = AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => string.Equals(a.GetName().Name, "UnityEngine.UI", StringComparison.Ordinal));
             var moduleType = uiAssembly?.GetType("UnityEngine.EventSystems.StandaloneInputModule", throwOnError: false);
@@ -56,9 +58,9 @@ internal sealed class MouseUiGameplayOverride
             // reflection methods, so search both visibility flags.
             target = moduleType?.GetMethod("ProcessMouseEvent",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                binder: null, types: Type.EmptyTypes, modifiers: null);
+                binder: null, types: new[] { typeof(int) }, modifiers: null);
             if (target == null)
-                throw new MissingMethodException("UnityEngine.EventSystems.StandaloneInputModule.ProcessMouseEvent()");
+                throw new MissingMethodException("UnityEngine.EventSystems.StandaloneInputModule.ProcessMouseEvent(int)");
 
             suppressMouse = false;
             active = this;
@@ -66,7 +68,7 @@ internal sealed class MouseUiGameplayOverride
                 BindingFlags.Static | BindingFlags.NonPublic)!;
             harmony.Patch(target, prefix: new HarmonyMethod(prefix));
             installed = true;
-            MelonLogger.Msg("Sloptifine experimental mouse-UI hook ready; it skips mouse UI only during active gameplay.");
+            MelonLogger.Msg("Sloptifine experimental mouse-UI hook ready on StandaloneInputModule.ProcessMouseEvent(int); it skips mouse UI only during active gameplay.");
         }
         catch (Exception ex)
         {

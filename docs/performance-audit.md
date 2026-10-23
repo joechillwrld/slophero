@@ -1,5 +1,19 @@
 # Performance audit notes
 
+### v0.4.73 mouse-raycast target correction
+
+The latest v0.4.72 log had `PerformanceSkipGameplayMouseUi` enabled, but it
+could only confirm that Harmony installed a hook. Disassembly of the supplied
+v1.1.0.6142 GameAssembly showed `StandaloneInputModule.Process()` calling
+`ProcessMouseEvent(int)` directly; its zero-argument overload is a forwarding
+stub that `Process()` does not call. v0.4.73 now patches the integer overload reported in the WPA
+trace, so it can return before pointer-data creation and UI raycasting while
+leaving the rest of `Process()` available. The same log also had the separate
+solo `EventSystem.Update` pause enabled; that broader option suspended UI
+events during the timing capture, so the log does not isolate or measure the
+mouse-only switch. No FPS or frame-time gain is claimed until the corrected
+hook is compared with that broader option off.
+
 ### v0.4.72 source and WPA follow-up
 
 `Core.OnUpdate` was checking the whammy-cap and highway-animation preference
@@ -963,9 +977,9 @@ independent controller polling and keyboard/controller UI navigation paths,
 but mouse clicks and hover interactions on gameplay UI would be unavailable
 until pausing. This is now implemented as the default-off Sloptifine option
 `PerformanceSkipGameplayMouseUi` in the Performance tab. It patches only the
-zero-argument `StandaloneInputModule.ProcessMouseEvent()` wrapper, which
-avoids the captured mouse path before it reaches pointer raycasts; the parent
-input module continues into its keyboard/controller navigation. Mouse
+`StandaloneInputModule.ProcessMouseEvent(int)` overload, which avoids the
+captured mouse path before it reaches pointer raycasts; the parent input module
+continues into its keyboard/controller navigation. Mouse
 processing is suppressed only while the setting is enabled and Clone Hero
 reports active, unpaused gameplay. When enabled, the hook is installed as the
 Gameplay scene loads and stays pass-through until the existing 20 Hz
@@ -983,17 +997,18 @@ implementation compiles, but the trace is still a lead rather than an A/B
 result. It does not establish a frame-time gain; that requires a matched run
 with the option off/on and presentation or frame-time measurements.
 
-The first v0.4.59 runtime log showed that lookup failing closed with
-`StandaloneInputModule.ProcessMouseEvent()` unresolved. Inspection of the
-generated UnityEngine.UI wrapper confirmed the method exists with the expected
-zero-argument signature, but Il2CppInterop exposes it as `Public` through
-reflection even though Unity declares it protected. The initial lookup asked
-only for non-public methods. v0.4.60 searches both visibility flags; the next
-runtime log confirmed that the hook activates. That run also recorded a single
-16.9 ms `OnUpdate` maximum shortly after Harmony patched the method. Timing
-alone cannot prove the patch caused the spike, but v0.4.61 moves installation
-to Gameplay scene load and keeps the hook pass-through while paused, so resume
-does not patch again mid-song.
+The first v0.4.59 runtime log showed the original lookup failing closed with
+`StandaloneInputModule.ProcessMouseEvent()` unresolved. v0.4.60 corrected the
+visibility lookup, and later logs confirmed a hook was installed. A native
+call-site check against the supplied GameAssembly and generated dump now shows
+that the installed zero-argument wrapper was the wrong target: Unity's
+`StandaloneInputModule.Process()` calls `ProcessMouseEvent(int)` directly
+(GameAssembly RVA `0x2ADE70F` calls `0x2ADCFA0`), while the zero-argument method
+at RVA `0x2ADD240` is only a forwarding stub. Thus the old logs showed
+installation, not skipped raycasts. v0.4.73 targets the exact int overload
+identified in the WPA export. The initial lookup failure and the later
+16.9 ms `OnUpdate` maximum remain historical observations; timing alone did
+not establish a causal link to Harmony patching.
 
 The trace also attributes 2,116 ms to `Rewired.InputManager_Base.DoUpdate`.
 That is kept intact by design: it is input work, and this profile is no reason
@@ -1192,14 +1207,17 @@ candidate. The cached `Texture` wrapper remains strongly referenced while the
 tracker is active. The 200 Hz cap itself is unchanged, and no benchmark yet
 quantifies this per-call reduction.
 
-The mouse experiment already skips the measured Unity `StandaloneInputModule`
-mouse handler before pointer-data creation and raycasting when the chart is
-active; it remains default-off and has no effect on keyboard/controller
-navigation or Rewired polling. A broader `EventSystem.RaycastAll` bypass would
-also suppress raycasts requested by non-mouse UI code, so the trace does not
-justify broadening the patch. The next useful performance comparison is a
-matched WPA capture with the mouse option off and on, keeping chart, scene,
-resolution, and frame multiplier the same.
+The mouse experiment now targets the measured Unity
+`StandaloneInputModule.ProcessMouseEvent(int)` handler before pointer-data
+creation and raycasting when the chart is active. It remains default-off and
+has no effect on keyboard/controller navigation or Rewired polling. A broader
+`EventSystem.RaycastAll` bypass would also suppress raycasts requested by
+non-mouse UI code, so the trace does not justify broadening the patch. The
+latest v0.4.72 log had the option enabled, but that version patched only the
+unused wrapper and therefore did not test the mouse-only optimization. The next
+useful comparison is a matched WPA capture with the corrected v0.4.73 hook on,
+the separate full EventSystem pause off, and the same chart, scene, resolution,
+and frame multiplier as baseline.
 
 ### v0.4.64 log and v0.4.65 follow-up
 
