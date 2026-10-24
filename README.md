@@ -1,11 +1,22 @@
-# SlopHero 0.4.80 alpha
+# SlopHero 0.4.82 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
 features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.80
+build, compiled against its loader and generated assemblies. Version 0.4.82
+adds a default-off Unity Job System experiment: it lowers the active worker
+limit by one only during focused, unpaused, offline solo gameplay and restores
+the previous limit on pause, menus, online play, scene changes, and unload. It
+uses Unity's generated `SetJobQueueMaximumActiveThreadCount` API; no direct
+native detour is used. The effect on performance is unmeasured.
+The counter HUD also reuses the existing 20 Hz network-state cache instead of
+performing its own duplicate IL2CPP lookup at each stats refresh.
+Version 0.4.81 shares the 20 Hz online-state check across the offline-only optimizations, the
+hidden leaderboard, and restart/practice eligibility. The retained counter HUD
+also skips its Unity object synchronization when its content and appearance are
+unchanged. Version 0.4.80
 reuses one offline-solo state check for the optional solo-only performance
 switches and avoids reading optional gameplay state when those switches are
 off. Version 0.4.79
@@ -54,7 +65,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.80 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.80-alpha.zip)
+[Download SlopHero v0.4.82 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.82-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

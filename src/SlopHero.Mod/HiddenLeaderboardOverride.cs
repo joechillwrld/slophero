@@ -19,7 +19,7 @@ internal sealed class HiddenLeaderboardOverride
 
     public bool NeedsRestore => entries.Length != 0;
 
-    public void Apply(bool requested, double realtime)
+    public void Apply(bool requested, double realtime, bool online)
     {
         if (!requested)
         {
@@ -42,8 +42,6 @@ internal sealed class HiddenLeaderboardOverride
 
         // Keep online score displays fully under the game's control. In solo
         // play, skip motion checks only after the entire group has faded out.
-        var network = CHNetManager.instance;
-        bool online = network != null && (int)network.field_Private_ConnectionState_0 != 0;
         bool hidden = scoreList.activeInHierarchy && group.alpha <= .001f;
         bool suspend = !online && hidden;
         foreach (var state in entries)

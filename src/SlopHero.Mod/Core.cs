@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.80", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.82", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -44,6 +44,8 @@ public sealed partial class Core : MelonMod
     private double nextStats, nextGameStateRefresh, nextOverridePass, nextOptionalServicePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
     private double nextAprilFoolsPass;
     private double nextOptionalHookSettingsPass;
+    private double nextOnlineStateCheck;
+    private bool onlineStateKnown, onlineState;
     private bool? lastWhammyCapSetting;
     private bool? lastHighwayPauseSetting;
     private bool aprilFoolsError;
@@ -102,8 +104,11 @@ public sealed partial class Core : MelonMod
 
     public override void OnSceneWasLoaded(int buildIndex, string sceneName)
     {
+        unityJobWorkerLimit.Clear();
         SongSpeedControl.ResetMenuCache();
         gameplayInitialized = false;
+        onlineStateKnown = false;
+        nextOnlineStateCheck = 0;
         practiceModeActive = false;
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
@@ -379,24 +384,24 @@ public sealed partial class Core : MelonMod
             var game = gameplay && gameplayInitialized ? GameManager.field_Private_Static_GameManager_0 : null;
             bool ready = game != null && game.songLoaded && game.playersInit && game.globalVariables != null;
             bool songPlaying = ready && game!.isSongPlaying;
+            practiceModeActive = ready && game!.globalVariables!.isPracticeEnabled;
+            bool shortcutCandidate = ready && !transition && !settingsOpen && !moveHud
+                && resizeTarget < 0 && Application.isFocused && !game!.isPaused
+                && !game.isSongOver && game.isSongPlaying && game.coroutinesRunning == 0
+                && game.actualPlayerCount == 1 && (int)game.globalVariables!.gameMode == 0
+                && !practiceModeActive && !game.globalVariables.isPlayingSetlist;
             bool pauseHighwayRequested = pauseHighwayAnimations.Value && highwayAnimations.IsInstalled;
             bool pauseCheatsActive = pauseGameplayCheatScanner.Value && cheatScanner.IsInstalled;
             bool pauseUiRequested = pauseGameplayUiProcessing.Value && gameplayUiEvents.IsInstalled;
-            bool needsOfflineSoloGate = pauseHighwayRequested || pauseCheatsActive || pauseUiRequested;
-            bool activeSoloContext = needsOfflineSoloGate && ready && songPlaying
+            bool workerLimitRequested = reduceUnityJobWorkers.Value;
+            bool needsOfflineSoloGate = pauseHighwayRequested || pauseCheatsActive || pauseUiRequested || workerLimitRequested;
+            bool soloOptimizationCandidate = needsOfflineSoloGate && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0
                 && Application.isFocused;
-            bool isOfflineSolo = false;
-            if (activeSoloContext)
-            {
-                try
-                {
-                    var net = CHNetManager.instance;
-                    isOfflineSolo = net == null || (int)net.field_Private_ConnectionState_0 == 0;
-                }
-                catch { isOfflineSolo = false; }
-            }
+            bool activeSoloContext = soloOptimizationCandidate;
+            bool isOfflineSolo = (activeSoloContext || shortcutCandidate) && !IsOnline(now);
+            unityJobWorkerLimit.Update(workerLimitRequested && activeSoloContext && isOfflineSolo);
             highwayAnimations.SetSuppressed(pauseHighwayRequested && activeSoloContext && isOfflineSolo);
             if (cheatScanner.IsInstalled)
             {
@@ -438,18 +443,13 @@ public sealed partial class Core : MelonMod
                 finalStatsRefreshUntil = now + 1;
             }
             lastStatsSongPlaying = songPlaying;
-            practiceModeActive = ready && game!.globalVariables!.isPracticeEnabled;
             bool skipMouseUiRequested = skipGameplayMouseUi.Value;
             bool mouseUiGameplayActive = skipMouseUiRequested && ready && songPlaying && !game!.isPaused && !game.isSongOver
                 && game.coroutinesRunning == 0 && !transition && !settingsOpen && !moveHud
                 && resizeTarget < 0 && Application.isFocused;
             mouseUiGameplay.Update(HarmonyInstance, skipMouseUiRequested, mouseUiGameplayActive);
             if (ready) CompletePracticeTransition(game!);
-            bool allow = ready && !transition && !settingsOpen && !moveHud && resizeTarget < 0 && Application.isFocused && !game!.isPaused
-                && !game.isSongOver && game.isSongPlaying && game.coroutinesRunning == 0
-                && game.actualPlayerCount == 1 && (int)game.globalVariables!.gameMode == 0
-                && !practiceModeActive && !game.globalVariables.isPlayingSetlist
-                && (CHNetManager.instance == null || (int)CHNetManager.instance.field_Private_ConnectionState_0 == 0);
+            bool allow = shortcutCandidate && isOfflineSolo;
             if (restartHold.Update(allow && restartPressed, allow, now, Duration))
             {
                 BeginRestart(game!);
@@ -489,13 +489,7 @@ public sealed partial class Core : MelonMod
                     // not whether this is our player slot. The CHPlayer's
                     // Rewired Player reference is present for local controllers
                     // and absent for network-owned remote slots.
-                    bool online;
-                    try
-                    {
-                        var net = CHNetManager.instance;
-                        online = net != null && (int)net.field_Private_ConnectionState_0 != 0;
-                    }
-                    catch { online = true; }
+                    bool online = IsOnline(now);
                     var player = game.playerObjects.FirstOrDefault(p => p != null && p.enabled
                         && p.TryCast<GuitarPlayer>() != null && p.engine != null
                         && p.player != null && p.player.field_Public_Player_0 != null);
@@ -555,6 +549,7 @@ public sealed partial class Core : MelonMod
             // Disable on a binding failure instead of retrying bad game calls every frame.
             mouseUiGameplay.Clear(HarmonyInstance);
             whammyTextureThrottle.Clear(HarmonyInstance);
+            unityJobWorkerLimit.Clear();
             compatible = false;
             statsText = "";
             pendingSection = null;
@@ -668,6 +663,28 @@ public sealed partial class Core : MelonMod
         status = message;
         noticeUntil = clock.Elapsed.TotalSeconds + 8;
         LoggerInstance.Msg(message);
+    }
+
+    // Core and the hidden-leaderboard option both need the same connection
+    // state. Cache it at their shared 20 Hz cadence instead of repeatedly
+    // crossing the IL2CPP boundary from each independent feature.
+    private bool IsOnline(double realtime)
+    {
+        if (onlineStateKnown && realtime < nextOnlineStateCheck) return onlineState;
+        nextOnlineStateCheck = realtime + .05;
+        try
+        {
+            var network = CHNetManager.instance;
+            onlineState = network != null && (int)network.field_Private_ConnectionState_0 != 0;
+        }
+        catch
+        {
+            // Keep all offline-only behavior disabled when connection state
+            // cannot be resolved.
+            onlineState = true;
+        }
+        onlineStateKnown = true;
+        return onlineState;
     }
 
     public override void OnGUI()
@@ -930,6 +947,7 @@ public sealed partial class Core : MelonMod
         highwayAnimations.Clear(HarmonyInstance);
         rings.Clear(HarmonyInstance);
         whammyTextureThrottle.Clear(HarmonyInstance);
+        unityJobWorkerLimit.Clear();
         timings.Finish();
         aprilFools.Restore();
         visuals.RestoreBeatRenderers();

@@ -28,6 +28,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> pauseGameplayCheatScanner = null!;
     private MelonPreferences_Entry<bool> pauseGameplayUiProcessing = null!;
     private MelonPreferences_Entry<bool> pauseHighwayAnimations = null!;
+    private MelonPreferences_Entry<bool> reduceUnityJobWorkers = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
     private readonly VisualOverrides visuals = new();
@@ -43,6 +44,7 @@ public sealed partial class Core
     private readonly CheatScannerOverride cheatScanner = new();
     private readonly GameplayUiEventOverride gameplayUiEvents = new();
     private readonly HighwayAnimationOverride highwayAnimations = new();
+    private readonly UnityJobWorkerLimit unityJobWorkerLimit = new();
     private readonly RuntimeTimings timings = new();
     private string songText = "", editText = "", editLabel = "", editError = "";
     private Action<string>? editApply;
@@ -133,6 +135,7 @@ public sealed partial class Core
         pauseGameplayCheatScanner = preferences.CreateEntry("PerformancePauseGameplayCheatScanner", false);
         pauseGameplayUiProcessing = preferences.CreateEntry("PerformancePauseGameplayUiProcessing", false);
         pauseHighwayAnimations = preferences.CreateEntry("PerformancePauseHighwayAnimations", false);
+        reduceUnityJobWorkers = preferences.CreateEntry("PerformanceReduceUnityJobWorkers", false);
         var legacyFreezeLyricsScroll = preferences.CreateEntry("PerformanceFreezeLyricsBackgroundScroll", false);
         if (legacyFreezeLyricsScroll.Value)
         {
@@ -248,6 +251,9 @@ public sealed partial class Core
                 }
                 GUI.Label(new Rect(x, y + 348, 540, 42), "Type 10–5000 on the game's speed row; * means pending. Pause or press Enter to apply.");
                 GUI.Label(new Rect(x, y + 394, 540, 50), "Timings are written to Latest.log. Close this menu and play.");
+                SectionHeader("Experimental Unity scheduler", x, y + 452);
+                Toggle(reduceUnityJobWorkers, "Use one fewer Unity job worker during offline solo songs", x, y + 480);
+                GUI.Label(new Rect(x + 22, y + 510, 610, 40), "Live and reversible. Restores the game's worker limit on pause, menus, online play, and scene changes.");
                 break;
             case 1:
                 Toggle(showHud, "Counter HUD", x, y); Toggle(showMisses, "Misses", x, y + 40);
@@ -799,6 +805,7 @@ public sealed partial class Core
             Bool("PerformancePauseGameplayCheatScanner", pauseGameplayCheatScanner);
             Bool("PerformancePauseGameplayUiProcessing", pauseGameplayUiProcessing);
             Bool("PerformancePauseHighwayAnimations", pauseHighwayAnimations);
+            Bool("PerformanceReduceUnityJobWorkers", reduceUnityJobWorkers);
         }
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
@@ -845,6 +852,7 @@ public sealed partial class Core
         Bool("PerformancePauseGameplayCheatScanner", pauseGameplayCheatScanner);
         Bool("PerformancePauseGameplayUiProcessing", pauseGameplayUiProcessing);
         Bool("PerformancePauseHighwayAnimations", pauseHighwayAnimations);
+        Bool("PerformanceReduceUnityJobWorkers", reduceUnityJobWorkers);
         if (values.ContainsKey("PerformanceFreezeComboSmokeScroll"))
             Bool("PerformanceFreezeComboSmokeScroll", freezeComboSmokeScroll);
         else
@@ -1055,7 +1063,8 @@ public sealed partial class Core
         // polled every LateUpdate did no extra useful work.
         if (!hiddenLeaderboardError && (suspendHiddenLeaderboard.Value || hiddenLeaderboard.NeedsRestore))
         {
-            try { hiddenLeaderboard.Apply(suspendHiddenLeaderboard.Value, now); }
+            try { hiddenLeaderboard.Apply(suspendHiddenLeaderboard.Value, now,
+                suspendHiddenLeaderboard.Value && IsOnline(now)); }
             catch (Exception ex)
             {
                 hiddenLeaderboard.Clear();

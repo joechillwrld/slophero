@@ -1469,6 +1469,65 @@ the caller stack needed to name which game callback, Harmony patch, or other
 mod is issuing the expensive invocations. This is now the strongest lead, but
 it is not a safe patch target until that caller is identified.
 
+### Native/Unity follow-up from the supplied stack export
+
+Correction to the earlier export note: the later-supplied
+`CPU_Usage_(Sampled)_Utilization_by_Process,_Thread,_Stack.zip` does contain
+populated Clone Hero stacks (113,554 rows). No second ETL or WPA export is
+needed. Its UnityPlayer/GameAssembly frames remain `<PDB not found>`; the
+separate `Sloptifine-CPU.csv` gives module-relative native offsets, but the two
+exports do not contain a shared stack key that joins an offset to its callers.
+
+I mapped the largest UnityPlayer offsets against the exact uploaded Unity
+2022.3.62f2 binary and inspected their surrounding code and Windows imports.
+The sampled `+0x8050DB` site is in the window message/timer loop (`GetMessageW`,
+`PeekMessageW`, `timeBeginPeriod`, `timeEndPeriod`, and cursor/timer cleanup).
+`+0x80270B` is in window-message handling and can post a quit message. These
+paths own input and frame pacing, so they are not safe suppression targets.
+`+0x577AB9` is a short state-check loop after Unity's internal queue helper;
+the helper claims work from a ring buffer. It is engine scheduling, not an
+identified Clone Hero callback, and changing its worker cadence could reduce
+throughput or disturb audio/render jobs. `+0x6B3C1C` is in a TLS-backed,
+indirect-callback dispatcher. Its actual callback target is dynamic. These
+offsets explain where to focus symbolized profiling, but none justifies a
+native detour or a new default-on switch.
+
+The matching UnityPlayer CodeView identity is
+`UnityPlayer_Win64_player_il2cpp_x64.pdb`, GUID
+`6313482A-F658-4F38-906E-79EC0C4DBC51`, age 1. The symbol-server request from
+this environment was rejected by its network proxy, but the user supplied this
+matching PDB. It resolves the native Unity frames below. This is separate from
+the Unity/Clone Hero code-path work already implemented through the optional
+mouse-raycast, EventSystem, whammy-upload, effect, and persistent-callback
+switches; those experiments remain reversible and are not claimed to improve
+FPS until matched PresentMon captures show it.
+
+An earlier `UnityPlayer_Win64_il2cpp_x64.pdb` upload is a valid MSF PDB but
+does not match the supplied runtime: its embedded GUID is
+`130F6D00-6C82-444C-9938-86840D8FE506`, age 1, with a 2020-07-29 timestamp.
+It was not used; the newer PDB above is the exact match for the 2025
+UnityPlayer image.
+
+The `JobsUtility.JobWorkerCount` property setter in the generated CoreModule
+assembly is indeed a `NotSupportedException` stub. However, that is not the
+only API: the same assembly exposes public
+`JobsUtility.SetJobQueueMaximumActiveThreadCount(int)` and
+`GetJobQueueWorkerThreadCount()` wrappers. The matching PDB resolves their
+native implementations to UnityPlayer RVAs `0x51ED0` and `0x51EC0`; the setter
+forwards to `JobQueue::SetWorkerThreadCount` at `0x576990`. That native method
+clamps the requested count to the queue maximum and updates its active-worker
+limit. This supports a cautious live experiment through Unity's generated API;
+it does not require a native detour or a guessed address.
+
+Version 0.4.82 adds a default-off switch that reduces the current active-worker
+limit by one only during focused, unpaused, offline solo gameplay. It restores
+the captured limit on pause, menus, online play, scene changes, or unload, and
+leaves the value alone if another component changed it while the experiment was
+active. If Unity already reports one or fewer active workers, it does nothing.
+The setting does not alter Rewired/controller polling or audio/note timing. Its
+performance effect is unmeasured; treat it as an A/B experiment, not a claimed
+optimization.
+
 ### Next screening lanes (no PDB required)
 
 There are several independent paths worth pursuing; none requires current
@@ -1696,3 +1755,50 @@ game-state reads when their options are disabled. Online sessions still pass
 through the original game methods, and the mouse option keeps its existing
 scope. This removes duplicate managed/native boundary crossings; its FPS effect
 is unmeasured and expected to be small.
+
+v0.4.81 extends that connection-state cache to the hidden-leaderboard guard and
+the existing restart/practice eligibility gate. These paths now reuse one
+20-Hz `CHNetManager` read, with connection lookup failures treated as online so
+offline-only changes remain inactive. The same release adds an unchanged-state
+fast path to the retained counter HUD: if text, position, size, colors, and
+resolution match its last successful sync, it skips text measurement, position
+clamping, and Unity component property access until something changes. Both
+changes are CPU-work reductions with no measured FPS claim; the uploaded capture
+shows the relevant callbacks are already small on average.
+
+### v0.4.82: matching Unity symbols and guarded job-worker experiment
+
+The newly supplied `UnityPlayer_Win64_player_il2cpp_x64.pdb` matches the
+installed UnityPlayer exactly: GUID
+`6313482A-F658-4F38-906E-79EC0C4DBC51`, age 1. It resolves the native timing
+addresses discussed above, including `ExecutePlayerLoop`, `PlayerRender`,
+`RenderManager::RenderCameras`, `Camera::CustomCull`,
+`GfxDeviceWorker::RunCommand`, `PlayerMainWndProc`, and Unity's job queue
+scheduling functions. These are broad engine dispatch, rendering, input, and
+scheduling paths; the symbols help classify samples but do not justify skipping
+those functions.
+
+The same capture's stack table also assigns substantial inclusive weight to
+`RtlWalkFrameChain`, `RtlpWalkFrameChain`, and `EtwpTraceStackWalk`. Those are
+Windows' stack-collection path during the ETW capture, so their recorded cost
+is profiling overhead and should not be mistaken for Clone Hero work outside
+the capture.
+
+The job queue offered a narrower control: public generated CoreModule wrappers
+for `GetJobQueueWorkerThreadCount` and
+`SetJobQueueMaximumActiveThreadCount(int)`. The PDB maps them to UnityPlayer
+RVA `0x51EC0` and `0x51ED0`; the latter calls
+`JobQueue::SetWorkerThreadCount` at `0x576990`. The unrelated
+`JobWorkerCount` property setter is still a throwing stub, so the mod does not
+call it. The new preference is default-off. When enabled, it lowers the active
+worker limit by one only during focused, unpaused, offline solo gameplay; it
+restores the saved limit when that condition ends. It leaves the count alone if
+Unity reports one or fewer workers or if another component changes the count
+while the experiment is active. The change uses the generated Unity API and
+does not touch controller polling, audio, or note timing. Its FPS/frame-time
+effect remains unmeasured.
+
+The counter refresh now reuses the same 20 Hz online-state cache instead of
+making another `CHNetManager.instance` lookup at its 5 Hz refresh rate. A lookup
+failure remains conservatively treated as online, preserving remote-player
+selection behavior while removing duplicate IL2CPP boundary work.

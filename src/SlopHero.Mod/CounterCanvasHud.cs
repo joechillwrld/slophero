@@ -20,6 +20,10 @@ internal sealed class CounterCanvasHud
     private int shownFont = -1, shownX = -1, shownY = -1, shownWidth = -1, shownHeight = -1;
     private bool textColorConfigured, backgroundConfigured;
     private bool failed;
+    private bool refreshCacheValid;
+    private string? cachedRefreshText;
+    private int cachedRefreshX, cachedRefreshY, cachedRefreshFont, cachedScreenWidth, cachedScreenHeight;
+    private Color cachedRefreshTextColor, cachedRefreshBackgroundColor;
 
     public bool Visible { get; private set; }
     public bool HasObjects => root != null;
@@ -46,11 +50,20 @@ internal sealed class CounterCanvasHud
                 throw new InvalidOperationException("Canvas HUD components were not created.");
 
             int size = Math.Clamp(fontSize, 14, 48);
+            int screenWidth = Screen.width, screenHeight = Screen.height;
+            var panelColor = new Color(0, 0, 0, HudLayout.Unit(opacity, .65f));
+            if (Visible && root.activeSelf && refreshCacheValid
+                && string.Equals(cachedRefreshText, text, StringComparison.Ordinal)
+                && cachedRefreshX == x && cachedRefreshY == y && cachedRefreshFont == size
+                && cachedScreenWidth == screenWidth && cachedScreenHeight == screenHeight
+                && cachedRefreshTextColor == textColor && cachedRefreshBackgroundColor == panelColor)
+                return null;
+
             int width = Math.Max(240, size * 12 + 24);
             int lines = 1;
             for (int i = 0; i < text.Length; i++) if (text[i] == '\n') lines++;
             int height = (int)(size * 1.25f) * lines + 20;
-            var position = HudLayout.ClampPosition(x, y, width, height, Screen.width, Screen.height);
+            var position = HudLayout.ClampPosition(x, y, width, height, screenWidth, screenHeight);
             if (shownX != position.X || shownY != position.Y || shownWidth != width || shownHeight != height)
             {
                 panelRect.anchoredPosition = new Vector2(position.X, -position.Y);
@@ -65,7 +78,6 @@ internal sealed class CounterCanvasHud
             if (shownFont != size) { label.fontSize = size; shownFont = size; }
             if (!textColorConfigured || shownTextColor != textColor)
             { label.color = textColor; shownTextColor = textColor; textColorConfigured = true; }
-            var panelColor = new Color(0, 0, 0, HudLayout.Unit(opacity, .65f));
             if (!backgroundConfigured || shownBackgroundColor != panelColor)
             {
                 background.color = panelColor;
@@ -76,6 +88,15 @@ internal sealed class CounterCanvasHud
             if (!root.activeSelf) root.SetActive(true);
             if (label.font == null)
                 throw new InvalidOperationException("Clone Hero did not provide a default TextMeshPro font.");
+            cachedRefreshText = text;
+            cachedRefreshX = x;
+            cachedRefreshY = y;
+            cachedRefreshFont = size;
+            cachedScreenWidth = screenWidth;
+            cachedScreenHeight = screenHeight;
+            cachedRefreshTextColor = textColor;
+            cachedRefreshBackgroundColor = panelColor;
+            refreshCacheValid = true;
             Visible = true;
             return null;
         }
@@ -112,6 +133,8 @@ internal sealed class CounterCanvasHud
         label = null;
         shownText = null;
         shownFont = shownX = shownY = shownWidth = shownHeight = -1;
+        cachedRefreshText = null;
+        refreshCacheValid = false;
         textColorConfigured = backgroundConfigured = false;
     }
 
