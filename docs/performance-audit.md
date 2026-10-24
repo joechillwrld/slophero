@@ -1488,22 +1488,52 @@ it is not a safe patch target until that caller is identified.
 
 Correction to the earlier export note: the later-supplied
 `CPU_Usage_(Sampled)_Utilization_by_Process,_Thread,_Stack.zip` does contain
-populated Clone Hero stacks (113,554 rows). No second ETL or WPA export is
-needed. Its UnityPlayer/GameAssembly frames remain `<PDB not found>`; the
+populated Clone Hero stacks (113,554 rows), so no new ETL is needed. Its
+UnityPlayer/GameAssembly frames remain `<PDB not found>` because matching
+symbols were not loaded for that export. A later copy of the expanded WPA grid
+with the matching UnityPlayer PDB loaded names the Unity frames; WPAExporter
+with the saved profile instead produced collapsed process totals. The
 separate `Sloptifine-CPU.csv` gives module-relative native offsets, but the two
 exports do not contain a shared stack key that joins an offset to its callers.
 
-A direct CSV pass found 113,554 Clone Hero rows in the stack table. Stack rows
-traversing GameAssembly sum to about 9,955 ms across 1,218 distinct stack
-shapes. This is an inclusive module total, not one method's exclusive cost.
+The 113,554 Clone Hero rows in the stack ZIP continue past the 31.1-second
+method-export window into WPA's `Trace Rundown` tail, shown from about 31 to
+37 seconds on the graph; the trace itself spans 42.28 seconds. About 18.8
+CPU-seconds of rows after 31.1 have `Stack=n/a` and no GameAssembly frames.
+Those rows are not useful gameplay attribution and must be excluded when
+comparing to the method export. Filter the existing stack data to 0–31.1
+seconds; no new ETL is needed.
+
+Within that gameplay window, rows traversing GameAssembly sum to about 9,955
+ms across 1,489 distinct full stack strings; 1,365 appear on main thread
+13808, accounting for 9,684 ms (97.3%) of that inclusive total. The weight is
+spread across the gameplay interval, generally about 0.25–0.38 seconds per
+second, rather than one spike. This is not one method's exclusive cost. Among
+those rows, 5,523 ms have an
+unresolved GameAssembly frame as the last recorded frame, 2,555 ms continue
+into unresolved UnityPlayer frames, and 993 ms continue into a MelonLoader
+reverse-P/Invoke stub; the remainder ends in smaller native, input, or audio
+paths. These tail buckets are mutually exclusive, unlike the nested method
+CSV's inclusive rows.
+
 Named callback frames account for about 101 ms in `SlopHero.Core.OnUpdate`,
 55 ms in `ClonZones.Core.OnUpdate`, and 183 ms in
-`MelonLoader.Support.ComponentSiblingFix` over the 31-second view. These
-weights overlap the IL2CPP trampoline and MelonLoader event dispatch frames.
-`ComponentSiblingFix` appears over the capture, but its measured cost is small
-and it maintains mod component ordering; do not disable it globally. The
-stack export still cannot map its unresolved GameAssembly frames to the two
-specific hot PCs in the method export.
+`MelonLoader.Support.ComponentSiblingFix.SetAsLastSibling` over the view.
+ClonZones' fret update detour, settle check, and idle-head check account for
+about 271, 284, and 104 ms, respectively. These are also inclusive and overlap
+their loader/IL2CPP bridge frames. They show no single SlopHero callback owns
+the broad native total. `ComponentSiblingFix` maintains component ordering;
+its small measured cost does not justify disabling it globally.
+
+The two hot GameAssembly addresses are inside a generic dynamic invocation
+path: the parent at `+0x2FAB100` calls `+0x2FAB600`, which dispatches through a
+method-invoker pointer. The many stack forms are consistent with different
+callbacks using this shared bridge. They are not evidence for one removable
+method. The stack CSV has no raw GameAssembly frame RVAs, while the method CSV
+has no shared row key, so the two exports cannot join a particular stack form
+to either hot address. Skipping `il2cpp_runtime_invoke` wholesale risks
+breaking arbitrary game, Unity, or mod callbacks; the next useful target is a
+specific expensive caller, once the stack-to-RVA association is available.
 
 The current-build visual disassembly also rules out two tempting shortcuts.
 `HighwayScroll.Update` at RVA `0x3818E0` returns on non-rendering simulation
@@ -1519,18 +1549,26 @@ hook is not justified by these paths without call-site measurements outside
 that gate.
 
 I mapped the largest UnityPlayer offsets against the exact uploaded Unity
-2022.3.62f2 binary and inspected their surrounding code and Windows imports.
-The sampled `+0x8050DB` site is in the window message/timer loop (`GetMessageW`,
-`PeekMessageW`, `timeBeginPeriod`, `timeEndPeriod`, and cursor/timer cleanup).
-`+0x80270B` is in window-message handling and can post a quit message. These
-paths own input and frame pacing, so they are not safe suppression targets.
-`+0x577AB9` is a short state-check loop after Unity's internal queue helper;
-the helper claims work from a ring buffer. It is engine scheduling, not an
-identified Clone Hero callback, and changing its worker cadence could reduce
-throughput or disturb audio/render jobs. `+0x6B3C1C` is in a TLS-backed,
-indirect-callback dispatcher. Its actual callback target is dynamic. These
-offsets explain where to focus symbolized profiling, but none justifies a
-native detour or a new default-on switch.
+2022.3.62f2 binary and its matching PDB. The PDB resolves `+0x6B3C1C` to
+`Thread::RunThreadWrapper+0x92c`. Disassembly shows it is immediately after
+`call rax`, the dynamic callback stored in the thread context; Unity then
+clears a flag and runs thread cleanup. This is shared worker-thread plumbing,
+not one specific Clone Hero callback. `+0x577AB9` resolves inside
+`lane_allocator`; its surrounding instructions repeatedly test queue state,
+call a helper, and retry. This is job scheduling / synchronization, not a
+confirmed idle-only path. Changing it could reduce throughput or disturb
+audio/render jobs. Neither is safe to skip wholesale.
+
+The sampled `+0x8050DB` site resolves inside `PlayerMainWndProc` and is in the
+window message/timer path (`GetMessageW`, `PeekMessageW`, `timeBeginPeriod`,
+`timeEndPeriod`, and cursor/timer cleanup). `+0x80270B` resolves inside
+`DoQuit` and can post a quit message. The `+0x5BB74B`, `+0x5BBA19`, and
+`+0x5BBE6F` rows resolve to `ExecutePlayerLoop` / `PlayerLoop`. These paths
+own lifecycle, input, and frame pacing, so they are not safe suppression
+targets. The matching PDB can name Unity frames when loaded in WPA; the
+uploaded stack CSV's `<PDB not found>` means the PDB was not loaded for that
+export. The symbols identify shared engine containers, but a raw stack-frame
+RVA is still required to identify which callback each container serves.
 
 The matching UnityPlayer CodeView identity is
 `UnityPlayer_Win64_player_il2cpp_x64.pdb`, GUID
@@ -1607,29 +1645,33 @@ it needs a stack-bearing WPA export, not a PDB or another asset bundle.
 
 ### Current native files and hotspot disassembly
 
-The newly supplied `UnityPlayer.dll` is Unity 2022.3.62f2 and includes
-unwind records covering the sampled addresses. It has a CodeView PDB identity,
-but no PDB was supplied; function bounds and call instructions are still
-recoverable from the PE. The exact bytes are SHA-256
+The supplied `UnityPlayer.dll` is Unity 2022.3.62f2 and includes unwind
+records covering the sampled addresses. Its exact matching PDB is also
+supplied and has been used to resolve the Unity symbols below. The exact DLL
+bytes are SHA-256
 `43fb0aea1b80c74963dae88ec7fc1c3c1993d893ce94d12972000fcc9b653ad1`.
 
-Disassembly sharpens, but does not yet name, the top native rows:
+Disassembly and PDB symbols identify the surrounding engine work:
 
-- `UnityPlayer+0x6B3C1C` is immediately after an indirect callback call. The
-  surrounding function clears callback state and returns through a helper.
-  The call target is dynamic, so this remains a strong stack-trace target.
-- `UnityPlayer+0x577AB9` is a recheck/loop site after a helper that manipulates
-  atomic ring-buffer state. This resembles worker-queue scheduling; the stack
-  is needed to tell whether the sampled thread is doing useful work or waiting
-  for it. Do not hook or throttle it by address.
-- `UnityPlayer+0x8050DB` sits in a Windows event/timer path that calls
-  `PeekMessageA`, `GetMessageW`, `CreateEventA`, and `timeBeginPeriod`. These
-  services can affect window input and frame pacing, so this is diagnostic
-  evidence rather than a suppression target.
-- `UnityPlayer+0x80869B` follows a helper and calls `GetCurrentProcess` and
-  `TerminateProcess`. That shape is consistent with an exit/error path; its
-  large inclusive CPU attribution is not credible as steady gameplay work
-  without the caller stack.
+- `UnityPlayer+0x6B3C1C` is `Thread::RunThreadWrapper+0x92c`, immediately after
+  an indirect callback call. The callback target is dynamic; the wrapper then
+  clears state and runs thread cleanup. Do not bypass the whole wrapper.
+- `UnityPlayer+0x577AB9` is inside `lane_allocator`, a queue-state retry loop
+  that repeatedly calls a helper. It resembles job scheduling or
+  synchronization, but the stack export does not identify which worker/task
+  each sample serves. Do not hook or throttle it by address.
+- `UnityPlayer+0x8050DB` is inside `PlayerMainWndProc`, a Windows event/timer
+  path that calls `PeekMessageA`, `GetMessageW`, `CreateEventA`, and
+  `timeBeginPeriod`. These services can affect window input and frame pacing,
+  so this is diagnostic evidence rather than a suppression target.
+- `UnityPlayer+0x5BB74B`, `+0x5BBA19`, and `+0x5BBE6F` resolve to
+  `ExecutePlayerLoop` / `PlayerLoop`; these are lifecycle dispatch paths.
+- `UnityPlayer+0x80869B` resolves to `UnityMain2+0xb`; its short wrapper calls
+  a helper, then the process APIs `GetCurrentProcess` and `TerminateProcess`.
+  `+0x8083FD` is within `UnityMainImpl`. Both rows carry about 29.1 seconds of
+  inclusive weight, but the wrapper is only 38 bytes and the rows are nested
+  around the application's main work. This is call-tree attribution flowing
+  through an outer function, not 29 seconds spent terminating the process.
 
 The other uploads add context rather than a new per-frame removal target.
 `baselib.dll` is the matching Unity 2022.3.62f2 runtime library; its largest

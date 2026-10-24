@@ -1,36 +1,43 @@
 using Il2Cpp;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace SlopHero.Mod;
 
 /// <summary>
-/// Optional skip for the six leaderboard motion checks while their parent
-/// score list is fully invisible. Entry data, network requests, and rendering
-/// are left alone. Components are restored within 50 ms of the list appearing.
+/// Optional skip for hidden leaderboard entry and layout callbacks. Entry data,
+/// network requests, and rendering are left alone. Components are restored
+/// within 50 ms of the list appearing.
 /// </summary>
 internal sealed class HiddenLeaderboardOverride
 {
     private readonly record struct EntryState(InGameLeaderboardEntry Entry, bool Enabled);
+    private readonly record struct FitterState(AspectRatioFitter Fitter, bool Enabled);
 
     private EntryState[] entries = Array.Empty<EntryState>();
+    private FitterState[] fitters = Array.Empty<FitterState>();
+    private SpectatorCount? spectator;
+    private bool spectatorEnabled;
     private GameObject? scoreList;
     private CanvasGroup? group;
     private double nextDiscovery;
+    private double nextReconcile;
+    private bool? lastHidden;
 
-    public bool NeedsRestore => entries.Length != 0;
+    public bool NeedsRestore => entries.Length != 0 || fitters.Length != 0 || spectator != null;
 
     public void Apply(bool requested, double realtime, bool online)
     {
-        if (!requested)
+        if (!requested || online)
         {
             Restore();
-            nextDiscovery = 0;
+            nextDiscovery = online ? realtime + 1 : 0;
             return;
         }
 
         if (scoreList == null || group == null)
         {
-            if (entries.Length != 0)
+            if (NeedsRestore)
             {
                 Restore();
                 nextDiscovery = 0;
@@ -43,7 +50,10 @@ internal sealed class HiddenLeaderboardOverride
         // Keep online score displays fully under the game's control. In solo
         // play, skip motion checks only after the entire group has faded out.
         bool hidden = scoreList.activeInHierarchy && group.alpha <= .001f;
-        bool suspend = !online && hidden;
+        if (lastHidden == hidden && realtime < nextReconcile) return;
+        lastHidden = hidden;
+        nextReconcile = realtime + 1;
+        bool suspend = hidden;
         foreach (var state in entries)
         {
             var entry = state.Entry;
@@ -51,6 +61,17 @@ internal sealed class HiddenLeaderboardOverride
             bool desired = state.Enabled && !suspend;
             if (entry.enabled != desired) entry.enabled = desired;
         }
+        foreach (var state in fitters)
+        {
+            var fitter = state.Fitter;
+            if (fitter == null) continue;
+            bool desired = state.Enabled && !suspend;
+            if (fitter.enabled != desired) fitter.enabled = desired;
+        }
+        // SpectatorCount.FixedUpdate polls the online count even in solo play.
+        // It is independent of the score-list fade, but needed immediately
+        // again if the session becomes online.
+        if (spectator != null && spectator.enabled) spectator.enabled = false;
     }
 
     public void Clear()
@@ -65,15 +86,21 @@ internal sealed class HiddenLeaderboardOverride
         try
         {
             var root = GameObject.Find("HUDCam");
-            var list = root == null ? null : root.transform.Find("Leaderboard/Canvas/ScoreList");
+            if (root == null) return;
+            var list = root.transform.Find("Leaderboard/Canvas/ScoreList");
             if (list == null) return;
             var canvasGroup = list.GetComponent<CanvasGroup>();
             var found = list.GetComponentsInChildren<InGameLeaderboardEntry>(true);
             if (canvasGroup == null || found.Length == 0) return;
+            var foundFitters = list.GetComponentsInChildren<AspectRatioFitter>(true);
 
             scoreList = list.gameObject;
             group = canvasGroup;
             entries = found.Select(entry => new EntryState(entry, entry != null && entry.enabled)).ToArray();
+            fitters = foundFitters.Select(fitter => new FitterState(fitter, fitter != null && fitter.enabled)).ToArray();
+            spectator = root.transform.Find("Menu Canvas/Spectator Count")?.GetComponent<SpectatorCount>();
+            spectatorEnabled = spectator != null && spectator.enabled;
+            lastHidden = null;
             nextDiscovery = double.MaxValue;
         }
         catch
@@ -83,6 +110,10 @@ internal sealed class HiddenLeaderboardOverride
             scoreList = null;
             group = null;
             entries = Array.Empty<EntryState>();
+            fitters = Array.Empty<FitterState>();
+            spectator = null;
+            spectatorEnabled = false;
+            lastHidden = null;
         }
     }
 
@@ -97,8 +128,28 @@ internal sealed class HiddenLeaderboardOverride
             }
             catch { }
         }
+        foreach (var state in fitters)
+        {
+            try
+            {
+                if (state.Fitter != null && state.Fitter.enabled != state.Enabled)
+                    state.Fitter.enabled = state.Enabled;
+            }
+            catch { }
+        }
+        try
+        {
+            if (spectator != null && spectator.enabled != spectatorEnabled)
+                spectator.enabled = spectatorEnabled;
+        }
+        catch { }
         entries = Array.Empty<EntryState>();
+        fitters = Array.Empty<FitterState>();
+        spectator = null;
+        spectatorEnabled = false;
         scoreList = null;
         group = null;
+        nextReconcile = 0;
+        lastHidden = null;
     }
 }

@@ -37,6 +37,6 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-An unreleased FC-ring no-op cleanup is in the source tree. The latest actual
-download is 0.4.83; there is no published 0.4.84 build. Keep those statuses
-separate when continuing the work.
+The latest packaged build is 0.4.84. Its FC-ring cleanup and hidden offline
+leaderboard/spectator callbacks are narrow CPU-work reductions with no measured
+FPS gain yet. Do not present them as the complete native optimization project.

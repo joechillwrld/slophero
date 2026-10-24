@@ -29,6 +29,21 @@ check version/hash against the current build, distinguish their contents from
 instructions, and add verified findings here or to the audit. Future uploads
 cannot be inventoried in advance. Do not ask the user for files already here.
 
+The supplied `GameAssembly.dll` has an RSDS CodeView reference to
+`E:\2guitargame\Library\Bee\artifacts\WinPlayerBuildProgram\6h2wl\GameAssembly.pdb`
+with signature `c41525c5957c43d28908de01b58f9ef1`, age 4. No GameAssembly PDB
+is present in the uploaded files or current workspace. If one is found, verify
+that exact identity; a same-named PDB from another Clone Hero build will not
+match. The binary and metadata remain usable for static mapping without it.
+
+The re-uploaded `globalgamemanagers.assets` at
+`/workspace/attachments/67aa8362-148d-4733-9e78-98cec1f2e972/globalgamemanagers.assets`
+contains 1,698 MonoScript definitions. Joining its path IDs to `level2` resolves
+the current Gameplay scene's script components, including the six hidden
+leaderboard entries and their six `AspectRatioFitter` components, the offline
+`SpectatorCount`, and the drum input viewer. These are static scene identities;
+live enabled state still needs the runtime snapshot or a controlled test.
+
 ## Implemented subset of Sol's research
 
 These are the research leads that reached code. They do **not** cover every
@@ -41,6 +56,7 @@ the Sloptifine pages and preserve their documented scope:
 | Broader Unity UI event work was also costly | `GameplayUiEventOverride` is a separate default-off switch scoped to active offline solo play. It pauses Unity EventSystem work and resumes outside that state. It is not additive with the mouse-only switch while the broad pause is active. |
 | Old source suggested frequent whammy texture uploads; current native code uses raw byte writes | `WhammyTextureThrottle` hooks the exact current data writer and upload wrapper. It permits an upload after data changes and leaves producer writes and GPU compute intact. It is default-off; the user has seen no clear performance gain, so keep it experimental. |
 | Hidden beatline, leaderboard, particles, fret fades, combo smoke and star-progress effects continued some work while invisible/unused | `VisualOverrides`, `HiddenLeaderboardOverride`, `PerformanceOverrides`, `ComboSmokeScrollOverride`, and `StarProgressParticleOverride` offer separate controls and restore prior state. Scene discoveries and limitations are in the audit. |
+| Exact Gameplay scene script map shows hidden leaderboard layout and offline spectator polling | The existing default-off hidden leaderboard switch now pauses six `AspectRatioFitter` updates while the score list is invisible and `SpectatorCount.FixedUpdate` while offline. It restores both when needed and checks component states only once per second during stable visibility. No frame gain is measured yet. |
 | Old source showed a per-tick cheat-code scan; current component lookup was unreliable | `CheatScannerOverride` targets `CheatManager.Update()` directly, only during eligible offline solo play. It does not replace guitar input or disable the component. |
 | Unity job queue setter was resolved through the matching player PDB | `UnityJobWorkerLimit` uses the generated `SetJobQueueMaximumActiveThreadCount` API and restores the prior limit. It is default-off; the latest three-run callback comparison shows no benefit. |
 | Current `HighwayScroll.Update` combines property-block writes with video/fade behavior | `HighwayAnimationOverride` is a default-off whole-update freeze during offline solo songs. It may freeze those visuals and has no demonstrated frame gain. The old source's note `yield`/hit-detection paths remain untouched because they are scoring-sensitive and not confirmed in current code. |
@@ -52,27 +68,49 @@ remaining cost of eligible rendered-frame work.
 
 ## Still open: evidence to turn into code
 
-1. **Name the expensive native caller.** The 31-second `Sloptifine-CPU.csv`
+1. **Separate the IL2CPP dispatcher from its callbacks.** The 31-second `Sloptifine-CPU.csv`
    puts roughly 9 seconds of *inclusive* weight at
    `GameAssembly+0x2FAB159` / `+0x2FAB63D` and matching `version.dll`
-   return sites. Sol traced those GameAssembly PCs through
-   `il2cpp_runtime_invoke` and the version proxy through MelonLoader's
-   `InvokeDetour`. These rows overlap on one call path; they do not establish
-   that reflection, MelonLoader, or SlopHero costs 9 seconds exclusively.
-   The supplied `CPU_Usage_(Sampled)_Utilization_by_Process,_Thread,_Stack.zip`
-   has populated stacks, while the method CSV has native offsets, but their
-   exports lack a shared row key. Inspect the existing raw files and exact
-   binaries first; if the caller cannot be recovered, state that limit before
-   proposing an instrumented or symbolized follow-up. A blanket hook on
-   `il2cpp_runtime_invoke` would touch the whole game and is not the fix.
-2. **Finish Unity native attribution.** The matching PDB resolves
-   `ExecutePlayerLoop`, camera/render dispatch, window messages, and job queue
-   code. The sampled `UnityPlayer+0x6B3C1C` follows an indirect callback,
-   `+0x577AB9` is job-queue state, and `+0x8050DB` is a Windows message/timer
-   path. These are named *containers*, not removable gameplay work. Use the
-   supplied PDB, stack ZIP, exact UnityPlayer, and native offsets to identify
-   a concrete callback or render operation before patching. The worker-count
-   experiment showed no benefit in the latest captures.
+   return sites. The exact disassembly shows a generic IL2CPP invoke path: the
+   parent at `+0x2FAB100` calls `+0x2FAB600`, which makes an indirect call
+   through a method-invoker pointer. Those sites are shared callback plumbing,
+   not a single game feature. The populated stack ZIP shows 1,489 distinct
+   full stack shapes containing GameAssembly; 9,684 of the 9,955 ms inclusive
+   weight is on the main thread. The export does not provide the raw GameAssembly
+   frame RVAs needed to correlate each shape with the two hot method rows.
+   Continue by attributing individual callers; do not skip the generic invoke
+   path, since that could bypass unrelated game, Unity, and mod callbacks.
+2. **Finish Unity native attribution.** The exact matching PDB maps the hottest
+   Unity rows to `Thread::RunThreadWrapper` (`+0x6B3C1C`), the job
+   `lane_allocator` (`+0x577AB9`), `PlayerMainWndProc` (`+0x8050DB`), and
+   `PlayerLoop` / `ExecutePlayerLoop`. Disassembly shows the thread wrapper
+   returning from an indirect callback and the allocator looping on queue
+   state. These are shared worker, scheduling, and window paths, not removable
+   gameplay methods. Their cumulative weights overlap. The WPA stack CSV says
+   `<PDB not found>` because those symbols were not loaded when it was
+   exported; the exact matching Unity PDB is already supplied. Load it into
+   WPA to name Unity frames, then use the existing trace to inspect callback
+   families. The worker-count experiment showed no benefit in the latest
+   captures.
+
+   A later copy of the symbolized WPA grid is now available as
+   `/workspace/attachments/26f8cf3d-3b89-4d04-a347-358413e1ebef/Sloptifine-symbolized.tsv`.
+   It contains 420 rows from the expanded main-thread tree. WPAExporter with
+   the saved `.wpaProfile` produced only 85 process totals with blank Stack
+   cells; that route does not preserve this grid expansion. In the copied
+   tree, `PlayerRender` has 11,463 ms inclusive weight, including
+   `RenderManager::RenderCameras` at 10,344 ms. Under the camera branch,
+   `Camera::CustomRender` has 5,440 ms and sibling `Camera::CustomCull` has
+   4,654 ms. `CullResults::GetOrCreateSharedRendererScene` has 2,314 ms;
+   `ExtractSceneRenderNodeQueue` has 2,006 ms. Separately under the player
+   loop, `BaseBehaviourManager::CommonUpdate<BehaviourManager>` has 6,942 ms
+   and `DirectorManager::ExecuteStage` has 3,771 ms. These are inclusive
+   sampled weights in a copied, partly expanded tree, not exclusive costs or
+   additive elapsed times. The specific camera/culling work and game callbacks
+   beneath the collapsed branches remain unidentified. `RenderOverlays` is
+   478 ms and `RenderOffscreenCameras` is 45 ms in this tree, so this sample
+   does not point to broad overlay or offscreen-camera suppression as the
+   main gain.
 3. **Target current game visual setters narrowly.** Current
    `GuitarFretAnimator.Update` can repeat seven sorting-order writes in its
    idle branch. Current `HighwayScroll.Update` performs
@@ -91,26 +129,105 @@ remaining cost of eligible rendered-frame work.
    Canvas rendering, GPU work, and the game's native callbacks. Evaluate the
    hooks and UI layout from the existing trace before suggesting a rewrite.
 
+### 2026-10-24 scene and native follow-up
+
+I reassembled the nine uploaded `resources.assets` parts and parsed the exact
+uploaded Gameplay `level2` scene. Its two serialized cameras are `Background
+Cam` (layer-13 mask, solid-color clear) and `HUDCam` (layers 5 and 12, no
+clear). The live snapshot's third camera is created or supplied at runtime.
+Among serialized objects with active ancestors, 357 SpriteRenderers are
+enabled and visible to `HUDCam`: 322 are under `Input Viewer` and 35 under
+`HUD`. None are on the background camera's layer in the static scene. This is
+not a live draw count: the previous in-game snapshot found only 48 enabled
+guitar-viewer sprites and zero GHL/drum-viewer sprites after instrument setup.
+The serialized input-viewer variants are therefore already being deactivated;
+removing their prefab renderers would not explain the live culling cost. The
+background camera owns the screen clear and the video layer, so disabling it
+from the static zero-sprite count would be unsound.
+
+I built Il2CppDumper against the exact GameAssembly/metadata pair to check
+older-source leads. The current `HighScoreDisplay` and `GHLFretAnimator`
+classes no longer declare an `Update` method; disabling their old empty
+callbacks would do no work. `DrumsPlayer` and `DrumsNoteRenderer` still declare
+`Update`, but the existing live guitar snapshot has no active drum-viewer
+sprites and the method export's prominent game callbacks are guitar-specific.
+The existing MIDI switch covers the persistent optional drum-input service.
+Do not add a general drum-disable switch until a drum-only component is shown
+to keep running in guitar mode.
+
+The method export maps `BaseGuitarPlayer.Update` (~457 ms inclusive),
+`BasePlayer.Update` (~414 ms), `BaseGuitarNoteRenderer.Update` (~114 ms), and
+`Rewired.InputManager_Base.DoUpdate` (~2,116 ms) in its 31-second view.
+Together with the symbolized WPA grid's camera render/cull branches, this
+separates necessary guitar input/scoring from Unity rendering. Do not throttle
+Rewired or skip the player update to pursue the rendering cost.
+
 ### Direct check of the supplied stack ZIP
 
-I parsed the 86 MB stack CSV inside the uploaded ZIP. It has 113,554 Clone
-Hero rows and timestamps from the capture. Rows whose stack traverses
-GameAssembly sum to about 9,955 ms across 1,218 distinct stack shapes; that
-is a broad inclusive total, not one 9.955-second function. The method CSV's
-two hottest GameAssembly addresses are nested call sites in this invocation
-path, but the stack export has no addresses with which to identify their
-callers.
+I parsed the 86 MB stack CSV inside the uploaded ZIP. Its 113,554 Clone Hero
+rows extend past the 31.1-second gameplay window into WPA's `Trace Rundown`
+tail (the graph continues to 42.28 seconds). About 18.8 CPU-seconds of rows
+after 31.1 seconds have `Stack=n/a` and no GameAssembly frames; they are not
+useful gameplay attribution. The matching method export ends at 31.092
+seconds, so analyses should filter the stack rows to 0–31.1 seconds. In that
+gameplay window, rows whose stack traverses
+GameAssembly sum to about 9,955 ms across 1,489 distinct full stack strings;
+1,365 of those shapes occur on main thread 13808, which accounts for 9,684 ms
+(97.3%) of that inclusive total. This is the same broad time-spread path from
+the method export, not one 9.955-second function. The weight is distributed
+throughout the 31-second gameplay interval at roughly 0.25–0.38 seconds per
+second rather than being one isolated spike.
 
-The stack table does name several managed callbacks: SlopHero
+Looking at the last recorded frame in those stacks makes the spread concrete:
+5,523 ms end at an unresolved GameAssembly frame, 2,555 ms continue into an
+unresolved UnityPlayer frame, and 993 ms continue into MelonLoader's
+`IL_STUB_ReversePInvoke`; the remaining weight ends in several smaller native
+or input/audio paths. These are mutually exclusive stack-tail buckets, while
+the method export's parent/child rows are inclusive and overlap. The exact
+GameAssembly disassembly confirms `+0x2FAB159` is after a call to
+`+0x2FAB600`, and `+0x2FAB63D` is after that helper's indirect call through a
+method-invoker pointer. That shared dynamic dispatch naturally appears with
+different stack depths and callback tails. The current export proves the
+shape variation is real, but does not identify a single callback responsible
+for the broad native weight: its unresolved GameAssembly frames contain no
+RVA, and the separate method CSV has no common row key to join.
+
+This rules out a blanket skip of `il2cpp_runtime_invoke` as a safe
+optimization. The native dispatcher validates and invokes arbitrary managed
+methods; skipping it could suppress unrelated game lifecycle, UI, scoring,
+and mod callbacks. The useful target would be one specific caller or callback
+whose own cost is high, not the common dispatch bridge.
+
+Within the gameplay window, the stack table does name several managed callbacks: SlopHero
 `Core.OnUpdate` totals about 101 ms, `ClonZones.Core.OnUpdate` about 55 ms,
 and MelonLoader `ComponentSiblingFix` about 183 ms across the 31-second view.
-These are also inclusive weights; the calls overlap their MelonLoader and
-IL2CPP trampoline frames. `ComponentSiblingFix` appears throughout gameplay,
-but its measured cost is small beside the broad native total and it maintains
-component ordering for mod callbacks. Do not disable it globally. This check
-narrows attribution and rejects a blanket MelonLoader or SlopHero update-loop
-rewrite; it still does not identify the game callback behind the largest
-native paths.
+The stack also names ClonZones' `GuitarFretPatch.FretUpdateNativeDetour`
+(about 271 ms), `IsFretSettled` (284 ms), and `IsHeadSettledAtIdle` (104 ms).
+These are inclusive weights; callback totals overlap their MelonLoader and
+IL2CPP trampoline frames and are spread across the trace. SlopHero's named
+callbacks are individually small beside the broad native total. ClonZones'
+fret hooks and MelonLoader's `ComponentSiblingFix` are separate mod work, not
+evidence that the shared dispatcher itself should be disabled. This narrows
+the remaining target to a specific native/game callback, which the current
+stack export still cannot name.
+
+The method export's largest Unity inclusive weights further explain the
+distributed stacks: `Thread::RunThreadWrapper` is about 47.3 seconds,
+`lane_allocator` about 34.4 seconds, `PlayerMainWndProc` about 27.7 seconds,
+and the `PlayerLoop` / `ExecutePlayerLoop` rows are about 27.2 seconds each.
+These totals overlap across nested frames and threads, so they are not extra
+elapsed seconds or separate optimization wins. The PDB maps `+0x6B3C1C` to
+the wrapper immediately after an indirect callback call; `+0x577AB9` sits in
+a queue-state retry loop. That accounts for why the same hot framework rows
+show many stack shapes: execution flows through generic worker and callback
+machinery into different targets. The current export still cannot connect
+those targets to exact stack samples, and neither common wrapper is safe to
+skip wholesale. As a useful sanity check, `UnityMain2+0xb` and
+`UnityMainImpl+0x1d8d` each carry about 29.1 seconds of inclusive weight,
+although `UnityMain2` is a tiny wrapper around a helper and process-exit
+imports. That weight follows the work called beneath the wrapper; it does not
+mean Unity spent 29 seconds terminating the process. This is why the hot
+method totals must be read as call-tree attribution, not exclusive self-time.
 
 The current PresentMon baseline measured 0.760 ms mean CPU busy against
 0.281 ms mean GPU busy, with 1,261.2 average presented FPS. This makes CPU
@@ -123,27 +240,30 @@ and scene assets suggest other candidates, but several (`SoftMaskController`,
 phrase fast path, and `CameraShake` returns quickly while idle. Consult the
 audit before adding controls for those.
 
-The next work session should start with the supplied native stack ZIP and
-method CSV, inspect the exact `GameAssembly` and Unity paths above, and look
-for a concrete callback that can be changed without touching note timing,
-audio, online state, or 1000 Hz controller polling. In parallel, examine the
-current generated assemblies and older source for visual-only per-frame work
-the game's settings cannot suppress. Batch independent, grounded fixes into
-one reviewable build; preserve existing SlopHero features. If a hot native
-caller remains unidentifiable from these exports, record that specific limit
-and keep working on the independent leads. Do not ask for the same ETL, WPA
-exports, assets, or PDB again.
+Continue using the supplied stack ZIP and method CSV; do not ask the user to
+repeat those exports. The next profiling improvement is a stack export that
+preserves module-relative frame addresses so a stack row can be associated
+with a hot RVA. The matching UnityPlayer PDB can name Unity frames when loaded
+in WPA; it cannot name GameAssembly frames. Until per-frame RVAs are available,
+use named stack tails to rule out individual mod callbacks and continue
+screening independent current-game visual paths. Preserve note timing, audio,
+online behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest released build: SlopHero **0.4.83** on the private
+- Latest packaged build: SlopHero **0.4.84** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded three-run `Latest.log`
-  is from that version; its SHA-256
+  remains from 0.4.83; its SHA-256
   `8DFD151C5664E71831849636E6E95EBC89C603C697DB3300FEDFF95D8AA56E46`
   matches the DLL in that release ZIP. Clone Hero is **1.1.0.6142**, Unity
   **2022.3.62f2**, with ClonZones 2.0.0 also loaded. This log has no
-  SlopHero errors. A small FC-ring cleanup is pending in source; it is not
-  a 0.4.84 release or a substitute for the open research above.
+  SlopHero errors. Version 0.4.84 ships the FC-ring no-op cleanup and extends
+  the default-off hidden leaderboard switch to pause its six layout fitters
+  while invisible and the spectator counter while offline. It reduces the
+  switch's repeated native component-state checks to a one-second recovery
+  pass when visibility is stable. The switch restores those components on
+  visibility, online transition, option disable, and scene exit. No measured
+  frame-rate improvement is claimed for this build.
 - The exact UnityPlayer PDB is
   `UnityPlayer_Win64_player_il2cpp_x64.pdb`, GUID
   `6313482A-F658-4F38-906E-79EC0C4DBC51`, age 1. The earlier
@@ -195,11 +315,10 @@ Canvas HUD sync averaged 0.009–0.018 ms, with one 4.821 ms maximum in run 1;
 the other two maxima were 0.165/0.228 ms. Treat that as an isolated outlier.
 
 The 0.4.83 capture showed 597 `FC rings` calls at a 0.003 ms average in the
-run with ring customization disabled. The pending source cleanup skips these
-empty calls while other visual settings are active, and still runs once to
-restore ring state after the user turns customization off. This is a small mod
-  cleanup with no measured frame-rate effect; do not release it alone as the
-answer to the broader optimization request.
+run with ring customization disabled. The 0.4.84 cleanup skips these empty
+calls while other visual settings are active, and still runs once to restore
+ring state after the user turns customization off. This has no measured
+frame-rate effect and is one small part of the broader optimization work.
 
 The capture's callback intervals are measured inside the mod. They do not
 measure displayed FPS, GPU time, or the full cost of Unity Canvas rendering.

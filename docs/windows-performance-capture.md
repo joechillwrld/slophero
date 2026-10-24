@@ -72,21 +72,32 @@ $output = 'C:\path\to\CSV-output'
 & (Join-Path $tool 'WPAExporter.exe') -i $trace -profile $profile -outputfolder $output
 ```
 
-The exporter writes the profile's tables into the output folder. If
+The exporter writes the profile's tables into the output folder, but a saved
+profile may lose the grid's expanded process/thread/stack rows. Check the CPU
+CSV's `Stack` column before sharing it: a short file containing only process
+totals with blank `Stack` values is not a symbolized stack export. Do not
+repeat the trace or profile export just to recreate those same blank rows. If
 `WPAExporter.exe` is missing, modify the Windows ADK installation and select
 **Windows Performance Toolkit**. The ETL stays on the PC; share only the
 resulting CSV files.
 
 ### If the CSV has blank Thread and Stack values
 
-Do not record another ETL or rerun WPAExporter. Open the existing ETL and
-select the **CPU Usage (Sampled)** table. In its table grid, expand the
-**Clone Hero.exe** row, then expand the game's highest-weight thread rows until
-the individual stack frames appear beneath them. Right-click the expanded grid
-and choose **Copy Table**, then paste into a text file and save it as `.txt`. Keep
-the Clone Hero rows and verify the **Thread ID** and **Stack** columns contain
-values. The earlier process-only CSVs have those columns but contain only
-collapsed process totals, so they cannot identify the native caller.
+Do not record another ETL or rerun WPAExporter. The `.wpaProfile` saves the
+table grouping but does not preserve the expanded stack rows, so rerunning the
+same command can produce only process totals. Open the existing ETL in WPA,
+expand the **Clone Hero.exe** thread and stack rows in **CPU Usage (Sampled)**,
+and copy the expanded table from the grid. Save the clipboard as tab-separated
+text in PowerShell:
+
+```powershell
+Get-Clipboard -Raw | Set-Content -LiteralPath 'D:\Downloads\Sloptifine-symbolized.tsv' -Encoding UTF8
+```
+
+Check the saved file for a function name visible in WPA, such as
+`UnityPlayer.dll!PlayerRender`. This exports only rows copied from the current
+grid; collapsed branches are not included. The earlier process-only CSVs have
+blank stack columns and cannot identify native callers.
 
 ## Optional presentation trace
 

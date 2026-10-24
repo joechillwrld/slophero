@@ -339,7 +339,7 @@ public sealed partial class Core
                     "Live toggle; turn off here to restore the game's joke modes.");
 
                 SectionHeader("Services and HUD", x, y + 270);
-                Toggle(suspendHiddenLeaderboard, "Skip motion checks for the hidden offline leaderboard", x, y + 296);
+                Toggle(suspendHiddenLeaderboard, "Pause offline leaderboard and spectator UI", x, y + 296);
                 Toggle(stopMidiInput, "Pause drum MIDI polling", x, y + 324);
                 Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to restore)", x, y + 352);
                 Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, y + 380);
