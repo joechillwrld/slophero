@@ -8,11 +8,11 @@ A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
 build, compiled against its loader and generated assemblies. Version 0.4.75
 adds a zero-allocation counter for mouse UI calls actually bypassed by the
 raycast experiment, reported at shutdown so its engagement is visible in the
-normal log. Version 0.4.74
-extends the default-off whammy cap to skip redundant 1×24 CPU pixel writes
-before their matching texture upload, while retaining the existing upload cap
-as a fallback. The hook only matches the whammy texture and column shape;
-other texture writes pass through. Version 0.4.73
+normal log. Version 0.4.74 attempted an additional 1×24 CPU pixel-write
+gate, but current-game disassembly shows that the whammy path writes through
+`NativeArray<byte>` and the observed write-hook match count was zero. The
+unproductive write hook has been removed; the default-off texture-upload cap
+remains available. Version 0.4.73
 fixes the mouse-raycast experiment to intercept the integer overload that
 Clone Hero actually calls during gameplay; the old wrapper hook only appeared
 installed and did not stop the measured path. Version 0.4.72 checks the two

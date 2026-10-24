@@ -5,6 +5,14 @@ are in [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 It records 37,717 actual presented frames and the next native/Unity targets;
 use it before inferring gains from older Unity callback or WPA samples.
 
+The [exact-build native map](presentmon-baseline-2026-10-23.md#current-game-native-map-research-no-new-gameplay-patch)
+supersedes the older whammy-write hypothesis below. v1.1 writes whammy data
+through a `NativeArray<byte>` at a 5 ms step, so the `SetPixels` prefix added
+in v0.4.74 had no observed matches. It and an untested `SetPixelsImpl` prefix
+have been removed from the source. The optional `Texture2D.Apply` cap remains.
+The map also identifies repeated `GuitarFretAnimator` sorting-order setters,
+but their runtime cost has not been measured.
+
 ### v0.4.75 trace findings and mouse-path verification
 
 The supplied CPU export covers about 31 seconds. Its largest identified
@@ -32,34 +40,31 @@ appear heavily in this capture, so WPA's sampling cost may influence the
 captured run; it is not evidence of equivalent overhead during normal play.
 
 The older source's `Helper.InvokeRepeating` is used only by its whammy updater
-and catches up missed intervals in a loop. That is an interesting hitch-time
-lead, but the supplied v1.1 generated assemblies expose no method named
-`InvokeRepeating`, and the old source's static producer does not appear on the
-current `GuitarNoteRenderer` wrapper. I did not patch that stale call shape.
-v0.4.74 instead guards the live CPU texture write/upload path observed in the
-current logs; its new `SetPixels` match/skip counters will show whether the
-older 1×24 write shape is still used.
+and catches up missed intervals in a loop. The current game uses a differently
+named static updater with a 5 ms step. The v0.4.74 `SetPixels` experiment had
+zero matches in v0.4.75's log; current native disassembly shows a raw
+`NativeArray<byte>` write path. That hook was removed after the finding.
 
 ### v0.4.74 whammy CPU-write gate
 
 The existing default-off cap rejected redundant `Texture2D.Apply()` uploads,
 but only after the caller had already written its pixels. The older source
 shows the CPU updater writing one `1x24` column to the shared whammy texture,
-then applying it. v0.4.74 adds a matching `Texture2D.SetPixels(int,int,int,int,
+then applying it. v0.4.74 added a matching `Texture2D.SetPixels(int,int,int,int,
 Color[])` prefix: it skips only a `1x24` write at `y=0` to the captured whammy
 texture when the 200 Hz upload interval has not elapsed. The existing `Apply`
 prefix remains the final guard and still controls row clears and any other
 matching writes. If that Unity overload is unavailable, the mod logs the
 fallback and keeps the previous Apply-only cap. The hook is only installed
 when the experimental option is enabled in Gameplay; all unrelated textures,
-input, scoring, and GPU compute dispatch remain untouched.
+input, scoring, and GPU compute dispatch remained untouched. The hook was
+subsequently removed because the current game uses a different write path.
 
 The latest v0.4.73 log matched 20,205 Apply calls to the whammy texture and
 skipped 8,982, confirming the upload gate was active. It does not prove the
 current game's producer uses the older source's exact `1x24` SetPixels shape.
-The next log reports how many candidate writes matched and how many were
-skipped; this tells us whether the upstream gate engages. No frame-time gain
-is claimed from code inspection alone.
+The next log reported zero candidate write matches. No frame-time gain is
+claimed from that hook.
 
 ### v0.4.73 mouse-raycast target correction
 

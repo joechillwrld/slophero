@@ -36,8 +36,10 @@ matched 156,105 calls and skipped 132,246 across the **whole game session**;
 those counts are not restricted to the 29.9-second PresentMon interval.
 The column-write match count remained zero. The reported `columnSetPixelsHook`
 is its **shutdown** state after scene cleanup, so `False` alone does not prove
-the hook was absent during play. Its zero match count does show that the exact
-`1x24` shape was not observed by that prefix.
+the hook was absent during play. Current-game native disassembly explains the
+zero matches: its whammy data path writes a `NativeArray<byte>`, not the old
+source's `Texture2D.SetPixels` column. Both speculative pixel-write hooks were
+removed after that discovery. The working Apply cap remains default-off.
 
 No new game binaries, assets, WPA CSV exports, or symbols are needed to start
 the next code batch. The present capture establishes the bottleneck class,
@@ -46,24 +48,20 @@ not an exact specification for current obfuscated methods.
 
 ## Concrete next code batch
 
-1. **Find and gate upstream CPU whammy work.** The existing cap removes many
-   `Texture2D.Apply` uploads but does not establish that it skips the writes
-   that precede them. The current interop assembly exposes 5- and 6-argument
-   `Texture2D.SetPixels` and a `SetPixelsImpl`; v0.4.75 covered only the
-   5-argument form and expected the older source's `1x24` shape. This source
-   branch now also hooks `SetPixelsImpl` behind the same default-off switch,
-   matches only the captured whammy texture and the exact `1x24` base-mip
-   shape, and reports separate match/skip counts. It has compiled but **has
-   not been tested in the game**. If those counts remain zero, identify the
-   actual current call/shape before suppressing any other writes. Keep
-   row clears, GPU compute, whammy input, and pause behavior intact. The
-   upstream gate should use the existing default-off whammy experiment and
-   fail open if a binding is not identified.
-2. **Profile current idle visual callbacks at their actual call sites.** The
-   old `Fret_Animator.Update` repeatedly sets sprites, masks, sorting order,
-   and transforms even when idle; the current build exposes
-   `GuitarFretAnimator.Update` and the same head/lift/cover sprite-renderer
-   fields. Its current cost and behavior have not been measured.
+1. **Use the current whammy path for the next experiment.** The exact-build
+   native map below identifies a 5 ms CPU byte-write step and a separate
+   LateUpdate upload. The existing Apply cap skips many uploads, but does not
+   skip byte writes. Those writes already run only when the 5 ms time step
+   advances; a second blind rate cap would risk missing whammy data. A future
+   upload gate could key off that step's actual progress, with explicit
+   handling for setup, resets, pause, and direct writes, and must fail open
+   if the exact build binding does not match. Keep GPU compute, whammy input,
+   and online timing untouched.
+2. **Profile current idle visual callbacks at their actual call sites.**
+   `GuitarFretAnimator.Update` still writes seven sprite sorting orders in an
+   idle/render path (exact-build native map below). It already checks
+   `OnDemandRendering.willCurrentFrameRender`; preserve that behavior. Its
+   exclusive cost and unchanged-value frequency have not been measured.
    The current `HighwayScroll.Update` performs `GetPropertyBlock` →
    `SetVector` → `SetPropertyBlock` per update, but also handles video/fade
    state. The existing highway switch freezes the whole updater and is not a
@@ -88,3 +86,28 @@ count of frames above 2/3/5 ms, and CPU/GPU busy alongside average FPS. A
 single favorable average is not proof of a gain. The previous WPA export has
 inclusive, overlapping stacks and cannot assign the 0.760 ms CPU work to a
 specific current native method on its own.
+
+## Current-game native map (research, no new gameplay patch)
+
+This map is for the supplied v1.1.0.6142 `GameAssembly.dll` (SHA-256
+`12bc21e5a88a2fc9abc259d5d67f24835145eabca6c3f863b075ba37ad75f197`)
+and `global-metadata.dat` (SHA-256
+`5f14231810f2641639167eb72956e85cced2f36cb4a84682bdefb1e9da3e3d42`).
+The offsets are image RVAs, not stable addresses across builds.
+
+| RVA | Current native behavior | Consequence |
+| --- | --- | --- |
+| `0x22B760` | Static whammy updater advances in 0.005-second steps and calls the raw-byte writer only for elapsed steps. | The old-source 200 Hz scheduler exists in a new form; it is already gated. |
+| `0x1C7D20` | Writes each elapsed step's 32 lanes into a `NativeArray<byte>`. | A `Texture2D.SetPixels` prefix cannot suppress this work. |
+| `0x22BE10` | Static upload wrapper invokes the texture object's upload method. | A possible narrow gate, but all direct writes and initial clears must be preserved. |
+| `0x1C74C0` | Small wrapper calls `Texture2D.Apply()` for the CPU texture. | Explains the many Apply matches in the log. |
+| `0xB4500` | `GameManager.LateUpdate` calls the static upload wrapper. | Upload attempts can greatly exceed the 200 Hz data-step rate. |
+| `0xAA890`, `0xA88E0`, `0xA9ED0` | `GuitarFretAnimator.Update`, visual helper, and idle helper; the idle helper repeats seven `SpriteRenderer.sortingOrder` writes on eligible render callbacks. | Measure before adding a state cache; generic `SpriteRenderer` hooks may cost more than they save. |
+
+The whammy texture uses 32 lanes and 1,024 time slots in this build. Its
+static initializer references `_GlobalWhammyTexture`. This mapping explains
+the prior zero column-write matches without assuming the hook was broken.
+It does **not** establish the cost of the byte writes, sorting setters, or
+uploads in isolation; the PresentMon capture gives only whole-frame CPU/GPU
+busy. A safe future code change needs an exact-build call path, a default-off
+switch, and matched gameplay checks, including practice and online play.
