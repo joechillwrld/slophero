@@ -6,7 +6,7 @@
     <AssemblyName>SlopHero</AssemblyName>
     <PlatformTarget>x64</PlatformTarget>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.4.77</Version>
+    <Version>0.4.78</Version>
     <GameReferences Condition="'$(GameReferences)' == ''">../../references</GameReferences>
   </PropertyGroup>
   <ItemGroup>

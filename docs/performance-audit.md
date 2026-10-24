@@ -9,9 +9,9 @@ The [exact-build native map](presentmon-baseline-2026-10-23.md#current-game-nati
 supersedes the older whammy-write hypothesis below. v1.1 writes whammy data
 through a `NativeArray<byte>` at a 5 ms step, so the `SetPixels` prefix added
 in v0.4.74 had no observed matches. It and an untested `SetPixelsImpl` prefix
-have been removed from the source. As of v0.4.77, the optional 200 Hz cap
-targets Clone Hero's whammy upload wrapper directly; older `Texture2D.Apply`
-observations below describe previous versions.
+have been removed from the source. As of v0.4.78, the optional whammy gate
+tracks the exact byte-writer and only permits an upload when its data changes;
+older `Texture2D.Apply` observations below describe previous versions.
 The map also identifies repeated `GuitarFretAnimator` sorting-order setters,
 but their runtime cost has not been measured.
 
@@ -1621,7 +1621,7 @@ block the mouse-path correction or the narrowly matched whammy-write gate in
 this release. Both can be checked from their existing runtime diagnostics;
 there is no new WPA capture step for v0.4.74.
 
-### v0.4.77: target the actual whammy upload wrapper
+### v0.4.77–0.4.78: use the actual whammy data-change path
 
 The v1.1.0.6142 generated wrapper maps TypeDef 993 to
 `Il2Cpp.ObjectPublicAbstractSealedInBoInObDoInSiDoInDoUnique`. Its
@@ -1631,10 +1631,21 @@ the static whammy upload wrapper called from `GameManager.LateUpdate` (RVA
 advances in 5 ms steps, so a 200 Hz upload ceiling matches the producer's
 maximum update cadence.
 
-v0.4.77 moves the opt-in cap from `Texture2D.Apply()` to this exact game
-wrapper. This stops redundant calls before they enter the texture upload path
-and removes the two `Shader.SetGlobalTexture` tracking patches. It preserves
-the raw byte writes and the GPU compute path. This is code-path work saved;
-the magnitude of any frame-time/FPS change is not measured yet. The preference
-remains off by default, and the compatibility hash prevents installing this
-native-map-dependent option on a different game build.
+v0.4.77 moved the opt-in cap from `Texture2D.Apply()` to this exact game
+wrapper. v0.4.78 completes the path: a postfix on the identified raw byte
+writer increments a data version, while the upload prefix compares that
+version with the last successfully uploaded one. It skips the full game
+wrapper when bytes have not changed and removes per-frame stopwatch sampling.
+The upload postfix records the version only after a successful upload, so a
+write arriving during an upload remains pending for the next call. The two
+global `Shader.SetGlobalTexture` tracking patches are gone. Raw byte writes and
+GPU compute remain untouched. This is code-path work saved; its frame-time/FPS
+effect is not yet measured. The preference remains off by default, and the
+compatibility hash prevents enabling the native-map-dependent mod on a
+different game build.
+
+The native map also identifies repeated idle fret sorting-order setters, but
+the supplied current log shows ClonZones 2.0.0 already installs a
+`GuitarFretAnimator.Update` settle gate. Duplicating that patch in SlopHero
+would not save another call in this setup, and its exclusive CPU cost remains
+unmeasured.
