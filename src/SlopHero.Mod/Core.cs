@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.87", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.88", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -105,6 +105,8 @@ public sealed partial class Core : MelonMod
     public override void OnSceneWasLoaded(int buildIndex, string sceneName)
     {
         unityJobWorkerLimit.Clear();
+        staticTmpScale.Clear();
+        staticTmpScaleError = false;
         SongSpeedControl.ResetMenuCache();
         gameplayInitialized = false;
         onlineStateKnown = false;
@@ -181,6 +183,8 @@ public sealed partial class Core : MelonMod
 
     public override void OnSceneWasUnloaded(int buildIndex, string sceneName)
     {
+        staticTmpScale.Clear();
+        staticTmpScaleError = false;
         SongSpeedControl.ResetMenuCache();
         counterCanvas.Clear();
         cheatScanner.Clear(HarmonyInstance);
@@ -954,6 +958,7 @@ public sealed partial class Core : MelonMod
         rings.Clear(HarmonyInstance);
         whammyTextureThrottle.Clear(HarmonyInstance);
         unityJobWorkerLimit.Clear();
+        staticTmpScale.Clear();
         timings.Finish();
         aprilFools.Restore();
         visuals.RestoreBeatRenderers();

@@ -29,6 +29,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> pauseGameplayUiProcessing = null!;
     private MelonPreferences_Entry<bool> pauseHighwayAnimations = null!;
     private MelonPreferences_Entry<bool> reduceUnityJobWorkers = null!;
+    private MelonPreferences_Entry<bool> staticTmpScaleDuringSong = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
     private readonly VisualOverrides visuals = new();
@@ -45,6 +46,7 @@ public sealed partial class Core
     private readonly GameplayUiEventOverride gameplayUiEvents = new();
     private readonly HighwayAnimationOverride highwayAnimations = new();
     private readonly UnityJobWorkerLimit unityJobWorkerLimit = new();
+    private readonly StaticTmpScaleOverride staticTmpScale = new();
     private readonly RuntimeTimings timings = new();
     private string songText = "", editText = "", editLabel = "", editError = "";
     private Action<string>? editApply;
@@ -137,6 +139,7 @@ public sealed partial class Core
         pauseGameplayUiProcessing = preferences.CreateEntry("PerformancePauseGameplayUiProcessing", false);
         pauseHighwayAnimations = preferences.CreateEntry("PerformancePauseHighwayAnimations", false);
         reduceUnityJobWorkers = preferences.CreateEntry("PerformanceReduceUnityJobWorkers", false);
+        staticTmpScaleDuringSong = preferences.CreateEntry("PerformanceStaticTmpScaleDuringSong", false);
         var legacyFreezeLyricsScroll = preferences.CreateEntry("PerformanceFreezeLyricsBackgroundScroll", false);
         if (legacyFreezeLyricsScroll.Value)
         {
@@ -354,7 +357,8 @@ public sealed partial class Core
                 Toggle(pauseHighwayAnimations, "Freeze highway, video, and track-fade visuals in solo play", x, y + 162);
                 Toggle(reduceUnityJobWorkers, "Use one fewer Unity job worker during offline solo songs", x, y + 196);
                 Toggle(disableMidiForSession, "Disable drum MIDI input (restart to restore)", x, y + 232);
-                GUI.Label(new Rect(x + 22, y + 266, 610, 66), "These switches are experimental and default off. The worker limit restores on pause, menus, online play, scene changes, or unload. Drum MIDI shutdown closes devices; turn it off and restart to restore them.");
+                Toggle(staticTmpScaleDuringSong, "Skip TMP scale checks in offline solo play", x, y + 266);
+                GUI.Label(new Rect(x + 22, y + 300, 610, 92), "Experimental; default off. TMP layout and graphic rebuilds stay enabled. Scale-changing or animated labels are left alone; changes restore on pause, menus, online play, scene changes, or unload. The worker limit restores on the same transitions. Drum MIDI shutdown requires a restart to restore.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -810,6 +814,7 @@ public sealed partial class Core
             Bool("PerformancePauseGameplayUiProcessing", pauseGameplayUiProcessing);
             Bool("PerformancePauseHighwayAnimations", pauseHighwayAnimations);
             Bool("PerformanceReduceUnityJobWorkers", reduceUnityJobWorkers);
+            Bool("PerformanceStaticTmpScaleDuringSong", staticTmpScaleDuringSong);
         }
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
@@ -857,6 +862,7 @@ public sealed partial class Core
         Bool("PerformancePauseGameplayUiProcessing", pauseGameplayUiProcessing);
         Bool("PerformancePauseHighwayAnimations", pauseHighwayAnimations);
         Bool("PerformanceReduceUnityJobWorkers", reduceUnityJobWorkers);
+        Bool("PerformanceStaticTmpScaleDuringSong", staticTmpScaleDuringSong);
         if (values.ContainsKey("PerformanceFreezeComboSmokeScroll"))
             Bool("PerformanceFreezeComboSmokeScroll", freezeComboSmokeScroll);
         else
@@ -1054,9 +1060,15 @@ public sealed partial class Core
     private bool starProgressError;
     private bool hiddenLeaderboardError;
     private bool comboSmokeScrollError;
+    private bool staticTmpScaleError;
     public override void OnLateUpdate()
     {
-        if (!compatible || !gameplay || !gameplayInitialized || transition) return;
+        if (!compatible || !gameplay || !gameplayInitialized || transition)
+        {
+            if (staticTmpScale.IsActive || staticTmpScale.NeedsRestore)
+                UpdateStaticTmpScaleExperiment(null, clock.Elapsed.TotalSeconds);
+            return;
+        }
         // Read preference entries and inspect Unity objects at the same 20 Hz
         // cadence as the actual visual work. On an unlocked game, doing these
         // checks first would still repeat them thousands of times per second.
@@ -1117,14 +1129,18 @@ public sealed partial class Core
         bool starProgressApplyDue = !starProgressError
             && starProgressParticles.IsApplyDue(disableStarProgressParticles.Value, now);
         bool comboSmokeRequested = !comboSmokeScrollError && (freezeComboSmokeScroll.Value || comboSmokeScroll.NeedsRestore);
+        bool tmpScalePassDue = !staticTmpScaleError
+            && (staticTmpScaleDuringSong.Value || staticTmpScale.IsActive || staticTmpScale.NeedsRestore);
         bool visualPending = !visualError && (visualRequested || practiceSpeedRequested || visuals.NeedsUpdate
             || ringUpdateDue);
-        if (!nativeHudPending && !visualPending && !comboSmokeRequested && !performanceApplyDue && !starProgressApplyDue) return;
+        if (!nativeHudPending && !visualPending && !comboSmokeRequested && !performanceApplyDue
+            && !starProgressApplyDue && !tmpScalePassDue) return;
 
         // Avoid GameManager/IL2CPP property reads at the unlocked update rate.
         // All HUD and visual changes refresh at 5–20 Hz, so resolving the
         // manager at the same cadence is sufficient.
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
+        if (tmpScalePassDue) UpdateStaticTmpScaleExperiment(game, now);
         if (starProgressApplyDue)
         {
             long starParticleTiming = timings.Begin();
@@ -1237,6 +1253,36 @@ public sealed partial class Core
             LoggerInstance.Error($"Visual overrides paused after an error; counters and controls remain available: {ex}");
             Notice("Visual overrides stopped after an error. Send Latest.log.");
         }
+    }
+
+    private void UpdateStaticTmpScaleExperiment(Il2Cpp.GameManager? game, double now)
+    {
+        if (staticTmpScaleError) return;
+        long timing = timings.Begin();
+        bool wasActive = staticTmpScale.IsActive;
+        int previousCount = staticTmpScale.ModifiedCount;
+        try
+        {
+            bool eligible = staticTmpScaleDuringSong.Value && game != null
+                && game.songLoaded && game.playersInit && game.globalVariables != null
+                && game.isSongPlaying && !game.isPaused && !game.isSongOver
+                && game.actualPlayerCount == 1 && (int)game.globalVariables.gameMode == 0
+                && !transition && !settingsOpen && !moveHud && resizeTarget < 0
+                && nativeMoveTarget == 0 && editApply == null && capture == null
+                && Application.isFocused && !IsOnline(now);
+            staticTmpScale.Apply(eligible, now);
+            if (!wasActive && staticTmpScale.IsActive)
+                LoggerInstance.Msg($"TMP static-scale experiment active; {staticTmpScale.ModifiedCount} stable gameplay labels are opted out of per-frame scale checks.");
+            else if (wasActive && !staticTmpScale.IsActive)
+                LoggerInstance.Msg($"TMP static-scale experiment restored {previousCount} gameplay labels.");
+        }
+        catch (Exception ex)
+        {
+            staticTmpScale.Clear();
+            staticTmpScaleError = true;
+            LoggerInstance.Warning($"TMP static-scale experiment stopped; original label states were restored: {ex.Message}");
+        }
+        finally { timings.End(8, timing); }
     }
 
     private void LogGameplaySnapshot()

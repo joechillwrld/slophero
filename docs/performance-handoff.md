@@ -61,6 +61,7 @@ the Sloptifine pages and preserve their documented scope:
 | SlopHero's restart/practice shortcuts resolved a joystick ID by scanning the full Rewired joystick list on every mod update | Since v0.4.87, `InputBinding` caches the matching joystick wrapper and refreshes that lookup once per second (and after Rewired becomes unready). The `GetButton` state query still runs at the same mod-update cadence; Rewired's configured device polling is unchanged. This reduces duplicate lookup work, not the measured 2.1 seconds inside Rewired's own `DoUpdate`. |
 | Unity job queue setter was resolved through the matching player PDB | `UnityJobWorkerLimit` uses the generated `SetJobQueueMaximumActiveThreadCount` API and restores the prior limit. It is default-off; the latest three-run callback comparison shows no benefit. |
 | Current `HighwayScroll.Update` combines property-block writes with video/fade behavior | `HighwayAnimationOverride` is a default-off whole-update freeze during offline solo songs. It may freeze those visuals and has no demonstrated frame gain. The old source's note `yield`/hit-detection paths remain untouched because they are scoring-sensitive and not confirmed in current code. |
+| TMP's SDF scale queue repeatedly checks text transforms | The worktree adds a default-off offline-solo experiment. It marks active Gameplay labels without Animator/Animation parents static, checks cached scales at 4 Hz, and restores their original flags on pause, menu/editor, focus loss, online transition, scene exit, or unload. The source compiles with no warnings; layout, graphic-rebuild, and culling queues remain active. It is not in the packaged DLL and has no runtime result. |
 
 ClonZones installs a `GuitarFretAnimator.Update` settle gate in the user's
 setup, which may overlap with another fret hook. Current `HighwayScroll` also
@@ -112,23 +113,26 @@ remaining cost of eligible rendered-frame work.
    478 ms and `RenderOffscreenCameras` is 45 ms in this tree, so this sample
    does not point to broad overlay or offscreen-camera suppression as the
    main gain.
-3. **Target current game visual setters narrowly.** Current
-   `GuitarFretAnimator.Update` can repeat seven sorting-order writes in its
-   idle branch. Current `HighwayScroll.Update` performs
-   `GetPropertyBlock` → `SetVector` → `SetPropertyBlock` on eligible render
-   callbacks and also advances video/fade state. The existing whole-update
-   freeze is a user-selected visual compromise, not an unchanged-value fast
-   path. Exact-build disassembly shows both methods already check
-   `OnDemandRendering.willCurrentFrameRender`; `HighwayScroll` derives a new
-   texture offset from `songTime` on every scheduled render. Check ClonZones
-   overlap before considering a cache; preserve normal animation transitions.
-4. **Attribute optional hook and UI costs.** Inventory enabled Harmony
-   prefixes/postfixes under the user's actual settings. The broad
-   `EventSystem.Update` pause prevents the narrower mouse handler from
-   running in active solo play, so their effects cannot be added. SlopHero's
-   own timed callbacks are small, but those timers exclude hook dispatch,
-   Canvas rendering, GPU work, and the game's native callbacks. Evaluate the
-   hooks and UI layout from the existing trace before suggesting a rewrite.
+3. **Reopen visual setters only with new attribution.** `HighwayScroll.Update`
+   already checks `OnDemandRendering.willCurrentFrameRender`; its mapped row is
+   only about 22 ms inclusive in the 31-second WPA method view, and its update
+   also advances video/fades. `GuitarFretAnimator.Update` has the same render
+   guard, and ClonZones already installs its settle gate. The 26 SpriteMask
+   objects in resource prefabs are not a runtime count; the sampled Unity
+   SpriteMask job is about 0.04% of WPA sample weight, and `GhostMeterRing.Update`
+   returns immediately when current and target scale match. These do not
+   support another visual suppression or global setter hook. Revisit only if a
+   new trace attributes substantial exclusive cost to one of these paths.
+4. **Use the next runtime log to validate configuration, not infer FPS.** The
+   broad offline-solo EventSystem pause suppresses the mouse handler beneath
+   it, so those switches are not additive in that scope. Existing mod timing
+   shows very small average callback cost, counter contents refresh at 5 Hz
+   only when visible, and the Canvas sync call at 20 Hz exits on unchanged
+   content. The passive overlay skips non-repaint events or returns while
+   hidden. A new `Latest.log` can confirm active settings, hook installation,
+   state restoration, and errors; it cannot measure native frame cost. Use
+   matched PresentMon/WPA frame data for performance conclusions and do not ask
+   for the already supplied exports again.
 
 ### 2026-10-24 scene and native follow-up
 
@@ -247,16 +251,30 @@ preserves module-relative frame addresses so a stack row can be associated
 with a hot RVA. The matching UnityPlayer PDB can name Unity frames when loaded
 in WPA; it cannot name GameAssembly frames. Until per-frame RVAs are available,
 use named stack tails to rule out individual mod callbacks and continue
-screening independent current-game visual paths. Preserve note timing, audio,
-online behavior, 1000 Hz input polling, and existing SlopHero features.
+screening independent current-game visual paths. One experimental candidate
+is TMP's per-component SDF scale-update queue: the existing sample shows about
+320 ms in its dispatcher and 279 ms in nested label updates over 31 seconds.
+The exact setter can unregister eligible text labels without skipping TMP's
+required layout or graphic rebuild queues. Its default-off offline-solo
+experiment is in the unbuilt worktree; animated and scale-changing labels are
+excluded, and modified flags restore at gameplay-state boundaries. Its
+possible gain is small and unmeasured. The News coroutine has no per-frame
+Update and the Discord fixed callback is only about 10 ms in that export;
+neither supports another gameplay change. Preserve note timing, audio, online
+behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.87** on the private
+- Latest packaged build: SlopHero **0.4.88** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.85 (SHA-256
-  `1FCC576612A1973E6E90D3ED692F6B50A0E2A7C4503D00C7575D3D4C2F5F4CB6`);
-  it confirms MIDI cleanup and has no SlopHero exceptions. The 0.4.83 and
+  0.4.87 (SHA-256
+  `f1f2b1b5411260cfcd0e1025a6e114da3a356cecaf147e206d5cd67861517cf0`).
+  Its three 30-second captures report 2,636–2,691 simulation updates/s,
+  `Core.Update` averaging 0.002 ms, visual overrides 0.015 ms, and Canvas sync
+  averaging 0.010–0.019 ms. One Canvas sync hit 5.259 ms in the first capture;
+  the following two peak below 0.15 ms. The log confirms configured switches
+  and live scene counts, but does not isolate a switch or measure presented
+  frames/GPU work. The 0.4.83 and
   0.4.84 captures below are historical. Clone Hero is **1.1.0.6142**, Unity
   **2022.3.62f2**, with ClonZones 2.0.0 also loaded. Version 0.4.85 separates
   the worker limit from foreground focus, clarifies the MIDI discovery
@@ -266,13 +284,14 @@ online behavior, 1000 Hz input polling, and existing SlopHero features.
   offline gameplay and restore it plus menu selection on exit. Version 0.4.87
   avoids scanning Rewired's joystick list for SlopHero hotkeys on every mod
   update; it does not change controller polling or the game's input path. Both
-  are candidates without matched PresentMon A/B results. The 0.4.86 hashes
-  remain below as historical package evidence. The current 0.4.87 package
-  builds with zero warnings/errors and core checks pass (101 checks). The
-  package SHA-256 is
-  `29F9CC2A13B1E7D99A15D9E137E16E3B358CA8488276EC47FE84666BCD5315A6`, and
-  the DLL SHA-256 is
-  `82B3B7E4DF57E2A4BBAFEAE2B7DEACEFF3A9496DA9DF5F43252CBFF7B1D0E1E4`.
+  are candidates without matched PresentMon A/B results. Version 0.4.88 adds
+  the default-off offline-solo TMP scale-update experiment described above.
+  The 0.4.88 build has zero warnings/errors and core checks pass (101 checks).
+  The packaged DLL has not been tested in Clone Hero yet. Its package SHA-256
+  is `527b5367bceb523a64375ad958360356eb0a72a28353636e57c1078f976c054d`,
+  and the DLL SHA-256 is
+  `57611b4fc606ad7c01af89ec1bc866b8afe15d7c01743d555e73684713656b33`.
+  The 0.4.87 package hashes are retained in Git history.
   Version 0.4.84 ships the
   FC-ring no-op cleanup and extends the default-off hidden leaderboard switch
   to pause its six layout fitters

@@ -2064,3 +2064,114 @@ remain default-off because prior runs did not establish a win. This review
 found one narrow input-side optimization and no evidence-backed reason to
 change controller polling, scoring, Unity camera/cull scheduling, or the
 ClonZones-owned fret path.
+
+### Deeper screen of render, input, setter, and hook paths (2026-10-24)
+
+I checked the four remaining leads against the exact GameAssembly disassembly,
+the supplied Unity scene and resource prefabs, the expanded WPA tree, existing
+runtime logs, and the current SlopHero update paths.
+
+- **Unity rendering/culling:** the static Gameplay scene has two cameras with
+  separate responsibilities: a background camera clears the screen and draws
+  the video layer, while HUDCam draws HUD/input-viewer layers. The live scene
+  adds the guitar gameplay camera. Their masks are distinct, so none is an
+  obvious duplicate. The WPA `PlayerRender`/camera/cull rows are inclusive
+  shared Unity work; the tree does not identify a removable camera or renderer.
+  The nine resource-asset parts contain 26 SpriteMask prefab components, mostly
+  ghost-meter/multiplier masks plus fret masks; this is a prefab inventory, not
+  a count of active runtime masks. `SpriteMaskJobs::SpriteMaskPrepareRendererNodes`
+  contributes about 283 ms of sampled weight in the 42.28-second WPA view
+  (about 0.04% of the WPA sample weight). The exact `GhostMeterRing.Update`
+  begins by comparing current and target scale and returns immediately while
+  the ring is stable. Together these facts do not support a worthwhile mask or
+  camera-removal toggle.
+- **Highway and fret updates:** exact-build `HighwayScroll.Update` calls
+  `OnDemandRendering.willCurrentFrameRender` before its render work, then
+  updates the song-time-driven property block and video/fade state. Its mapped
+  GameAssembly row is only about 22 ms inclusive in the 31-second WPA method
+  view, so the whole-update freeze has a small upper bound and a visible cost;
+  there is no case for broadening it. `GuitarFretAnimator.Update` has the same
+  render-cadence guard and delegates state work to helpers. ClonZones already
+  installs its native settle gate for that method in the user's setup, so a
+  second gate or global SpriteRenderer setter hook would duplicate work or add
+  hot-path interception overhead without a demonstrated saving.
+- **Rewired and SlopHero input:** Rewired's roughly 2.1 seconds of inclusive
+  sampled weight belongs to its own input update, not the mod's shortcut lookup.
+  The current shortcut lookup is already cached once per second. Core guitar
+  input and Rewired's configured 1000 Hz polling remain untouched. SlopHero's
+  measured `OnUpdate` averages about 0.002 ms per simulation callback; counters
+  and note scans refresh at 5 Hz only when visible, while optional-service and
+  state checks are rate-limited. This leaves little evidence for a broad mod
+  update rewrite.
+- **UI and optional hooks:** the previously mapped EventSystem/raycast path is
+  still the strongest attributable game-side candidate. In offline solo, the
+  broad EventSystem suspension removes the dispatcher and the mouse handler
+  beneath it, so the mouse-only switch cannot add another active-song saving
+  in that scope. The mouse switch remains relevant where the EventSystem stays
+  active. The passive overlay returns without drawing on non-repaint events and
+  when no overlay is visible; Canvas sync enters at the 20 Hz override cadence
+  but its cached comparison returns when content is unchanged. Counter contents
+  themselves refresh at 5 Hz. Existing timing buckets exclude Harmony dispatch
+  and Unity's Canvas render, so they
+  cannot prove those costs are zero, but they do not point to another broad
+  always-running SlopHero loop.
+
+This screen produced no safe, evidence-backed code change to add before the
+next runtime log. Use that log to verify which optional switches and hooks were
+actually active, whether any target failed to install or restore, and whether
+the run includes a newly observed issue. Keep performance claims tied to
+PresentMon/WPA measurements rather than callback counts.
+
+### TextMeshPro scale-update candidate (2026-10-24)
+
+The supplied 31-second ETWAnalyzer method export attributes about 320 ms to
+`TMP_UpdateManager.DoRebuilds` and 279 ms to `TextMeshProUGUI.InternalUpdate`;
+the latter is nested in the former, so these are not additive. The queue manager
+also drains layout, graphic-rebuild, and culling queues, which must continue to
+run. The native dump and exact-build disassembly show a narrower switch: the
+public `TMP_Text.isTextObjectScaleStatic` setter marks one text component as
+static and unregisters it from the internal-update queue; clearing the flag
+registers it again. That queue exists to recalculate SDF text scale when a
+text transform or its parent changes scale.
+
+This is a plausible small CPU target (roughly 1% of one core in that sampled
+window), not a measured FPS gain and not yet isolated in a current-build
+PresentMon A/B. A reversible experiment could set the flag only for eligible
+gameplay TMP labels while a chart is active, restore it whenever paused or
+leaving gameplay, and leave the manager's layout/graphic/culling queues alone.
+The tradeoff is visual: scaling animated text while it is marked static can
+leave its SDF sharpness stale until the flag is restored. The user approved a
+default-off experiment. The worktree now adds **Skip TMP scale checks in
+offline solo play** on Sloptifine 2. It discovers active Gameplay TMP labels
+once per scene, excludes labels beneath Animator/Animation components, checks
+cached label scale at 4 Hz, excludes a label if that scale changes, and restores
+the original false flag on pause, focus loss, menu/editor, online transition,
+scene exit, or unload. The experiment leaves TMP layout, graphic-rebuild, and
+culling queues running. The code compiles against the supplied generated
+assemblies with no warnings, but has not been runtime-tested; expected gain
+remains small and unmeasured.
+
+The newly supplied v0.4.87 `Latest.log` (SHA-256
+`f1f2b1b5411260cfcd0e1025a6e114da3a356cecaf147e206d5cd67861517cf0`)
+contains three 30-second SlopHero timing captures. They report 2,636–2,691
+simulation updates/s, `Core.Update` average 0.002 ms, visual overrides 0.015
+ms, and canvas sync 0.010–0.019 ms average. The first canvas-sync capture has a
+single 5.259 ms maximum; the next two peak at 0.136 and 0.140 ms, so that first
+outlier does not identify a recurring cost. The first spike is consistent with
+the Canvas HUD's one-time GameObject/Canvas/TMP creation path, but the aggregate
+bucket does not prove that attribution. The snapshots show the offline
+leaderboard already at zero eligible entry Updates, the live guitar viewer at
+48 sprites, no active particle systems, and the configured switches/hook state.
+These are mod callback timings and scene snapshots, not frame-time/GPU data or
+an isolated A/B for the worker, raycast, or TMP options. No SlopHero exception
+is recorded in this log.
+
+The other persistent-service screen produced no additional song-loop target:
+the exact `News` type has coroutine/WebRequest methods but no `Update`, and
+older source starts the feed from `MainMenu`; it does not establish a gameplay
+tick. The mapped `DiscordController.FixedUpdate` row is about 10 ms in the
+same 31-second method export, too little to justify another change. The current
+MIDI device shutdown option already closes drum devices for the session, while
+the 0.2-second discovery task has no named material cost in this trace. Drum
+player/render callbacks are instrument-specific and should not be globally
+disabled for a guitar performance test.
