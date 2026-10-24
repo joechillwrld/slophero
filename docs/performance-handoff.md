@@ -79,8 +79,10 @@ remaining cost of eligible rendered-frame work.
    `GetPropertyBlock` → `SetVector` → `SetPropertyBlock` on eligible render
    callbacks and also advances video/fade state. The existing whole-update
    freeze is a user-selected visual compromise, not an unchanged-value fast
-   path. Check exact call frequency, unchanged values, and ClonZones overlap
-   before implementing a cache; preserve normal animation transitions.
+   path. Exact-build disassembly shows both methods already check
+   `OnDemandRendering.willCurrentFrameRender`; `HighwayScroll` derives a new
+   texture offset from `songTime` on every scheduled render. Check ClonZones
+   overlap before considering a cache; preserve normal animation transitions.
 4. **Attribute optional hook and UI costs.** Inventory enabled Harmony
    prefixes/postfixes under the user's actual settings. The broad
    `EventSystem.Update` pause prevents the narrower mouse handler from
@@ -88,6 +90,27 @@ remaining cost of eligible rendered-frame work.
    own timed callbacks are small, but those timers exclude hook dispatch,
    Canvas rendering, GPU work, and the game's native callbacks. Evaluate the
    hooks and UI layout from the existing trace before suggesting a rewrite.
+
+### Direct check of the supplied stack ZIP
+
+I parsed the 86 MB stack CSV inside the uploaded ZIP. It has 113,554 Clone
+Hero rows and timestamps from the capture. Rows whose stack traverses
+GameAssembly sum to about 9,955 ms across 1,218 distinct stack shapes; that
+is a broad inclusive total, not one 9.955-second function. The method CSV's
+two hottest GameAssembly addresses are nested call sites in this invocation
+path, but the stack export has no addresses with which to identify their
+callers.
+
+The stack table does name several managed callbacks: SlopHero
+`Core.OnUpdate` totals about 101 ms, `ClonZones.Core.OnUpdate` about 55 ms,
+and MelonLoader `ComponentSiblingFix` about 183 ms across the 31-second view.
+These are also inclusive weights; the calls overlap their MelonLoader and
+IL2CPP trampoline frames. `ComponentSiblingFix` appears throughout gameplay,
+but its measured cost is small beside the broad native total and it maintains
+component ordering for mod callbacks. Do not disable it globally. This check
+narrows attribution and rejects a blanket MelonLoader or SlopHero update-loop
+rewrite; it still does not identify the game callback behind the largest
+native paths.
 
 The current PresentMon baseline measured 0.760 ms mean CPU busy against
 0.281 ms mean GPU busy, with 1,261.2 average presented FPS. This makes CPU

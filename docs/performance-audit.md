@@ -1493,6 +1493,31 @@ needed. Its UnityPlayer/GameAssembly frames remain `<PDB not found>`; the
 separate `Sloptifine-CPU.csv` gives module-relative native offsets, but the two
 exports do not contain a shared stack key that joins an offset to its callers.
 
+A direct CSV pass found 113,554 Clone Hero rows in the stack table. Stack rows
+traversing GameAssembly sum to about 9,955 ms across 1,218 distinct stack
+shapes. This is an inclusive module total, not one method's exclusive cost.
+Named callback frames account for about 101 ms in `SlopHero.Core.OnUpdate`,
+55 ms in `ClonZones.Core.OnUpdate`, and 183 ms in
+`MelonLoader.Support.ComponentSiblingFix` over the 31-second view. These
+weights overlap the IL2CPP trampoline and MelonLoader event dispatch frames.
+`ComponentSiblingFix` appears over the capture, but its measured cost is small
+and it maintains mod component ordering; do not disable it globally. The
+stack export still cannot map its unresolved GameAssembly frames to the two
+specific hot PCs in the method export.
+
+The current-build visual disassembly also rules out two tempting shortcuts.
+`HighwayScroll.Update` at RVA `0x3818E0` returns on non-rendering simulation
+ticks, then advances its texture offset from the difference in `songTime` and
+updates a material property block. During a running song the offset changes
+each scheduled render, so an equality cache would usually miss and add its own
+comparisons. The rest of this method also advances video and fade state.
+`GuitarFretAnimator.Update` at RVA `0xAA890` calls its state helpers and then
+checks the same render decision before reaching its rendered-frame animation
+helper. The idle sorting writes are in its helper at `0xA9ED0`; ClonZones
+already has a settle gate in this setup. A duplicate skip or global setter
+hook is not justified by these paths without call-site measurements outside
+that gate.
+
 I mapped the largest UnityPlayer offsets against the exact uploaded Unity
 2022.3.62f2 binary and inspected their surrounding code and Windows imports.
 The sampled `+0x8050DB` site is in the window message/timer loop (`GetMessageW`,
