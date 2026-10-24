@@ -1,5 +1,9 @@
 # Profiling Clone Hero 1.1.0.6142 on Windows 10
 
+The user has already supplied WPA stack and method exports and a matching
+UnityPlayer PDB. Consult [performance-handoff.md](performance-handoff.md)
+before requesting another export; this guide is for a new, specific capture.
+
 This workflow measures the shipped game without changing its files or
 controller polling. The supplied build uses Unity 2022.3.62. The retail player
 may not have Unity Profiler connection support enabled, so Windows ETW is the

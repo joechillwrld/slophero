@@ -1,5 +1,9 @@
 # Sloptifine baseline: Clone Hero 1.1.0.6142, 2026-10-23
 
+This is the v0.4.75 baseline and historical native research.
+[performance-handoff.md](performance-handoff.md) records what has since
+been implemented and what the latest v0.4.83 captures show.
+
 The user supplied the raw Intel PresentMon capture
 `pmcap-Clone Hero.exe-261023-195523.csv`, its stats CSV, and the matching
 `MelonLoader/Latest.log`. This document records conclusions and the next

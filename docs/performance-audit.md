@@ -1,5 +1,10 @@
 # Performance audit notes
 
+This is a chronological research record. For the current 0.4.83 state,
+three-run comparison, and next actions, start with
+[performance-handoff.md](performance-handoff.md). Earlier proposed next steps
+below may already be implemented or superseded.
+
 The first raw PresentMon baseline for v0.4.75 and its CPU/GPU interpretation
 are in [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 It records 37,717 actual presented frames and the next native/Unity targets;
@@ -1529,6 +1534,10 @@ performance effect is unmeasured; treat it as an A/B experiment, not a claimed
 optimization.
 
 ### Next screening lanes (no PDB required)
+
+Historical note: this list predates the matching UnityPlayer PDB and the
+populated stack export. Use the current handoff before requesting files or
+repeating an export.
 
 There are several independent paths worth pursuing; none requires current
 build symbols:
