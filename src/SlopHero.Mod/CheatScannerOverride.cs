@@ -1,67 +1,100 @@
+using System.Reflection;
+using HarmonyLib;
 using Il2Cpp;
+using MelonLoader;
 
 namespace SlopHero.Mod;
 
 /// <summary>
-/// Reversibly pauses the persistent cheat-code scanner during an active solo
-/// chart. Its v1.1 OnEnable/OnDisable methods are empty, so disabling the
-/// component leaves registered codes intact for the next menu or pause.
+/// Skips only CheatManager.Update during an active solo song. This avoids
+/// toggling the component's enabled state, which can invoke lifecycle methods
+/// and disturb its registered cheat-code list.
 /// </summary>
 internal sealed class CheatScannerOverride
 {
-    private CheatManager? scanner;
-    private bool originalEnabled;
-    private bool lookupAttempted;
+    private static CheatScannerOverride? active;
+    private MethodInfo? updateMethod;
+    private bool installed;
+    private bool failed;
+    private bool suppress;
 
-    internal bool IsAvailable => scanner != null && scanner.Pointer != IntPtr.Zero;
-    internal string Status => !IsAvailable ? "missing" : !originalEnabled ? "already-disabled" : scanner!.enabled ? "running" : "paused";
+    internal bool IsInstalled => installed;
+    internal bool IsSuppressed => installed && suppress;
+    internal string Status => failed ? "unavailable" : !installed ? "inactive" : suppress ? "paused" : "ready";
 
-    internal void Apply(bool pause)
+    internal void Update(HarmonyLib.Harmony harmony, bool requested, bool gameplayScene)
     {
-        if (!pause)
+        if (!requested || !gameplayScene)
         {
-            Restore();
+            suppress = false;
+            Restore(harmony);
+            failed = false;
             return;
         }
 
-        CheatManager? current = CheatManager.instance;
-        if (current == null || current.Pointer == IntPtr.Zero)
+        if (!installed && !failed) Install(harmony);
+    }
+
+    internal void SetSuppressed(bool value) => suppress = installed && value;
+
+    internal void Disable() => suppress = false;
+
+    internal void Clear(HarmonyLib.Harmony harmony)
+    {
+        suppress = false;
+        Restore(harmony);
+        failed = false;
+    }
+
+    private void Install(HarmonyLib.Harmony harmony)
+    {
+        try
         {
-            // The game's static singleton can be temporarily unset during a
-            // scene transition (or by another mod). Keep using our cached
-            // instance when possible, otherwise do one scene lookup for this
-            // active-song interval instead of rescanning on every game tick.
-            current = scanner;
-            if ((current == null || current.Pointer == IntPtr.Zero) && !lookupAttempted)
+            updateMethod = typeof(CheatManager).GetMethod("Update",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null, types: Type.EmptyTypes, modifiers: null)
+                ?? throw new MissingMethodException("CheatManager.Update()");
+
+            suppress = false;
+            active = this;
+            var prefix = typeof(CheatScannerOverride).GetMethod(nameof(BeforeCheatScannerUpdate),
+                BindingFlags.Static | BindingFlags.NonPublic)!;
+            harmony.Patch(updateMethod, prefix: new HarmonyMethod(prefix));
+            installed = true;
+            MelonLogger.Msg("Sloptifine solo cheat-scanner hook ready; it skips only CheatManager.Update during active solo songs.");
+        }
+        catch (Exception ex)
+        {
+            active = null;
+            suppress = false;
+            if (updateMethod != null)
             {
-                lookupAttempted = true;
-                current = UnityEngine.Object.FindObjectOfType<CheatManager>();
+                try { harmony.Unpatch(updateMethod, HarmonyPatchType.All, harmony.Id); }
+                catch { /* An inactive prefix passes through if cleanup fails. */ }
             }
+            updateMethod = null;
+            installed = false;
+            failed = true;
+            MelonLogger.Warning($"Sloptifine cheat-scanner pause could not install and remains inactive: {ex.Message}");
         }
-        if (current == null)
-        {
-            scanner = null;
-            originalEnabled = false;
-            return;
-        }
-        if (scanner == null || scanner.Pointer != current.Pointer)
-        {
-            Restore();
-            scanner = current;
-            originalEnabled = current.enabled;
-        }
-        if (originalEnabled && current.enabled) current.enabled = false;
     }
 
-    internal void Restore()
+    private void Restore(HarmonyLib.Harmony harmony)
     {
-        if (scanner != null)
+        if (!installed && updateMethod == null) return;
+        suppress = false;
+        if (ReferenceEquals(active, this)) active = null;
+        try
         {
-            try { if (scanner.enabled != originalEnabled) scanner.enabled = originalEnabled; }
-            catch { /* The persistent object may have been destroyed during shutdown. */ }
+            if (updateMethod != null) harmony.Unpatch(updateMethod, HarmonyPatchType.All, harmony.Id);
         }
-        scanner = null;
-        originalEnabled = false;
-        lookupAttempted = false;
+        catch (Exception ex)
+        {
+            MelonLogger.Warning($"Sloptifine cheat-scanner hook cleanup failed; vanilla scanner remains enabled: {ex.Message}");
+        }
+        updateMethod = null;
+        installed = false;
     }
+
+    private static bool BeforeCheatScannerUpdate() => active?.suppress != true;
 }

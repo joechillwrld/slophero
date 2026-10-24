@@ -1,11 +1,15 @@
-# SlopHero 0.4.78 alpha
+# SlopHero 0.4.79 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
 features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.78
+build, compiled against its loader and generated assemblies. Version 0.4.79
+pauses only `CheatManager.Update` during eligible solo songs instead of toggling
+the component's enabled state; this avoids depending on a live singleton lookup
+and preserves its lifecycle state. It also folds hidden-leaderboard polling
+into the existing 20 Hz override pass. Version 0.4.78
 uses the exact whammy byte-writer to mark texture data changes, then lets the
 matching upload through once per change. Unchanged frames skip the whole game
 upload wrapper; there is no per-frame stopwatch check or general Unity texture
@@ -47,7 +51,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.78 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.78-alpha.zip)
+[Download SlopHero v0.4.79 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.79-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

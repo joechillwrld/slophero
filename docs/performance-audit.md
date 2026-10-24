@@ -1649,3 +1649,24 @@ the supplied current log shows ClonZones 2.0.0 already installs a
 `GuitarFretAnimator.Update` settle gate. Duplicating that patch in SlopHero
 would not save another call in this setup, and its exclusive CPU cost remains
 unmeasured.
+
+### v0.4.79: pause the scanner at its Update entry point
+
+The v0.4.78 gameplay log reported `cheatScanner=True[state=missing]`, so its
+component lookup did not reliably reach the persistent scanner. The older
+source shows `CheatManager.Update` only reads registered cheat-code sequences
+through Rewired; it does not implement guitar note input. v0.4.79 replaces
+component enable/disable with a reversible prefix on the exact
+`CheatManager.Update()` wrapper. The hook is installed only when the option is
+requested in Gameplay, and skips only during focused, active, offline solo
+play. Pause, menus, online play, and multiplayer pass through normally. This
+preserves component lifecycle and registered cheat state. The switch remains
+opt-in; the current log did not measure this work or establish an FPS gain.
+The hidden-leaderboard visibility check also now shares the existing 20 Hz
+override pass, removing its duplicate per-LateUpdate timer poll without
+changing its 50 ms response interval.
+
+The v0.4.78 log confirms its whammy dirty-gate hook installed, but it does not
+record how often it skipped the upload; the user observed a slight FPS decrease
+and no clear benefit. Treat that experiment as unproven and leave the toggle off
+unless a matched frame capture shows a gain.

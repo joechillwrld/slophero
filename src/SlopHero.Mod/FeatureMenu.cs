@@ -1042,7 +1042,6 @@ public sealed partial class Core
     private bool starProgressError;
     private bool hiddenLeaderboardError;
     private bool comboSmokeScrollError;
-    private double nextHiddenLeaderboardPass;
     public override void OnLateUpdate()
     {
         if (!compatible || !gameplay || !gameplayInitialized || transition) return;
@@ -1050,25 +1049,20 @@ public sealed partial class Core
         // cadence as the actual visual work. On an unlocked game, doing these
         // checks first would still repeat them thousands of times per second.
         double now = clock.Elapsed.TotalSeconds;
-        if (now >= nextHiddenLeaderboardPass)
-        {
-            // The hidden score-list is visual-only. A 50 ms visibility poll
-            // matches the other menu overrides and avoids checking the group
-            // and its six entries at 60 Hz.
-            nextHiddenLeaderboardPass = now + .05;
-            if (!hiddenLeaderboardError && (suspendHiddenLeaderboard.Value || hiddenLeaderboard.NeedsRestore))
-            {
-                try { hiddenLeaderboard.Apply(suspendHiddenLeaderboard.Value, now); }
-                catch (Exception ex)
-                {
-                    hiddenLeaderboard.Clear();
-                    hiddenLeaderboardError = true;
-                    LoggerInstance.Warning($"Hidden leaderboard optimization stopped; the game's entries were restored: {ex.Message}");
-                }
-            }
-        }
         if (now < nextOverridePass) return;
         nextOverridePass = now + .05;
+        // This shares the existing 20 Hz override cadence. A separate timer
+        // polled every LateUpdate did no extra useful work.
+        if (!hiddenLeaderboardError && (suspendHiddenLeaderboard.Value || hiddenLeaderboard.NeedsRestore))
+        {
+            try { hiddenLeaderboard.Apply(suspendHiddenLeaderboard.Value, now); }
+            catch (Exception ex)
+            {
+                hiddenLeaderboard.Clear();
+                hiddenLeaderboardError = true;
+                LoggerInstance.Warning($"Hidden leaderboard optimization stopped; the game's entries were restored: {ex.Message}");
+            }
+        }
         // FC color postfixes are needed only while the customization is on.
         // Keep their Harmony hooks out of the game's setter path otherwise.
         rings.SetHookState(HarmonyInstance, tintFc.Value);

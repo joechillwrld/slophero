@@ -47,9 +47,9 @@ public sealed partial class Core : MelonMod
     private bool? lastWhammyCapSetting;
     private bool? lastHighwayPauseSetting;
     private bool aprilFoolsError;
-    private bool cheatScannerError;
     private bool gameplayUiEventError;
-    private string? lastCheatScannerStatus;
+    private bool? lastCheatScannerSetting;
+    private bool? lastCheatScannerSuppressed;
     private bool? lastGameplayUiSuspendState;
     private bool lastStatsSongPlaying;
     private IntPtr localStatsPlayer;
@@ -108,10 +108,10 @@ public sealed partial class Core : MelonMod
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
         counterCanvas.Clear();
-        cheatScanner.Restore();
-        cheatScannerError = false;
+        cheatScanner.Clear(HarmonyInstance);
         gameplayUiEventError = false;
-        lastCheatScannerStatus = null;
+        lastCheatScannerSetting = null;
+        lastCheatScannerSuppressed = null;
         lastGameplayUiSuspendState = null;
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
@@ -124,6 +124,9 @@ public sealed partial class Core : MelonMod
             gameplayUiEvents.Update(HarmonyInstance, requested: true, gameplayActive: false);
         if (compatible)
         {
+            bool pauseCheats = pauseGameplayCheatScanner.Value;
+            cheatScanner.Update(HarmonyInstance, pauseCheats, gameplay);
+            lastCheatScannerSetting = pauseCheats;
             bool capRequested = throttleWhammyTexture.Value;
             whammyTextureThrottle.Update(HarmonyInstance, capRequested, gameplay);
             lastWhammyCapSetting = capRequested;
@@ -138,7 +141,6 @@ public sealed partial class Core : MelonMod
         comboSmokeScroll.Clear();
         hiddenLeaderboardError = false;
         comboSmokeScrollError = false;
-        nextHiddenLeaderboardPass = 0;
         nativeHud.Clear();
         rings.Clear(HarmonyInstance);
         if (compatible && gameplay) rings.SetHookState(HarmonyInstance, tintFc.Value);
@@ -176,10 +178,10 @@ public sealed partial class Core : MelonMod
     {
         SongSpeedControl.ResetMenuCache();
         counterCanvas.Clear();
-        cheatScanner.Restore();
-        cheatScannerError = false;
+        cheatScanner.Clear(HarmonyInstance);
         gameplayUiEventError = false;
-        lastCheatScannerStatus = null;
+        lastCheatScannerSetting = null;
+        lastCheatScannerSuppressed = null;
         lastGameplayUiSuspendState = null;
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
@@ -205,7 +207,6 @@ public sealed partial class Core : MelonMod
         comboSmokeScroll.Clear();
         hiddenLeaderboardError = false;
         comboSmokeScrollError = false;
-        nextHiddenLeaderboardPass = 0;
         nativeHud.Clear();
         nativeHudActive = false;
         rings.Clear(HarmonyInstance);
@@ -252,7 +253,7 @@ public sealed partial class Core : MelonMod
                 if (settingsOpen || moveHud || resizeTarget >= 0)
                 {
                     mouseUiGameplay.Disable();
-                    cheatScanner.Restore();
+                    cheatScanner.Disable();
                     gameplayUiEvents.Disable();
                     highwayAnimations.SetSuppressed(false);
                 }
@@ -336,6 +337,13 @@ public sealed partial class Core : MelonMod
                     highwayAnimations.Update(HarmonyInstance, pauseHighway, gameplay);
                     lastHighwayPauseSetting = pauseHighway;
                 }
+                bool pauseCheatsRequested = pauseGameplayCheatScanner.Value;
+                if (lastCheatScannerSetting != pauseCheatsRequested)
+                {
+                    cheatScanner.Update(HarmonyInstance, pauseCheatsRequested, gameplay);
+                    lastCheatScannerSetting = pauseCheatsRequested;
+                    lastCheatScannerSuppressed = null;
+                }
             }
             if (transition && now - transitionStarted > 30)
             {
@@ -384,33 +392,27 @@ public sealed partial class Core : MelonMod
                 catch { pauseHighwayVisuals = false; }
             }
             highwayAnimations.SetSuppressed(pauseHighwayAnimations.Value && pauseHighwayVisuals);
-            if (!cheatScannerError)
+            if (cheatScanner.IsInstalled)
             {
-                try
+                bool pauseCheats = pauseGameplayCheatScanner.Value && ready && songPlaying
+                    && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
+                    && !transition && !settingsOpen && !moveHud
+                    && resizeTarget < 0 && Application.isFocused;
+                if (pauseCheats)
                 {
-                    bool pauseCheats = pauseGameplayCheatScanner.Value && ready && songPlaying
-                        && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
-                        && !transition && !settingsOpen && !moveHud
-                        && resizeTarget < 0 && Application.isFocused;
-                    if (pauseCheats)
+                    try
                     {
                         var net = CHNetManager.instance;
                         pauseCheats = net == null || (int)net.field_Private_ConnectionState_0 == 0;
                     }
-                    cheatScanner.Apply(pauseCheats);
-                    string scannerStatus = pauseCheats ? cheatScanner.Status : "";
-                    if (lastCheatScannerStatus != scannerStatus)
-                    {
-                        if (!string.IsNullOrEmpty(scannerStatus))
-                            LoggerInstance.Msg($"Sloptifine solo cheat scanner state: {scannerStatus}.");
-                        lastCheatScannerStatus = scannerStatus;
-                    }
+                    catch { pauseCheats = false; }
                 }
-                catch (Exception ex)
+                cheatScanner.SetSuppressed(pauseCheats);
+                if (lastCheatScannerSuppressed != cheatScanner.IsSuppressed)
                 {
-                    cheatScanner.Restore();
-                    cheatScannerError = true;
-                    LoggerInstance.Warning($"Sloptifine cheat scanner pause stopped; vanilla scanner restored: {ex.Message}");
+                    if (cheatScanner.IsSuppressed || lastCheatScannerSuppressed == true)
+                        LoggerInstance.Msg($"Sloptifine solo cheat scanner {(cheatScanner.IsSuppressed ? "paused" : "restored")}.");
+                    lastCheatScannerSuppressed = cheatScanner.IsSuppressed;
                 }
             }
             if (!gameplayUiEventError)
@@ -948,7 +950,7 @@ public sealed partial class Core : MelonMod
         starProgressParticles.Clear();
         comboSmokeScroll.Clear();
         counterCanvas.Clear();
-        cheatScanner.Restore();
+        cheatScanner.Clear(HarmonyInstance);
         optionalServices.Restore();
         settingsOpen = moveHud = hudDragging = false;
         resizeTarget = -1;
