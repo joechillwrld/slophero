@@ -3,6 +3,11 @@
 Read [docs/performance-handoff.md](docs/performance-handoff.md) before changing
 performance code. [docs/performance-audit.md](docs/performance-audit.md) is a
 chronological research record; older "next steps" there may be superseded.
+The handoff indexes current mod code, older source, exact-game binaries,
+Unity symbols, logs, captures, and local raw uploads. `references/` and
+`/workspace/attachments` are not committed to Git; in a fresh environment,
+restore needed files from conversation uploads. Inventory any new uploads and
+update the handoff with verified findings.
 
 The user wants SlopHero's existing features preserved and wants Sloptifine to
 improve both the mod and Clone Hero itself. Favor current-build game/Unity work
