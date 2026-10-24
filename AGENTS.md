@@ -37,6 +37,7 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.84. Its FC-ring cleanup and hidden offline
-leaderboard/spectator callbacks are narrow CPU-work reductions with no measured
-FPS gain yet. Do not present them as the complete native optimization project.
+The latest packaged build is 0.4.86. It extends the default-off solo UI-event
+pause to disable Unity's live EventSystem component, based on the measured
+raycast call path. This is a candidate CPU-work reduction without a matched
+FPS result; it is not the complete native optimization project.

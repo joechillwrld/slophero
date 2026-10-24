@@ -53,7 +53,7 @@ the Sloptifine pages and preserve their documented scope:
 | Research lead | Current implementation |
 | --- | --- |
 | WPA identified Unity mouse processing and raycasts during play | `MouseUiGameplayOverride` patches the called `StandaloneInputModule.ProcessMouseEvent(int)` overload. It is default-off and only suppresses mouse UI during active play. Keyboard/controller navigation and Rewired instrument polling stay available. |
-| Broader Unity UI event work was also costly | `GameplayUiEventOverride` is a separate default-off switch scoped to active offline solo play. It pauses Unity EventSystem work and resumes outside that state. It is not additive with the mouse-only switch while the broad pause is active. |
+| Broader Unity UI event work was also costly | `GameplayUiEventOverride` is a separate default-off switch scoped to active offline solo play. Since v0.4.86 it disables the live EventSystem component during that scope and restores it plus the prior selection on pause/menu/scene transitions. If the component cannot be resolved, it falls back to the previous Update prefix. It is not additive with the mouse-only switch while the broad pause is active. |
 | Old source suggested frequent whammy texture uploads; current native code uses raw byte writes | `WhammyTextureThrottle` hooks the exact current data writer and upload wrapper. It permits an upload after data changes and leaves producer writes and GPU compute intact. It is default-off; the user has seen no clear performance gain, so keep it experimental. |
 | Hidden beatline, leaderboard, particles, fret fades, combo smoke and star-progress effects continued some work while invisible/unused | `VisualOverrides`, `HiddenLeaderboardOverride`, `PerformanceOverrides`, `ComboSmokeScrollOverride`, and `StarProgressParticleOverride` offer separate controls and restore prior state. Scene discoveries and limitations are in the audit. |
 | Exact Gameplay scene script map shows hidden leaderboard layout and offline spectator polling | The existing default-off hidden leaderboard switch now pauses six `AspectRatioFitter` updates while the score list is invisible and `SpectatorCount.FixedUpdate` while offline. It restores both when needed and checks component states only once per second during stable visibility. No frame gain is measured yet. |
@@ -251,22 +251,25 @@ online behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.85** on the private
+- Latest packaged build: SlopHero **0.4.86** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.85 (SHA-256
   `1FCC576612A1973E6E90D3ED692F6B50A0E2A7C4503D00C7575D3D4C2F5F4CB6`);
-  the v0.4.83 and v0.4.84 captures below are historical. Clone Hero is
-  **1.1.0.6142**, Unity **2022.3.62f2**, with ClonZones 2.0.0 also loaded. The
-  0.4.85 log confirms MIDI cleanup and has no SlopHero exceptions. Version
-  0.4.85 separates the worker
-  limit from foreground focus, clarifies the MIDI discovery switch, and adds a
-  default-off restart-required drum MIDI shutdown using the game cleanup path.
-  The 0.4.85 DLL SHA-256 is
-  `4C79C915D6FBD6F0B2D8E39ECC7CDFB31283938CC3EDA83A9B8C71D1B36D35E0`, and
+  it confirms MIDI cleanup and has no SlopHero exceptions. The 0.4.83 and
+  0.4.84 captures below are historical. Clone Hero is **1.1.0.6142**, Unity
+  **2022.3.62f2**, with ClonZones 2.0.0 also loaded. Version 0.4.85 separates
+  the worker limit from foreground focus, clarifies the MIDI discovery
+  switch, and adds a default-off restart-required drum MIDI shutdown using the
+  game cleanup path. Version 0.4.86 extends the existing default-off solo UI
+  event pause to disable the live EventSystem component during eligible
+  offline gameplay and restore it plus menu selection on exit. The code builds
+  with zero warnings/errors and core checks pass (101 checks). This is a
+  measured-path optimization candidate, not a measured FPS gain; no 0.4.86
+  in-game run has been supplied yet. The 0.4.86 DLL SHA-256 is
+  `0EF5736EEE178FE067AFBF2C0278A244084301C8BC1042EF9E482ADE577A505E`, and
   the ZIP SHA-256 is
-  `DA5BEC97CA6C52F69C8E7FEDEBEB6CC9E64DAF7DD482A16BC3495E47FE1FC6AC`.
-  The mod builds with zero warnings and errors; the existing core checks pass
-  (101 checks). It makes no measured FPS claim. Version 0.4.84 ships the
+  `40FAD8B7644D602991821FA2CE3E6A0FD8F74535E64E0174AB436775DDD33506`.
+  Version 0.4.84 ships the
   FC-ring no-op cleanup and extends the default-off hidden leaderboard switch
   to pause its six layout fitters
   while invisible and the spectator counter while offline. It reduces the

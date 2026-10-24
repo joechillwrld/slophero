@@ -1985,3 +1985,40 @@ canvases, 3 animators, one enabled but idle VideoPlayer, and no playing particle
 systems. Its visual-script list shows one active camera-shake script, one
 lyrics script, and no active UV-scroll or CustomFade scripts. These counts
 identify scene contents but do not establish cost or safe removal targets.
+
+### v0.4.86 exact-method CPU mapping and EventSystem dispatch gate
+
+I mapped the largest GameAssembly method rows in the supplied WPA method export
+back to the exact v1.1.0.6142 `dump.cs` RVAs. The strongest actionable managed
+chain is Unity's mouse UI path: `EventSystem.Update` (`0x2AD2060`) accounts for
+about 1,610 ms inclusive weight over the 31.1-second gameplay capture;
+nested rows include `StandaloneInputModule.ProcessMouseEvent(int)` (`0x2ADCFA0`,
+about 1,451 ms), `PointerInputModule.GetMousePointerEventData(int)` (`0x2ADA520`,
+about 1,394 ms), `EventSystem.RaycastAll` (`0x2AD0F10`, about 1,358 ms), and
+`GraphicRaycaster.Raycast` (`0x2929DA0`, about 1,105 ms). These are nested,
+inclusive weights on the same call path and must not be added together. The
+older WPA trace establishes this as a meaningful code path; it is not a current
+PresentMon measurement.
+
+The supplied v0.4.85 `Latest.log` shows the broad UI-event switch became
+suspended at 18:25:45 during the solo timing run and restored at 18:26:34. The
+old Harmony prefix skipped the full `EventSystem.Update` body but Unity still
+dispatched the component callback each frame. Version 0.4.86 changes that same
+existing default-off setting to disable the live EventSystem component for the
+eligible offline-solo scope, so Unity also skips its per-frame BehaviourManager
+dispatch. On restore, it re-enables the same component and restores the prior
+selected object only if no newer selection exists. If no live instance is
+available at install time, the previous pass-through-safe Update prefix remains
+as fallback. The mouse-only switch remains separate; guitar polling, scoring,
+and online gating are unchanged. This is an evidence-driven optimization
+candidate, not a measured frame-rate win.
+
+The other mapped current-game CPU rows reinforce the boundaries: Rewired
+`InputManager_Base.DoUpdate` is about 2,116 ms inclusive over the same capture,
+so 1000 Hz controller polling stays untouched. `BasePlayer.Update` is about
+414 ms; note hit detection and scoring stay untouched. `HighwayScroll.Update`
+contributes only about 22 ms in the sample, `LyricDisplay.Update` about 4 ms,
+`StarProgress` about 5 ms, and `CameraShake.Update` about 1 ms. Those current
+rows do not support broad patches to those features. The native camera/culling
+branch remains the larger unresolved engine area; its Unity calls are shared
+render/cull scheduling, not a safe target to skip wholesale.

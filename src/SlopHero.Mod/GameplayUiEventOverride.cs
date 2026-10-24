@@ -1,21 +1,31 @@
 using System.Reflection;
 using HarmonyLib;
 using MelonLoader;
+using UnityEngine;
 
 namespace SlopHero.Mod;
 
 /// <summary>
-/// Experimental option to skip Unity UI event processing during an active
-/// offline solo song. Rewired's gameplay input polling is independent of this
-/// EventSystem callback and remains enabled.
+/// Optional pause for Unity UI event processing during active offline solo
+/// songs. The normal path disables the EventSystem component, removing its
+/// per-frame BehaviourManager dispatch as well as its mouse raycasts. If the
+/// live EventSystem cannot be resolved, a pass-through-safe Update prefix is
+/// used instead. Instrument polling is independent and remains untouched.
 /// </summary>
 internal sealed class GameplayUiEventOverride
 {
     private static GameplayUiEventOverride? active;
     private MethodInfo? updateMethod;
+    private PropertyInfo? selectedObjectProperty;
+    private MethodInfo? setSelectedObjectMethod;
+    private Behaviour? eventSystem;
+    private GameObject? selectedBeforeSuspend;
     private bool installed;
     private bool failed;
     private bool suspend;
+    private bool usingPrefix;
+    private bool originalEnabled;
+    private bool disabledByUs;
 
     internal bool IsInstalled => installed;
     internal bool IsSuspended => installed && suspend;
@@ -25,20 +35,35 @@ internal sealed class GameplayUiEventOverride
         if (!requested)
         {
             suspend = false;
+            RestoreComponent();
             Restore(harmony);
             failed = false;
             return;
         }
 
         if (!installed && !failed) Install(harmony);
-        suspend = installed && gameplayActive;
+        bool shouldSuspend = installed && gameplayActive;
+        if (usingPrefix)
+        {
+            suspend = shouldSuspend;
+            return;
+        }
+
+        SetComponentSuspended(shouldSuspend);
     }
 
-    internal void Disable() => suspend = false;
+    // F8 and Escape use this immediate path so the settings/menu UI is live in
+    // the same simulation tick instead of waiting for the 20 Hz state poll.
+    internal void Disable()
+    {
+        suspend = false;
+        RestoreComponent();
+    }
 
     internal void Clear(HarmonyLib.Harmony harmony)
     {
         suspend = false;
+        RestoreComponent();
         Restore(harmony);
         failed = false;
     }
@@ -56,41 +81,130 @@ internal sealed class GameplayUiEventOverride
             if (updateMethod == null)
                 throw new MissingMethodException("UnityEngine.EventSystems.EventSystem.Update()");
 
+            // Keep the component reference before disabling it: EventSystem
+            // clears its static `current` pointer and deactivates its input
+            // module from OnDisable. On restore we re-enable the same instance
+            // and return its previous selection if that object still exists.
+            var currentProperty = eventSystemType!.GetProperty("current",
+                BindingFlags.Public | BindingFlags.Static);
+            eventSystem = currentProperty?.GetValue(null) as Behaviour;
+            if (eventSystem == null)
+            {
+                var findObjectMethod = typeof(UnityEngine.Object).GetMethod("FindObjectOfType",
+                    BindingFlags.Public | BindingFlags.Static, binder: null,
+                    types: new[] { typeof(Type), typeof(bool) }, modifiers: null);
+                eventSystem = findObjectMethod?.Invoke(null, new object[] { eventSystemType, false }) as Behaviour;
+            }
+
+            if (eventSystem != null)
+            {
+                selectedObjectProperty = eventSystemType.GetProperty("currentSelectedGameObject",
+                    BindingFlags.Public | BindingFlags.Instance);
+                setSelectedObjectMethod = eventSystemType.GetMethod("SetSelectedGameObject",
+                    BindingFlags.Public | BindingFlags.Instance, binder: null,
+                    types: new[] { typeof(GameObject) }, modifiers: null);
+                installed = true;
+                MelonLogger.Msg("Sloptifine UI-event optimization ready; it disables the EventSystem component only during active offline solo gameplay.");
+                return;
+            }
+
+            // Some custom scenes may not expose an active EventSystem during
+            // scene initialization. Preserve the established safe behavior in
+            // that case rather than leaving UI events permanently disabled.
             suspend = false;
             active = this;
+            usingPrefix = true;
             var prefix = typeof(GameplayUiEventOverride).GetMethod(nameof(BeforeEventSystemUpdate),
                 BindingFlags.Static | BindingFlags.NonPublic)!;
             harmony.Patch(updateMethod, prefix: new HarmonyMethod(prefix));
             installed = true;
-            MelonLogger.Msg("Sloptifine experimental UI-event hook ready; event processing pauses only during active solo gameplay.");
+            MelonLogger.Msg("Sloptifine UI-event optimization using the Update-prefix fallback; event processing pauses only during active solo gameplay.");
         }
         catch (Exception ex)
         {
+            RestoreComponent();
             active = null;
             suspend = false;
-            if (updateMethod != null)
+            if (usingPrefix && updateMethod != null)
             {
                 try { harmony.Unpatch(updateMethod, HarmonyPatchType.All, harmony.Id); }
-                catch { /* Prefix stays inactive if cleanup fails. */ }
+                catch { /* The inactive prefix passes through if cleanup fails. */ }
             }
             updateMethod = null;
+            eventSystem = null;
+            usingPrefix = false;
             installed = false;
             failed = true;
-            MelonLogger.Warning($"Sloptifine UI-event experiment could not install and remains inactive: {ex.Message}");
+            MelonLogger.Warning($"Sloptifine UI-event optimization could not install and remains inactive: {ex.Message}");
         }
+    }
+
+    private void SetComponentSuspended(bool value)
+    {
+        suspend = value;
+        if (eventSystem == null) return;
+
+        if (value)
+        {
+            if (!disabledByUs)
+            {
+                originalEnabled = eventSystem.enabled;
+                if (originalEnabled)
+                {
+                    try { selectedBeforeSuspend = selectedObjectProperty?.GetValue(eventSystem) as GameObject; }
+                    catch { selectedBeforeSuspend = null; }
+                    disabledByUs = true;
+                }
+            }
+            if (disabledByUs && eventSystem.enabled) eventSystem.enabled = false;
+            return;
+        }
+
+        RestoreComponent();
+    }
+
+    private void RestoreComponent()
+    {
+        if (disabledByUs)
+        {
+            try
+            {
+                if (eventSystem != null && originalEnabled && !eventSystem.enabled)
+                    eventSystem.enabled = true;
+                var selected = selectedBeforeSuspend;
+                var currentSelection = eventSystem != null
+                    ? selectedObjectProperty?.GetValue(eventSystem) as GameObject
+                    : null;
+                if (eventSystem != null && currentSelection == null && selected != null && selected.activeInHierarchy)
+                    setSelectedObjectMethod?.Invoke(eventSystem, new object?[] { selected });
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Sloptifine could not fully restore Unity UI selection: {ex.Message}");
+            }
+        }
+        disabledByUs = false;
+        originalEnabled = false;
+        selectedBeforeSuspend = null;
     }
 
     private void Restore(HarmonyLib.Harmony harmony)
     {
-        if (!installed && updateMethod == null) return;
-        suspend = false;
-        try
+        if (usingPrefix || updateMethod != null)
         {
-            if (updateMethod != null) harmony.Unpatch(updateMethod, HarmonyPatchType.All, harmony.Id);
+            try
+            {
+                if (usingPrefix && updateMethod != null)
+                    harmony.Unpatch(updateMethod, HarmonyPatchType.All, harmony.Id);
+            }
+            catch (Exception ex) { MelonLogger.Warning($"Sloptifine UI-event hook cleanup failed: {ex.Message}"); }
         }
-        catch (Exception ex) { MelonLogger.Warning($"Sloptifine UI-event hook cleanup failed: {ex.Message}"); }
-        installed = false;
         updateMethod = null;
+        selectedObjectProperty = null;
+        setSelectedObjectMethod = null;
+        eventSystem = null;
+        usingPrefix = false;
+        installed = false;
         if (ReferenceEquals(active, this)) active = null;
     }
 
