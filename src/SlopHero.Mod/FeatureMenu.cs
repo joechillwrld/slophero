@@ -9,7 +9,7 @@ namespace SlopHero.Mod;
 
 public sealed partial class Core
 {
-    private static readonly string[] SettingsPages = { "General", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Sizing", "Profiles", "Sloptifine" };
+    private static readonly string[] SettingsPages = { "General", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Sizing", "Profiles", "Sloptifine", "Sloptifine 2" };
     private MelonPreferences_Entry<bool> showMisses = null!, showHit = null!, showGhosts = null!, showBest = null!;
     private MelonPreferences_Entry<bool> showSong = null!, showTitle = null!, showArtist = null!, showCharter = null!, showSpeed = null!;
     private MelonPreferences_Entry<int> songX = null!, songY = null!, songFont = null!;
@@ -251,9 +251,6 @@ public sealed partial class Core
                 }
                 GUI.Label(new Rect(x, y + 348, 540, 42), "Type 10–5000 on the game's speed row; * means pending. Pause or press Enter to apply.");
                 GUI.Label(new Rect(x, y + 394, 540, 50), "Timings are written to Latest.log. Close this menu and play.");
-                SectionHeader("Experimental Unity scheduler", x, y + 452);
-                Toggle(reduceUnityJobWorkers, "Use one fewer Unity job worker during offline solo songs", x, y + 480);
-                GUI.Label(new Rect(x + 22, y + 510, 610, 40), "Live and reversible. Restores the game's worker limit on pause, menus, online play, and scene changes.");
                 break;
             case 1:
                 Toggle(showHud, "Counter HUD", x, y); Toggle(showMisses, "Misses", x, y + 40);
@@ -346,11 +343,16 @@ public sealed partial class Core
                 Toggle(stopMidiInput, "Pause drum MIDI polling", x, y + 324);
                 Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to restore)", x, y + 352);
                 Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, y + 380);
-                Toggle(skipGameplayMouseUi, "Experimental: skip gameplay mouse UI raycasts", x, y + 408);
-                Toggle(throttleWhammyTexture, "Experimental: skip duplicate whammy texture uploads", x, y + 440);
-                Toggle(pauseGameplayCheatScanner, "Pause cheat-code scanner during solo songs", x, y + 468);
-                Toggle(pauseGameplayUiProcessing, "Experimental: pause UI events (also pauses keyboard/controller UI navigation)", x, y + 496);
-                Toggle(pauseHighwayAnimations, "Experimental: freeze highway, video, and track-fade visuals in solo play", x, y + 526);
+                break;
+            case 9:
+                SectionHeader("Engine and scheduler experiments", x, y);
+                Toggle(skipGameplayMouseUi, "Skip mouse UI raycasts during gameplay", x, y + 26);
+                Toggle(throttleWhammyTexture, "Skip duplicate whammy texture uploads", x, y + 60);
+                Toggle(pauseGameplayCheatScanner, "Pause cheat-code scanner during solo songs", x, y + 94);
+                Toggle(pauseGameplayUiProcessing, "Pause UI events during solo songs (also pauses UI navigation)", x, y + 128);
+                Toggle(pauseHighwayAnimations, "Freeze highway, video, and track-fade visuals in solo play", x, y + 162);
+                Toggle(reduceUnityJobWorkers, "Use one fewer Unity job worker during offline solo songs", x, y + 196);
+                GUI.Label(new Rect(x + 22, y + 232, 610, 66), "These switches are experimental and default off. The worker limit restores on pause, menus, online play, scene changes, or unload.");
                 break;
         }
         if (editApply != null) DrawValueEditor();

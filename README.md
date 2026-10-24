@@ -1,16 +1,22 @@
-# SlopHero 0.4.82 alpha
+# SlopHero 0.4.83 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
 features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.82
-adds a default-off Unity Job System experiment: it lowers the active worker
+build, compiled against its loader and generated assemblies. Version 0.4.83
+moves engine-level performance switches onto **Sloptifine 2** so the
+packed Sloptifine page has room and its controls stay comfortably inside the
+menu. It also reduces repeated player-effect hierarchy discovery from every
+five seconds to every 30 seconds, while immediately discovering newly added
+player necks. Version 0.4.82 added a default-off Unity Job System experiment:
+it lowers the active worker
 limit by one only during focused, unpaused, offline solo gameplay and restores
 the previous limit on pause, menus, online play, scene changes, and unload. It
 uses Unity's generated `SetJobQueueMaximumActiveThreadCount` API; no direct
-native detour is used. The effect on performance is unmeasured.
+native detour is used. The first mod-timing A/B showed no callback-rate gain;
+there is no PresentMon FPS comparison yet, so leave it off unless testing.
 The counter HUD also reuses the existing 20 Hz network-state cache instead of
 performing its own duplicate IL2CPP lookup at each stats refresh.
 Version 0.4.81 shares the 20 Hz online-state check across the offline-only optimizations, the
@@ -65,7 +71,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.82 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.82-alpha.zip)
+[Download SlopHero v0.4.83 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.83-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

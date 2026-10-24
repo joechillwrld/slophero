@@ -1802,3 +1802,28 @@ The counter refresh now reuses the same 20 Hz online-state cache instead of
 making another `CHNetManager.instance` lookup at its 5 Hz refresh rate. A lookup
 failure remains conservatively treated as online, preserving remote-player
 selection behavior while removing duplicate IL2CPP boundary work.
+
+The v0.4.82 log contains one 30-second capture with the worker limit active
+(15→14) and one with the default 15 workers. The active run reported 1,304.4
+scheduled render callbacks/s versus 1,318.6/s with the option off; the 95th and
+99th percentile callback intervals were 0.91/1.05 ms on and 0.90/0.99 ms off.
+Simulation Update percentiles were nearly identical. These are mod-observed
+callback intervals, not PresentMon frame times, and the single pair is too
+small to establish an FPS change. It shows no benefit, so the option remains
+default-off. The log confirms the limit restores after gameplay transitions.
+
+The settings panel is 900×660 design units and clamps its scale to fit the
+screen. A source layout audit found no controls drawn outside that panel, but
+the final Sloptifine toggle ended only two units above its lower edge. Version
+0.4.83 moves the mouse, whammy, cheat-scanner, UI-event, highway, and worker
+experiments to a second Sloptifine page; the remaining first-page options now end
+well above the bottom edge. No performance control was removed.
+
+The v0.4.82 timing bucket called `Performance effects` combines the neck-effect
+cache and star-progress particle check, so its isolated 9.478 ms maximum cannot
+be attributed from this log. The neck-effect cache nevertheless had an
+unnecessary five-second full hierarchy rediscovery despite already discovering
+new player necks by pointer. Version 0.4.83 stretches the fallback full scan to
+30 seconds; it still detects a new neck on the next apply pass and retains
+periodic discovery for late-added child effects. This reduces avoidable
+IL2CPP component-array allocations while the optional effect switches are on.

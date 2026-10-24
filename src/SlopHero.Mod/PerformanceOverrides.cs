@@ -85,16 +85,15 @@ internal sealed class PerformanceOverrides
             Restore();
             return;
         }
-        // Apply to cached player-neck effects at most once per second. Rebuild
-        // the hierarchy lists immediately on toggle, then every five seconds
-        // to catch effects or players added during a song. The effect pools
-        // are stable for a session, so rediscovering every child every second
-        // only creates avoidable IL2CPP wrapper/enumerator work.
+        // Apply to cached player-neck effects at most once per second. New
+        // necks are discovered on cache miss; rebuild known hierarchies only
+        // every 30 seconds to catch a rare late-added child without repeatedly
+        // allocating component arrays from stable effect pools.
         if (!changed && realtime < nextScan) return;
         nextScan = realtime + 1.0;
         if (game.playerObjects == null) return;
-        bool discover = changed || neckEffects.Count == 0 || realtime >= nextDiscovery;
-        if (discover) nextDiscovery = realtime + 5.0;
+        bool discover = neckEffects.Count == 0 || realtime >= nextDiscovery;
+        if (discover) nextDiscovery = realtime + 30.0;
 
         foreach (var player in game.playerObjects)
         {
