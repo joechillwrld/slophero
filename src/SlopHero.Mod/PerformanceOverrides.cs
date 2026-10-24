@@ -1,4 +1,5 @@
 using Il2Cpp;
+using MelonLoader;
 using UnityEngine;
 using Animator = Il2Cpp.Animator;
 using ParticleSystem = UnityEngine.ParticleSystem;
@@ -275,43 +276,68 @@ internal sealed class PerformanceOverrides
     }
 }
 
-/// <summary>Opt-in switches for global input/presence services; online game services are untouched.</summary>
+/// <summary>Opt-in MIDI and presence switches; networked game services are untouched.</summary>
 internal sealed class OptionalServiceOverrides
 {
     private MIDIInputManager? midi;
     private DiscordController? discord;
     private bool midiOriginalEnabled, discordOriginalEnabled;
     private IntPtr midiPointer, discordPointer;
-    private bool disableMidi, disableDiscord;
+    private IntPtr midiShutdownPointer;
+    private bool pauseMidiDiscovery, disableMidiForSession, midiDisabledForSession, disableDiscord;
     private bool discordSuppressedForSession;
     private double nextDiscovery;
 
-    public void Apply(bool stopMidi, bool disableRichPresence, double realtime)
+    public void Apply(bool stopMidiDiscovery, bool disableDrumMidiForSession, bool disableRichPresence, double realtime)
     {
-        bool changed = disableMidi != stopMidi || disableDiscord != disableRichPresence;
-        disableMidi = stopMidi;
+        bool changed = pauseMidiDiscovery != stopMidiDiscovery
+            || disableMidiForSession != disableDrumMidiForSession || disableDiscord != disableRichPresence;
+        pauseMidiDiscovery = stopMidiDiscovery;
+        disableMidiForSession = disableDrumMidiForSession;
         disableDiscord = disableRichPresence;
-        // Both switches default off. Skip service discovery entirely until a
+        // Service switches default off. Skip service discovery entirely until a
         // user opts in, or a previously suppressed service needs restoring.
-        if (!stopMidi && !disableRichPresence && !discordSuppressedForSession
+        if (!stopMidiDiscovery && !disableDrumMidiForSession && !midiDisabledForSession
+            && !disableRichPresence && !discordSuppressedForSession
             && midi == null && discord == null) return;
         if (!changed && realtime < nextDiscovery) return;
         nextDiscovery = realtime + .5;
 
-        var currentMidi = stopMidi ? MIDIInputManager.instance : null;
+        var currentMidi = stopMidiDiscovery || disableDrumMidiForSession || midiDisabledForSession
+            ? MIDIInputManager.instance : null;
         if (currentMidi != null)
         {
             if (midiPointer != currentMidi.Pointer)
             {
                 midi = currentMidi; midiPointer = currentMidi.Pointer; midiOriginalEnabled = currentMidi.enabled;
+                midiShutdownPointer = IntPtr.Zero;
+            }
+        }
+        if (midi != null && (disableDrumMidiForSession || midiDisabledForSession)
+            && midiShutdownPointer != midiPointer)
+        {
+            try
+            {
+                // This is Clone Hero's own teardown path: it closes the
+                // active MidiIn devices and unregisters their input callbacks.
+                midi.OnApplicationQuit();
+                midiShutdownPointer = midiPointer;
+                midiDisabledForSession = true;
+                MelonLogger.Msg("Sloptifine closed drum MIDI devices for this session; restart after turning the option off to restore them.");
+            }
+            catch (Exception ex)
+            {
+                midiShutdownPointer = midiPointer;
+                MelonLogger.Warning($"Sloptifine could not close drum MIDI devices; leaving the manager enabled: {ex.Message}");
             }
         }
         if (midi != null)
         {
-            bool shouldEnable = midiOriginalEnabled && !stopMidi;
+            bool shouldEnable = midiOriginalEnabled && !stopMidiDiscovery && !midiDisabledForSession;
             if (midi.enabled != shouldEnable) midi.enabled = shouldEnable;
         }
-        if (!stopMidi) { midi = null; midiPointer = IntPtr.Zero; }
+        if (!stopMidiDiscovery && !disableDrumMidiForSession && !midiDisabledForSession)
+        { midi = null; midiPointer = midiShutdownPointer = IntPtr.Zero; }
 
         var currentDiscord = disableRichPresence || discordSuppressedForSession
             ? DiscordController.instance : null;
@@ -335,11 +361,12 @@ internal sealed class OptionalServiceOverrides
 
     public void Restore()
     {
-        try { if (midi != null) midi.enabled = midiOriginalEnabled; } catch { }
+        if (!midiDisabledForSession)
+            try { if (midi != null) midi.enabled = midiOriginalEnabled; } catch { }
         if (!discordSuppressedForSession)
             try { if (discord != null) discord.enabled = discordOriginalEnabled; } catch { }
         midi = null; discord = null; midiPointer = discordPointer = IntPtr.Zero;
         nextDiscovery = 0;
-        disableMidi = disableDiscord = false;
+        pauseMidiDiscovery = disableMidiForSession = disableDiscord = false;
     }
 }

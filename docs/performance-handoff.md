@@ -251,14 +251,23 @@ online behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.84** on the private
-  `slophero-v1.1-alpha` branch. The latest uploaded three-run `Latest.log`
-  remains from 0.4.83; its SHA-256
-  `8DFD151C5664E71831849636E6E95EBC89C603C697DB3300FEDFF95D8AA56E46`
-  matches the DLL in that release ZIP. Clone Hero is **1.1.0.6142**, Unity
-  **2022.3.62f2**, with ClonZones 2.0.0 also loaded. This log has no
-  SlopHero errors. Version 0.4.84 ships the FC-ring no-op cleanup and extends
-  the default-off hidden leaderboard switch to pause its six layout fitters
+- Latest packaged build: SlopHero **0.4.85** on the private
+  `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
+  0.4.84 (SHA-256
+  `0491602982FE375A05DE707FAC1113EA09D64E5093CD9BA37B0FB8B79BBFA830`);
+  the v0.4.83 three-run log and captures below are historical. Clone Hero is
+  **1.1.0.6142**, Unity **2022.3.62f2**, with ClonZones 2.0.0 also loaded. The
+  0.4.84 log has no SlopHero exceptions. Version 0.4.85 separates the worker
+  limit from foreground focus, clarifies the MIDI discovery switch, and adds a
+  default-off restart-required drum MIDI shutdown using the game cleanup path.
+  The 0.4.85 DLL SHA-256 is
+  `4C79C915D6FBD6F0B2D8E39ECC7CDFB31283938CC3EDA83A9B8C71D1B36D35E0`, and
+  the ZIP SHA-256 is
+  `DA5BEC97CA6C52F69C8E7FEDEBEB6CC9E64DAF7DD482A16BC3495E47FE1FC6AC`.
+  The mod builds with zero warnings and errors; the existing core checks pass
+  (101 checks). It makes no measured FPS claim. Version 0.4.84 ships the
+  FC-ring no-op cleanup and extends the default-off hidden leaderboard switch
+  to pause its six layout fitters
   while invisible and the spectator counter while offline. It reduces the
   switch's repeated native component-state checks to a one-second recovery
   pass when visibility is stable. The switch restores those components on

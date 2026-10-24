@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.84", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.85", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -249,7 +249,7 @@ public sealed partial class Core : MelonMod
             if (now >= nextOptionalServicePass)
             {
                 nextOptionalServicePass = now + .1;
-                optionalServices.Apply(stopMidiInput.Value, disableDiscordPresence.Value, now);
+                optionalServices.Apply(stopMidiInput.Value, disableMidiForSession.Value, disableDiscordPresence.Value, now);
             }
             if (Input.GetKeyDown(KeyCode.F8))
             {
@@ -394,14 +394,20 @@ public sealed partial class Core : MelonMod
             bool pauseCheatsActive = pauseGameplayCheatScanner.Value && cheatScanner.IsInstalled;
             bool pauseUiRequested = pauseGameplayUiProcessing.Value && gameplayUiEvents.IsInstalled;
             bool workerLimitRequested = reduceUnityJobWorkers.Value;
+            bool workerLimitCandidate = workerLimitRequested && ready && songPlaying
+                && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
+                && !transition && !settingsOpen && !moveHud && resizeTarget < 0;
             bool needsOfflineSoloGate = pauseHighwayRequested || pauseCheatsActive || pauseUiRequested || workerLimitRequested;
             bool soloOptimizationCandidate = needsOfflineSoloGate && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0
                 && Application.isFocused;
             bool activeSoloContext = soloOptimizationCandidate;
-            bool isOfflineSolo = (activeSoloContext || shortcutCandidate) && !IsOnline(now);
-            unityJobWorkerLimit.Update(workerLimitRequested && activeSoloContext && isOfflineSolo);
+            bool isOfflineSolo = (activeSoloContext || shortcutCandidate || workerLimitCandidate) && !IsOnline(now);
+            // Unlike UI/input hooks, the worker-count limit is independent of
+            // foreground input. Keep it stable while the user alt-tabs during
+            // a solo song instead of restoring and reapplying the native pool.
+            unityJobWorkerLimit.Update(workerLimitCandidate && isOfflineSolo);
             highwayAnimations.SetSuppressed(pauseHighwayRequested && activeSoloContext && isOfflineSolo);
             if (cheatScanner.IsInstalled)
             {

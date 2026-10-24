@@ -1913,3 +1913,48 @@ new player necks by pointer. Version 0.4.83 stretches the fallback full scan to
 30 seconds; it still detects a new neck on the next apply pass and retains
 periodic discovery for late-added child effects. This reduces avoidable
 IL2CPP component-array allocations while the optional effect switches are on.
+
+### v0.4.84 log/assets review and v0.4.85 follow-ups
+
+The new `globalgamemanagers.assets` upload is an exact duplicate of the prior
+upload (SHA-256
+`255CA3E4FD36C07517E5688D6433500575C9440FF14227868F4619CC8165CBD1`), so it
+does not add a new serialized-scene clue. The accompanying log is Clone Hero
+1.1.0.6142 on Unity 2022.3.62f2 with SlopHero 0.4.84 and ClonZones 2.0.0; it
+contains no SlopHero exception. Three 30-second mod timing runs report
+scheduled render callback rates of 1,289.6, 1,302.6, and 1,318.6/s, with p99
+callback intervals of 1.11, 1.16, and 1.08 ms. These are not PresentMon FPS
+or end-to-end frame times. Performance-effect maxima were 0.667, 0.512, and
+0.572 ms. The first run had worker limiting off; the latter two overlapped
+worker limiting for most of their samples, but run rates rise across those
+three captures and cannot establish a gain. Keep the worker option default-off.
+
+The same log records dozens of 15→14→15 Unity worker transitions after the
+option was enabled. The old eligibility expression included
+`Application.isFocused`, so merely leaving the game window made the worker
+experiment restore; returning refilled the lower cap. That is a credible
+source of the observed churn, though the log does not record focus changes and
+cannot prove each transition's cause. Version 0.4.85 gives the worker switch a
+separate offline-solo, unpaused, non-menu gate without the focus check. UI and
+input suppressions retain their foreground-only gate. The worker cap still
+restores on pause, online play, menu/transition, scene change, and unload.
+
+The old **Pause drum MIDI polling** option was imprecisely named: the current
+native `MIDIInputManager.Update` (GameAssembly RVA `0x221980`) runs a 0.2-second
+device-refresh path at most 5 Hz, while actual MIDI note input arrives through
+device callbacks. Disabling the MonoBehaviour pauses discovery but does not
+close open devices or unregister those callbacks. The current native manager's
+public `OnApplicationQuit` method (RVA `0x21C8E0`) calls its cleanup routine
+(RVA `0x2208B0`), which closes active MIDI devices and unregisters their
+callbacks. Version 0.4.85 renames the existing switch to **Pause drum MIDI
+device discovery** and adds a separate default-off option to invoke the game's
+cleanup, then disable the manager for the current process. Turning it off
+requires restarting Clone Hero to reopen MIDI. This is an opt-in drum device
+shutdown; 1000 Hz guitar polling and all guitar input remain untouched. The
+present capture does not quantify any MIDI
+CPU cost or FPS benefit.
+
+The source changes preserve the existing online guard, and the session MIDI
+switch does not touch networking or score state. Neither the worker adjustment
+nor MIDI shutdown is presented as a measured FPS improvement. A matched
+PresentMon A/B would be needed to make that claim.

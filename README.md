@@ -1,11 +1,18 @@
-# SlopHero 0.4.84 alpha
+# SlopHero 0.4.85 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
-optimizations that keep gameplay timing, controller polling, and existing mod
-features intact.
+optimizations that preserve guitar timing and polling, online play, and existing
+mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.84
+build, compiled against its loader and generated assemblies. Version 0.4.85
+keeps the default-off Unity worker limit active across window focus changes
+during eligible offline solo play, avoiding repeated native worker-pool
+reconfiguration when alt-tabbing. It adds a separate default-off drum MIDI
+shutdown option that uses Clone Hero's own input-device cleanup path and
+requires a restart to restore; the existing live option only pauses device
+discovery. Guitar polling, online play, and note timing stay untouched, and no
+FPS gain is claimed without a matched capture. Version 0.4.84
 extends the default-off hidden leaderboard switch to pause six invisible
 leaderboard layout scripts and the offline spectator-count callback. They
 restore when the leaderboard appears, the game goes online, the option turns
@@ -77,7 +84,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.84 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.84-alpha.zip)
+[Download SlopHero v0.4.85 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.85-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -107,7 +114,7 @@ Backspace removes the last digit; Delete clears the entry; Escape cancels the ed
 game's normal left/right controls to change the value by the configured step (5%
 by default). Set that step on the SlopHero **Controls** page.
 
-F8 has nine pages: **General**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, and **Sloptifine**. The centered window uses a left category sidebar and a separate options panel. Boolean options use checkboxes throughout. The **Menu accent** color on the Colors page applies to the title bar, selected page, and resize outline; it is included in color themes.
+F8 has ten pages: **General**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, **Sloptifine**, and **Sloptifine 2**. The centered window uses a left category sidebar and a separate options panel. Boolean options use checkboxes throughout. The **Menu accent** color on the Colors page applies to the title bar, selected page, and resize outline; it is included in color themes.
 
 - Click a numeric or color value and type a replacement. Enter or **Apply** saves;
   Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.
@@ -437,8 +444,11 @@ The original Performance tab offered five independent switches, all off by defau
 note-hit particles, sustain particles, fret flames/sparks/lightning, drum MIDI
 input polling, and Discord Rich Presence. The effect switches deactivate their
 effect objects to stop their simulation, rather than only hiding their drawing.
-MIDI restores when switched off. Discord Rich Presence shuts down for the
-current session; switch it off and restart the game to restore it. Online play,
+The original MIDI switch pauses periodic device discovery and restores it when
+switched off. Version 0.4.85 adds a separate default-off drum MIDI shutdown
+that closes connected devices; switch it off and restart to restore MIDI.
+Discord Rich Presence shuts down for the current session; switch it off and
+restart the game to restore it. Online play,
 leaderboards, scoring, notes, timing, and all SlopHero features are preserved.
 
 ## 0.4.34 sizing menu and star background

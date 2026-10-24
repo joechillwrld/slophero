@@ -22,7 +22,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> customizeFpsColor = null!;
     private MelonPreferences_Entry<bool> disableHitParticles = null!, disableSustainParticles = null!, disableFretEffects = null!;
     private MelonPreferences_Entry<bool> disableStarProgressParticles = null!;
-    private MelonPreferences_Entry<bool> stopMidiInput = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!, useCanvasCounterHud = null!, freezeComboSmokeScroll = null!;
+    private MelonPreferences_Entry<bool> stopMidiInput = null!, disableMidiForSession = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!, useCanvasCounterHud = null!, freezeComboSmokeScroll = null!;
     private MelonPreferences_Entry<bool> skipGameplayMouseUi = null!;
     private MelonPreferences_Entry<bool> throttleWhammyTexture = null!;
     private MelonPreferences_Entry<bool> pauseGameplayCheatScanner = null!;
@@ -126,6 +126,7 @@ public sealed partial class Core
         disableFretEffects = preferences.CreateEntry("PerformanceDisableFretEffects", false);
         disableStarProgressParticles = preferences.CreateEntry("PerformanceDisableStarProgressParticles", false);
         stopMidiInput = preferences.CreateEntry("PerformanceStopMidiInput", false);
+        disableMidiForSession = preferences.CreateEntry("PerformanceDisableMidiForSession", false);
         disableDiscordPresence = preferences.CreateEntry("PerformanceDisableDiscordPresence", false);
         suspendHiddenLeaderboard = preferences.CreateEntry("PerformanceSuspendHiddenLeaderboard", false);
         useCanvasCounterHud = preferences.CreateEntry("PerformanceCanvasCounterHud", false);
@@ -243,7 +244,7 @@ public sealed partial class Core
                             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
                             || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                         SongSpeedControl.TryRead(out int speedSetting);
-                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret/starProgress)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}/{disableStarProgressParticles.Value}[starSuppressed={starProgressParticles.IsSuppressed}], pausedFretFadeScripts={performance.PausedFretFadeCount}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI={stopMidiInput.Value}, Discord={disableDiscordPresence.Value}, cheatScanner={pauseGameplayCheatScanner.Value}[state={cheatScanner.Status}], gameplayUiEvents={pauseGameplayUiProcessing.Value}[suspended={gameplayUiEvents.IsSuspended}], highwayPause={pauseHighwayAnimations.Value}[hook={highwayAnimations.IsInstalled},suppressed={highwayAnimations.IsSuppressed}], mouseUiSkip={skipGameplayMouseUi.Value}[hook={mouseUiGameplay.IsInstalled},suppressed={mouseUiGameplay.IsSuppressed}], whammyDirtyGate={throttleWhammyTexture.Value}[hooks={whammyTextureThrottle.IsInstalled}], nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret/starProgress)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}/{disableStarProgressParticles.Value}[starSuppressed={starProgressParticles.IsSuppressed}], pausedFretFadeScripts={performance.PausedFretFadeCount}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI(discovery/session)={stopMidiInput.Value}/{disableMidiForSession.Value}, Discord={disableDiscordPresence.Value}, cheatScanner={pauseGameplayCheatScanner.Value}[state={cheatScanner.Status}], gameplayUiEvents={pauseGameplayUiProcessing.Value}[suspended={gameplayUiEvents.IsSuspended}], highwayPause={pauseHighwayAnimations.Value}[hook={highwayAnimations.IsInstalled},suppressed={highwayAnimations.IsSuppressed}], mouseUiSkip={skipGameplayMouseUi.Value}[hook={mouseUiGameplay.IsInstalled},suppressed={mouseUiGameplay.IsSuppressed}], whammyDirtyGate={throttleWhammyTexture.Value}[hooks={whammyTextureThrottle.IsInstalled}], nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                         LogGameplaySnapshot();
                         timings.Start();
                     }
@@ -340,7 +341,7 @@ public sealed partial class Core
 
                 SectionHeader("Services and HUD", x, y + 270);
                 Toggle(suspendHiddenLeaderboard, "Pause offline leaderboard and spectator UI", x, y + 296);
-                Toggle(stopMidiInput, "Pause drum MIDI polling", x, y + 324);
+                Toggle(stopMidiInput, "Pause drum MIDI device discovery", x, y + 324);
                 Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to restore)", x, y + 352);
                 Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, y + 380);
                 break;
@@ -352,7 +353,8 @@ public sealed partial class Core
                 Toggle(pauseGameplayUiProcessing, "Pause UI events during solo songs (also pauses UI navigation)", x, y + 128);
                 Toggle(pauseHighwayAnimations, "Freeze highway, video, and track-fade visuals in solo play", x, y + 162);
                 Toggle(reduceUnityJobWorkers, "Use one fewer Unity job worker during offline solo songs", x, y + 196);
-                GUI.Label(new Rect(x + 22, y + 232, 610, 66), "These switches are experimental and default off. The worker limit restores on pause, menus, online play, scene changes, or unload.");
+                Toggle(disableMidiForSession, "Disable drum MIDI input (restart to restore)", x, y + 232);
+                GUI.Label(new Rect(x + 22, y + 266, 610, 66), "These switches are experimental and default off. The worker limit restores on pause, menus, online play, scene changes, or unload. Drum MIDI shutdown closes devices; turn it off and restart to restore them.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -797,7 +799,7 @@ public sealed partial class Core
             Bool("PerformancePauseHiddenBeatlineUpdates", pauseHiddenBeatlineUpdates);
             Bool("DisableAprilFoolsContent", disableAprilFools);
             Bool("PerformanceDisableHitParticles", disableHitParticles); Bool("PerformanceDisableSustainParticles", disableSustainParticles);
-            Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput);
+            Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput); Bool("PerformanceDisableMidiForSession", disableMidiForSession);
             Bool("PerformanceDisableStarProgressParticles", disableStarProgressParticles);
             Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
             Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
@@ -845,7 +847,7 @@ public sealed partial class Core
         Bool("PerformancePauseHiddenBeatlineUpdates", pauseHiddenBeatlineUpdates);
         Bool("DisableAprilFoolsContent", disableAprilFools);
         Bool("PerformanceDisableHitParticles", disableHitParticles); Bool("PerformanceDisableSustainParticles", disableSustainParticles);
-        Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput);
+        Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceStopMidiInput", stopMidiInput); Bool("PerformanceDisableMidiForSession", disableMidiForSession);
         Bool("PerformanceDisableStarProgressParticles", disableStarProgressParticles);
         Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
         Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
