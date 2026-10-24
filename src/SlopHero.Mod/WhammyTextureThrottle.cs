@@ -1,232 +1,101 @@
 using System.Diagnostics;
 using System.Reflection;
 using HarmonyLib;
+using Il2Cpp;
 using MelonLoader;
-using UnityEngine;
 
 namespace SlopHero.Mod;
 
 /// <summary>
-/// Experimental cap for redundant CPU whammy texture uploads. The target is
-/// discovered only when the game assigns its named global texture. The GPU
-/// compute path does not use Texture2D.Apply and is intentionally untouched.
+/// Experimental cap on Clone Hero's own whammy texture upload wrapper. The
+/// game updates the CPU-backed texture in 5 ms steps, so repeat uploads between
+/// those steps are redundant. This hook skips the game wrapper before it calls
+/// Texture2D.Apply, without intercepting other Unity texture uploads.
 /// </summary>
 internal sealed class WhammyTextureThrottle
 {
-    private const string GlobalTextureName = "_GlobalWhammyTexture";
     private const double MinimumUploadIntervalSeconds = 1.0 / 200.0;
-    private static readonly long MinimumUploadIntervalTicks = (long)(Stopwatch.Frequency * MinimumUploadIntervalSeconds);
+    private static readonly long MinimumUploadIntervalTicks =
+        (long)(Stopwatch.Frequency * MinimumUploadIntervalSeconds);
     private static WhammyTextureThrottle? active;
 
-    private readonly List<MethodInfo> captureMethods = new();
-    private MethodInfo? applyMethod;
-    private Texture? targetTexture;
-    private IntPtr targetTexturePointer;
-    private string lastTargetType = "not observed";
+    private MethodInfo? uploadMethod;
     private long lastUploadTimestamp;
-    private long matchedApplyCalls;
-    private long allowedUploads;
-    private long skippedUploads;
-    private int globalTextureId;
     private bool installed;
     private bool failed;
-    private bool captureHooksInstalled;
-    private bool requested;
-    private bool gameplayActive;
 
     internal bool IsInstalled => installed;
 
     internal void Update(HarmonyLib.Harmony harmony, bool enabled, bool isGameplay)
     {
-        if (!enabled)
+        if (!enabled || !isGameplay)
         {
-            requested = false;
-            gameplayActive = false;
-            if (installed || applyMethod != null) RestoreApply(harmony);
-            if (captureHooksInstalled || captureMethods.Count > 0) RestoreCapture(harmony);
+            Restore(harmony);
             failed = false;
             return;
         }
 
-        requested = true;
-        gameplayActive = isGameplay;
-
-        // Keep only the low-frequency global-texture assignment hooks active
-        // while enabled, so a texture assigned before a chart is remembered.
-        // Texture2D.Apply is much hotter, so its prefix exists only in Gameplay.
-        if (!captureHooksInstalled && captureMethods.Count == 0 && !failed) InstallCaptureHooks(harmony);
-        if (failed) return;
-
-        if (isGameplay)
-        {
-            if (!installed) InstallApplyHook(harmony);
-        }
-        else if (installed || applyMethod != null)
-        {
-            RestoreApply(harmony);
-        }
+        if (!installed && !failed) Install(harmony);
     }
 
     internal void Clear(HarmonyLib.Harmony harmony)
     {
-        requested = false;
-        gameplayActive = false;
         Restore(harmony);
         failed = false;
     }
 
-    internal void LogSummary()
-    {
-        if (!installed && matchedApplyCalls == 0 && allowedUploads == 0 && skippedUploads == 0) return;
-        string matchState = matchedApplyCalls > 0
-            ? "Texture2D.Apply calls matched the captured Unity object"
-            : "no matching Texture2D.Apply calls were observed";
-        MelonLogger.Msg($"Sloptifine whammy upload experiment: wrapper={lastTargetType}, matchedApply={matchedApplyCalls}, allowed={allowedUploads}, skipped={skippedUploads}; {matchState}; CPU upload cap, 200 Hz. GPU compute dispatch is unchanged.");
-    }
-
-    private void InstallCaptureHooks(HarmonyLib.Harmony harmony)
+    private void Install(HarmonyLib.Harmony harmony)
     {
         try
         {
-            MethodInfo setGlobalString = typeof(Shader).GetMethod(nameof(Shader.SetGlobalTexture),
-                BindingFlags.Static | BindingFlags.Public, binder: null,
-                types: new[] { typeof(string), typeof(Texture) }, modifiers: null)
-                ?? throw new MissingMethodException("Shader.SetGlobalTexture(string, Texture)");
-
-            var captureString = new HarmonyMethod(typeof(WhammyTextureThrottle).GetMethod(
-                nameof(CaptureGlobalTexture), BindingFlags.Static | BindingFlags.NonPublic)!);
+            // In the supplied v1.1.0.6142 metadata, TypeDef 993 is the static
+            // whammy uploader. This generated wrapper method maps to RVA
+            // 0x22BE10 and is called by GameManager.LateUpdate each frame.
+            Type uploaderType = typeof(ObjectPublicAbstractSealedInBoInObDoInSiDoInDoUnique);
+            uploadMethod = uploaderType.GetMethod("Method_Public_Static_Void_1",
+                BindingFlags.Public | BindingFlags.Static, binder: null,
+                types: Type.EmptyTypes, modifiers: null)
+                ?? throw new MissingMethodException(
+                    uploaderType.FullName, "Method_Public_Static_Void_1()");
 
             active = this;
-            globalTextureId = Shader.PropertyToID(GlobalTextureName);
-            harmony.Patch(setGlobalString, postfix: captureString);
-            captureMethods.Add(setGlobalString);
-
-            // Some Unity code uses a cached property ID instead of the string
-            // overload. This overload is optional; the named string hook above
-            // is the required, observed game path.
-            MethodInfo? setGlobalId = typeof(Shader).GetMethod(nameof(Shader.SetGlobalTexture),
-                BindingFlags.Static | BindingFlags.Public, binder: null,
-                types: new[] { typeof(int), typeof(Texture) }, modifiers: null);
-            if (setGlobalId != null)
-            {
-                var captureId = new HarmonyMethod(typeof(WhammyTextureThrottle).GetMethod(
-                    nameof(CaptureGlobalTextureById), BindingFlags.Static | BindingFlags.NonPublic)!);
-                harmony.Patch(setGlobalId, postfix: captureId);
-                captureMethods.Add(setGlobalId);
-            }
-
-            captureHooksInstalled = true;
-            MelonLogger.Msg("Sloptifine whammy texture tracking ready; the upload cap will install only during Gameplay.");
-        }
-        catch (Exception ex)
-        {
-            RestoreCapture(harmony);
-            failed = true;
-            MelonLogger.Warning($"Sloptifine whammy texture tracking could not install; the upload cap remains inactive: {ex.Message}");
-        }
-    }
-
-    private void InstallApplyHook(HarmonyLib.Harmony harmony)
-    {
-        try
-        {
-            MethodInfo apply = typeof(Texture2D).GetMethod(nameof(Texture2D.Apply),
-                BindingFlags.Instance | BindingFlags.Public, binder: null,
-                types: Type.EmptyTypes, modifiers: null)
-                ?? throw new MissingMethodException("Texture2D.Apply()");
             var prefix = new HarmonyMethod(typeof(WhammyTextureThrottle).GetMethod(
-                nameof(BeforeTextureApply), BindingFlags.Static | BindingFlags.NonPublic)!);
-            harmony.Patch(apply, prefix: prefix);
-            applyMethod = apply;
+                nameof(BeforeWhammyUpload), BindingFlags.Static | BindingFlags.NonPublic)!);
+            harmony.Patch(uploadMethod, prefix: prefix);
             installed = true;
-            MelonLogger.Msg("Sloptifine experimental whammy upload cap installed for Gameplay.");
         }
         catch (Exception ex)
         {
-            RestoreApply(harmony);
+            Restore(harmony);
             failed = true;
-            MelonLogger.Warning($"Sloptifine whammy upload experiment could not install and remains inactive: {ex.Message}");
+            MelonLogger.Warning($"Sloptifine whammy upload cap could not install and remains inactive: {ex.Message}");
         }
-    }
-
-    private void RestoreApply(HarmonyLib.Harmony harmony)
-    {
-        gameplayActive = false;
-        try
-        {
-            if (applyMethod != null) harmony.Unpatch(applyMethod, HarmonyPatchType.All, harmony.Id);
-        }
-        catch (Exception ex) { MelonLogger.Warning($"Sloptifine whammy Apply-hook cleanup failed: {ex.Message}"); }
-        applyMethod = null;
-        installed = false;
-        lastUploadTimestamp = 0;
-    }
-
-    private void RestoreCapture(HarmonyLib.Harmony harmony)
-    {
-        foreach (MethodInfo method in captureMethods)
-        {
-            try { harmony.Unpatch(method, HarmonyPatchType.All, harmony.Id); }
-            catch (Exception ex) { MelonLogger.Warning($"Sloptifine whammy texture-tracking cleanup failed: {ex.Message}"); }
-        }
-        captureMethods.Clear();
-        captureHooksInstalled = false;
-        targetTexture = null;
-        targetTexturePointer = IntPtr.Zero;
-        active = null;
     }
 
     private void Restore(HarmonyLib.Harmony harmony)
     {
-        requested = false;
-        gameplayActive = false;
-        RestoreApply(harmony);
-        RestoreCapture(harmony);
-    }
-
-    private static void CaptureGlobalTexture(string name, Texture value)
-    {
-        WhammyTextureThrottle? instance = active;
-        if (instance == null || !instance.requested || !string.Equals(name, GlobalTextureName, StringComparison.Ordinal)) return;
-        instance.Capture(value);
-    }
-
-    private static void CaptureGlobalTextureById(int nameID, Texture value)
-    {
-        WhammyTextureThrottle? instance = active;
-        if (instance == null || !instance.requested || nameID != instance.globalTextureId) return;
-        instance.Capture(value);
-    }
-
-    private void Capture(Texture value)
-    {
-        IntPtr valuePointer = value?.Pointer ?? IntPtr.Zero;
-        if (targetTexturePointer == valuePointer) return;
-        targetTexture = value;
-        targetTexturePointer = valuePointer;
-        lastUploadTimestamp = 0;
-        lastTargetType = valuePointer == IntPtr.Zero ? "cleared" : value!.GetType().Name;
-        if (valuePointer != IntPtr.Zero)
-            MelonLogger.Msg($"Sloptifine observed _GlobalWhammyTexture through IL2CPP wrapper type {lastTargetType}; actual effect is determined by matching Texture2D.Apply calls on the same Unity object.");
-    }
-
-    private static bool BeforeTextureApply(Texture2D __instance)
-    {
-        WhammyTextureThrottle? instance = active;
-        if (instance == null || !instance.requested || !instance.gameplayActive
-            || instance.targetTexturePointer == IntPtr.Zero || __instance.Pointer != instance.targetTexturePointer)
-            return true;
-
-        instance.matchedApplyCalls++;
-        long now = Stopwatch.GetTimestamp();
-        if (instance.lastUploadTimestamp != 0 && now - instance.lastUploadTimestamp < MinimumUploadIntervalTicks)
+        if (uploadMethod != null)
         {
-            instance.skippedUploads++;
-            return false;
+            try { harmony.Unpatch(uploadMethod, HarmonyPatchType.All, harmony.Id); }
+            catch (Exception ex) { MelonLogger.Warning($"Sloptifine whammy upload-hook cleanup failed: {ex.Message}"); }
         }
+        if (ReferenceEquals(active, this)) active = null;
+        uploadMethod = null;
+        installed = false;
+        lastUploadTimestamp = 0;
+    }
+
+    private static bool BeforeWhammyUpload()
+    {
+        WhammyTextureThrottle? instance = active;
+        if (instance == null) return true;
+
+        long now = Stopwatch.GetTimestamp();
+        if (instance.lastUploadTimestamp != 0
+            && now - instance.lastUploadTimestamp < MinimumUploadIntervalTicks)
+            return false;
 
         instance.lastUploadTimestamp = now;
-        instance.allowedUploads++;
         return true;
     }
 }

@@ -1,14 +1,17 @@
-# SlopHero 0.4.76 alpha
+# SlopHero 0.4.77 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
 features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.76
+build, compiled against its loader and generated assemblies. Version 0.4.77
+moves the default-off 200 Hz whammy cap from Unity's general
+`Texture2D.Apply` hook to Clone Hero's exact whammy upload wrapper. It skips
+the redundant wrapper call before the texture upload and removes the old
+global-texture tracking hooks. Version 0.4.76
 removes the zero-match whammy pixel-write hooks after current-game disassembly
-showed that whammy data is written through a raw byte buffer. The existing
-default-off texture-upload cap remains. Version 0.4.75 added a zero-allocation
+showed that whammy data is written through a raw byte buffer. Version 0.4.75 added a zero-allocation
 counter for mouse UI calls actually bypassed by the raycast experiment,
 reported at shutdown so its engagement is visible in the normal log. Version
 0.4.74 added a 1×24 CPU pixel-write gate based on the older source. Current
@@ -33,10 +36,9 @@ only and may freeze those animations; no performance gain is claimed yet.
 Version 0.4.68 added live state reporting for the cheat-scanner pause option,
 and 0.4.67 added a separate default-off switch that suspends Unity UI events
 during active solo songs, resuming on pause. The cheat-scanner switch also
-pauses its persistent per-tick scan during solo songs. The default-off
-200 Hz CPU whammy-texture cap remains scoped to Gameplay; texture assignment
-tracking still recognizes its target before a song starts. GPU compute
-rendering remains untouched. Earlier versions also added a separate option to suppress the
+pauses its persistent per-tick scan during solo songs. The whammy upload cap
+is default-off and scoped to Gameplay. GPU compute rendering remains
+untouched. Earlier versions also added a separate option to suppress the
 star-progress particle burst. The star bar, score, note timing, and 1000 Hz
 instrument polling remain untouched. When UI event processing is enabled,
 keyboard/controller UI navigation pauses during the song and returns on pause.
@@ -44,7 +46,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.76 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.76-alpha.zip)
+[Download SlopHero v0.4.77 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.77-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

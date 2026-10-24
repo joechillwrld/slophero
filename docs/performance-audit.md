@@ -9,7 +9,9 @@ The [exact-build native map](presentmon-baseline-2026-10-23.md#current-game-nati
 supersedes the older whammy-write hypothesis below. v1.1 writes whammy data
 through a `NativeArray<byte>` at a 5 ms step, so the `SetPixels` prefix added
 in v0.4.74 had no observed matches. It and an untested `SetPixelsImpl` prefix
-have been removed from the source. The optional `Texture2D.Apply` cap remains.
+have been removed from the source. As of v0.4.77, the optional 200 Hz cap
+targets Clone Hero's whammy upload wrapper directly; older `Texture2D.Apply`
+observations below describe previous versions.
 The map also identifies repeated `GuitarFretAnimator` sorting-order setters,
 but their runtime cost has not been measured.
 
@@ -1618,3 +1620,21 @@ caller above the reflected IL2CPP invocation path. That uncertainty does not
 block the mouse-path correction or the narrowly matched whammy-write gate in
 this release. Both can be checked from their existing runtime diagnostics;
 there is no new WPA capture step for v0.4.74.
+
+### v0.4.77: target the actual whammy upload wrapper
+
+The v1.1.0.6142 generated wrapper maps TypeDef 993 to
+`Il2Cpp.ObjectPublicAbstractSealedInBoInObDoInSiDoInDoUnique`. Its
+`Method_Public_Static_Void_1()` method corresponds to native RVA `0x22BE10`,
+the static whammy upload wrapper called from `GameManager.LateUpdate` (RVA
+`0xB4500`). The method calls the CPU texture's `Apply` wrapper. Its producer
+advances in 5 ms steps, so a 200 Hz upload ceiling matches the producer's
+maximum update cadence.
+
+v0.4.77 moves the opt-in cap from `Texture2D.Apply()` to this exact game
+wrapper. This stops redundant calls before they enter the texture upload path
+and removes the two `Shader.SetGlobalTexture` tracking patches. It preserves
+the raw byte writes and the GPU compute path. This is code-path work saved;
+the magnitude of any frame-time/FPS change is not measured yet. The preference
+remains off by default, and the compatibility hash prevents installing this
+native-map-dependent option on a different game build.
