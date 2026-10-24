@@ -1670,3 +1670,27 @@ The v0.4.78 log confirms its whammy dirty-gate hook installed, but it does not
 record how often it skipped the upload; the user observed a slight FPS decrease
 and no clear benefit. Treat that experiment as unproven and leave the toggle off
 unless a matched frame capture shows a gain.
+
+### v0.4.78 runtime capture review and v0.4.80 state-check consolidation
+
+The newly supplied log is from SlopHero v0.4.78, not v0.4.79. It contains no
+SlopHero errors or exceptions. During the 30-second capture, the performance
+settings showed the hidden leaderboard at 0/6 eligible entries, ten fret-fade
+components paused, two combo-smoke scroll components paused, and the star
+progress particle suppressed. The capture also reports about 2,468 mod Updates
+and 1,234 render callbacks per second. Mod callback averages remain small:
+Update 0.002 ms, HUD repaint 0.065 ms, visual overrides 0.015 ms, performance
+effects 0.080 ms across only 60 calls, and canvas HUD sync 0.010 ms. These
+managed timings do not include Unity rendering, Harmony prefix cost, or GPU
+work, and do not show a frame-time improvement.
+
+That settings snapshot had the solo-only highway, cheat-scanner, and UI-event
+switches enabled together. Before v0.4.80, each switch independently queried
+`CHNetManager.instance` during the same 20 Hz state pass; the highway eligibility
+and mouse-UI eligibility checks also read gameplay properties while their
+switches were off. v0.4.80 shares one conservative online-state check across
+the installed solo-only hooks and short-circuits the optional highway and mouse
+game-state reads when their options are disabled. Online sessions still pass
+through the original game methods, and the mouse option keeps its existing
+scope. This removes duplicate managed/native boundary crossings; its FPS effect
+is unmeasured and expected to be small.

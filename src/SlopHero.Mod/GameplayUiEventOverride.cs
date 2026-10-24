@@ -17,6 +17,7 @@ internal sealed class GameplayUiEventOverride
     private bool failed;
     private bool suspend;
 
+    internal bool IsInstalled => installed;
     internal bool IsSuspended => installed && suspend;
 
     internal void Update(HarmonyLib.Harmony harmony, bool requested, bool gameplayActive)

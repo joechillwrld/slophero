@@ -379,34 +379,28 @@ public sealed partial class Core : MelonMod
             var game = gameplay && gameplayInitialized ? GameManager.field_Private_Static_GameManager_0 : null;
             bool ready = game != null && game.songLoaded && game.playersInit && game.globalVariables != null;
             bool songPlaying = ready && game!.isSongPlaying;
-            bool pauseHighwayVisuals = ready && songPlaying && !game!.isPaused && !game.isSongOver
-                && game.actualPlayerCount == 1 && !transition && !settingsOpen && !moveHud
-                && resizeTarget < 0 && Application.isFocused;
-            if (pauseHighwayVisuals)
+            bool pauseHighwayRequested = pauseHighwayAnimations.Value && highwayAnimations.IsInstalled;
+            bool pauseCheatsActive = pauseGameplayCheatScanner.Value && cheatScanner.IsInstalled;
+            bool pauseUiRequested = pauseGameplayUiProcessing.Value && gameplayUiEvents.IsInstalled;
+            bool needsOfflineSoloGate = pauseHighwayRequested || pauseCheatsActive || pauseUiRequested;
+            bool activeSoloContext = needsOfflineSoloGate && ready && songPlaying
+                && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
+                && !transition && !settingsOpen && !moveHud && resizeTarget < 0
+                && Application.isFocused;
+            bool isOfflineSolo = false;
+            if (activeSoloContext)
             {
                 try
                 {
                     var net = CHNetManager.instance;
-                    pauseHighwayVisuals = net == null || (int)net.field_Private_ConnectionState_0 == 0;
+                    isOfflineSolo = net == null || (int)net.field_Private_ConnectionState_0 == 0;
                 }
-                catch { pauseHighwayVisuals = false; }
+                catch { isOfflineSolo = false; }
             }
-            highwayAnimations.SetSuppressed(pauseHighwayAnimations.Value && pauseHighwayVisuals);
+            highwayAnimations.SetSuppressed(pauseHighwayRequested && activeSoloContext && isOfflineSolo);
             if (cheatScanner.IsInstalled)
             {
-                bool pauseCheats = pauseGameplayCheatScanner.Value && ready && songPlaying
-                    && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
-                    && !transition && !settingsOpen && !moveHud
-                    && resizeTarget < 0 && Application.isFocused;
-                if (pauseCheats)
-                {
-                    try
-                    {
-                        var net = CHNetManager.instance;
-                        pauseCheats = net == null || (int)net.field_Private_ConnectionState_0 == 0;
-                    }
-                    catch { pauseCheats = false; }
-                }
+                bool pauseCheats = pauseCheatsActive && activeSoloContext && isOfflineSolo;
                 cheatScanner.SetSuppressed(pauseCheats);
                 if (lastCheatScannerSuppressed != cheatScanner.IsSuppressed)
                 {
@@ -419,15 +413,7 @@ public sealed partial class Core : MelonMod
             {
                 try
                 {
-                    bool pauseUiEvents = pauseGameplayUiProcessing.Value && ready && songPlaying
-                        && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
-                        && !transition && !settingsOpen && !moveHud && resizeTarget < 0
-                        && Application.isFocused;
-                    if (pauseUiEvents)
-                    {
-                        var net = CHNetManager.instance;
-                        pauseUiEvents = net == null || (int)net.field_Private_ConnectionState_0 == 0;
-                    }
+                    bool pauseUiEvents = pauseUiRequested && activeSoloContext && isOfflineSolo;
                     gameplayUiEvents.Update(HarmonyInstance, pauseGameplayUiProcessing.Value, pauseUiEvents);
                     if (lastGameplayUiSuspendState != gameplayUiEvents.IsSuspended)
                     {
@@ -453,10 +439,11 @@ public sealed partial class Core : MelonMod
             }
             lastStatsSongPlaying = songPlaying;
             practiceModeActive = ready && game!.globalVariables!.isPracticeEnabled;
-            bool mouseUiGameplayActive = ready && songPlaying && !game!.isPaused && !game.isSongOver
+            bool skipMouseUiRequested = skipGameplayMouseUi.Value;
+            bool mouseUiGameplayActive = skipMouseUiRequested && ready && songPlaying && !game!.isPaused && !game.isSongOver
                 && game.coroutinesRunning == 0 && !transition && !settingsOpen && !moveHud
                 && resizeTarget < 0 && Application.isFocused;
-            mouseUiGameplay.Update(HarmonyInstance, skipGameplayMouseUi.Value, mouseUiGameplayActive);
+            mouseUiGameplay.Update(HarmonyInstance, skipMouseUiRequested, mouseUiGameplayActive);
             if (ready) CompletePracticeTransition(game!);
             bool allow = ready && !transition && !settingsOpen && !moveHud && resizeTarget < 0 && Application.isFocused && !game!.isPaused
                 && !game.isSongOver && game.isSongPlaying && game.coroutinesRunning == 0
