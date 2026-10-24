@@ -1673,16 +1673,18 @@ unless a matched frame capture shows a gain.
 
 ### v0.4.78 runtime capture review and v0.4.80 state-check consolidation
 
-The newly supplied log is from SlopHero v0.4.78, not v0.4.79. It contains no
-SlopHero errors or exceptions. During the 30-second capture, the performance
-settings showed the hidden leaderboard at 0/6 eligible entries, ten fret-fade
-components paused, two combo-smoke scroll components paused, and the star
-progress particle suppressed. The capture also reports about 2,468 mod Updates
-and 1,234 render callbacks per second. Mod callback averages remain small:
-Update 0.002 ms, HUD repaint 0.065 ms, visual overrides 0.015 ms, performance
-effects 0.080 ms across only 60 calls, and canvas HUD sync 0.010 ms. These
-managed timings do not include Unity rendering, Harmony prefix cost, or GPU
-work, and do not show a frame-time improvement.
+The supplied log's loader banner says v0.4.78, but its SlopHero SHA-256
+(`F40D56F68AAF45326A9C64FD39CA950639D3581CBB3277E015EACD0F90F807FF`)
+matches the v0.4.80 DLL. This was a stale `MelonInfo` version string, not an
+old installation. The log contains no SlopHero errors or exceptions. During
+the 30-second capture, the performance settings showed the hidden leaderboard
+at 0/6 eligible entries, ten fret-fade components paused, two combo-smoke scroll
+components paused, and the star progress particle suppressed. The capture also
+reports about 2,468 mod Updates and 1,234 render callbacks per second. Mod
+callback averages remain small: Update 0.002 ms, HUD repaint 0.065 ms, visual
+overrides 0.015 ms, performance effects 0.080 ms across only 60 calls, and
+canvas HUD sync 0.010 ms. These managed timings do not include Unity rendering,
+Harmony prefix cost, or GPU work, and do not show a frame-time improvement.
 
 That settings snapshot had the solo-only highway, cheat-scanner, and UI-event
 switches enabled together. Before v0.4.80, each switch independently queried
