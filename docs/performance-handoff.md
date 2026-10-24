@@ -253,11 +253,12 @@ online behavior, 1000 Hz input polling, and existing SlopHero features.
 
 - Latest packaged build: SlopHero **0.4.85** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.84 (SHA-256
-  `0491602982FE375A05DE707FAC1113EA09D64E5093CD9BA37B0FB8B79BBFA830`);
-  the v0.4.83 three-run log and captures below are historical. Clone Hero is
+  0.4.85 (SHA-256
+  `1FCC576612A1973E6E90D3ED692F6B50A0E2A7C4503D00C7575D3D4C2F5F4CB6`);
+  the v0.4.83 and v0.4.84 captures below are historical. Clone Hero is
   **1.1.0.6142**, Unity **2022.3.62f2**, with ClonZones 2.0.0 also loaded. The
-  0.4.84 log has no SlopHero exceptions. Version 0.4.85 separates the worker
+  0.4.85 log confirms MIDI cleanup and has no SlopHero exceptions. Version
+  0.4.85 separates the worker
   limit from foreground focus, clarifies the MIDI discovery switch, and adds a
   default-off restart-required drum MIDI shutdown using the game cleanup path.
   The 0.4.85 DLL SHA-256 is

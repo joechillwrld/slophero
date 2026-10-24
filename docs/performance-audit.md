@@ -1958,3 +1958,30 @@ The source changes preserve the existing online guard, and the session MIDI
 switch does not touch networking or score state. Neither the worker adjustment
 nor MIDI shutdown is presented as a measured FPS improvement. A matched
 PresentMon A/B would be needed to make that claim.
+
+### v0.4.85 runtime check
+
+The latest `Latest.log` SHA-256 is
+`1FCC576612A1973E6E90D3ED692F6B50A0E2A7C4503D00C7575D3D4C2F5F4CB6`. It
+loads SlopHero 0.4.85 (`SlopHero.dll` hash matches the packaged build), Clone
+Hero 1.1.0.6142, Unity 2022.3.62f2, and ClonZones 2.0.0. There are no
+SlopHero errors. The log confirms the new session option reached the native
+MIDI cleanup path successfully; settings show both MIDI discovery pause and
+session shutdown enabled. No MIDI exception followed.
+
+One 30-second mod-timing capture had the Unity worker cap at 14 for essentially
+the full sample. Scheduled render callbacks measured 1,327.1/s with p99
+interval 1.04 ms; simulation Update p99 was 0.63 ms, with one 40.656 ms maximum
+gap. Canvas HUD sync averaged 0.018 ms across 598 calls, with a single 5.131 ms
+maximum. The sample shows stable worker engagement and low average mod callback
+cost, but these are not PresentMon frame intervals or FPS. The isolated Canvas
+maximum may be a one-off rebuild or runtime event; the log cannot attribute it
+to a visible hitch. The worker limit later restored and reapplied around game
+state transitions; the log does not include enough state to identify which
+eligibility condition changed.
+
+The scene snapshot reports 237/466 active SpriteRenderers, 3/3 cameras, 11/11
+canvases, 3 animators, one enabled but idle VideoPlayer, and no playing particle
+systems. Its visual-script list shows one active camera-shake script, one
+lyrics script, and no active UV-scroll or CustomFade scripts. These counts
+identify scene contents but do not establish cost or safe removal targets.
