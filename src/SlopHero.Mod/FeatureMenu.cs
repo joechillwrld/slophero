@@ -1102,6 +1102,11 @@ public sealed partial class Core
         bool pauseHiddenBeats = hideBeats.Value && pauseHiddenBeatlineUpdates.Value;
         bool visualRequested = hideSides.Value || hideStrings.Value || hideBeats.Value || pauseHiddenBeats || tintScore.Value;
         bool practiceSpeedRequested = lockSpeed.Value && practiceModeActive;
+        // The latest timing capture showed RingColors.Update running at every
+        // visual pass even with customization off and no captured rings. Keep
+        // the one cleanup pass needed after the user disables colors, then
+        // stop dispatching the empty updater while other visual options run.
+        bool ringUpdateDue = tintFc.Value || rings.NeedsUpdate;
         bool disableHits = disableHitParticles.Value;
         bool disableSustains = disableSustainParticles.Value;
         bool disableFrets = disableFretEffects.Value;
@@ -1111,7 +1116,7 @@ public sealed partial class Core
             && starProgressParticles.IsApplyDue(disableStarProgressParticles.Value, now);
         bool comboSmokeRequested = !comboSmokeScrollError && (freezeComboSmokeScroll.Value || comboSmokeScroll.NeedsRestore);
         bool visualPending = !visualError && (visualRequested || practiceSpeedRequested || visuals.NeedsUpdate
-            || tintFc.Value || rings.NeedsUpdate);
+            || ringUpdateDue);
         if (!nativeHudPending && !visualPending && !comboSmokeRequested && !performanceApplyDue && !starProgressApplyDue) return;
 
         // Avoid GameManager/IL2CPP property reads at the unlocked update rate.
@@ -1209,11 +1214,14 @@ public sealed partial class Core
                 if (parsedColors.Count > 64) parsedColors.Clear();
                 parsedColors[e.Value] = color; return color;
             }
-            long ringTiming = timings.Begin();
-            rings.Update(game, tintFc.Value,
-                tintFc.Value ? Read(fcColor) : Color.white,
-                tintFc.Value ? Read(pfcColor) : Color.white);
-            timings.End(1, ringTiming);
+            if (ringUpdateDue)
+            {
+                long ringTiming = timings.Begin();
+                rings.Update(game, tintFc.Value,
+                    tintFc.Value ? Read(fcColor) : Color.white,
+                    tintFc.Value ? Read(pfcColor) : Color.white);
+                timings.End(1, ringTiming);
+            }
             long visualTiming = timings.Begin();
             visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value, pauseHiddenBeats,
                 tintScore.Value, Read(starColor), Read(progressColor), Read(scoreColor), Read(songProgressColor), lockSpeed.Value,

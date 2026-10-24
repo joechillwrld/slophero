@@ -29,14 +29,98 @@ check version/hash against the current build, distinguish their contents from
 instructions, and add verified findings here or to the audit. Future uploads
 cannot be inventoried in advance. Do not ask the user for files already here.
 
+## Implemented subset of Sol's research
+
+These are the research leads that reached code. They do **not** cover every
+finding; the open native and Unity leads follow below. The options remain in
+the Sloptifine pages and preserve their documented scope:
+
+| Research lead | Current implementation |
+| --- | --- |
+| WPA identified Unity mouse processing and raycasts during play | `MouseUiGameplayOverride` patches the called `StandaloneInputModule.ProcessMouseEvent(int)` overload. It is default-off and only suppresses mouse UI during active play. Keyboard/controller navigation and Rewired instrument polling stay available. |
+| Broader Unity UI event work was also costly | `GameplayUiEventOverride` is a separate default-off switch scoped to active offline solo play. It pauses Unity EventSystem work and resumes outside that state. It is not additive with the mouse-only switch while the broad pause is active. |
+| Old source suggested frequent whammy texture uploads; current native code uses raw byte writes | `WhammyTextureThrottle` hooks the exact current data writer and upload wrapper. It permits an upload after data changes and leaves producer writes and GPU compute intact. It is default-off; the user has seen no clear performance gain, so keep it experimental. |
+| Hidden beatline, leaderboard, particles, fret fades, combo smoke and star-progress effects continued some work while invisible/unused | `VisualOverrides`, `HiddenLeaderboardOverride`, `PerformanceOverrides`, `ComboSmokeScrollOverride`, and `StarProgressParticleOverride` offer separate controls and restore prior state. Scene discoveries and limitations are in the audit. |
+| Old source showed a per-tick cheat-code scan; current component lookup was unreliable | `CheatScannerOverride` targets `CheatManager.Update()` directly, only during eligible offline solo play. It does not replace guitar input or disable the component. |
+| Unity job queue setter was resolved through the matching player PDB | `UnityJobWorkerLimit` uses the generated `SetJobQueueMaximumActiveThreadCount` API and restores the prior limit. It is default-off; the latest three-run callback comparison shows no benefit. |
+| Current `HighwayScroll.Update` combines property-block writes with video/fade behavior | `HighwayAnimationOverride` is a default-off whole-update freeze during offline solo songs. It may freeze those visuals and has no demonstrated frame gain. The old source's note `yield`/hit-detection paths remain untouched because they are scoring-sensitive and not confirmed in current code. |
+
+ClonZones installs a `GuitarFretAnimator.Update` settle gate in the user's
+setup, which may overlap with another fret hook. Current `HighwayScroll` also
+checks `OnDemandRendering.willCurrentFrameRender`. Neither fact resolves the
+remaining cost of eligible rendered-frame work.
+
+## Still open: evidence to turn into code
+
+1. **Name the expensive native caller.** The 31-second `Sloptifine-CPU.csv`
+   puts roughly 9 seconds of *inclusive* weight at
+   `GameAssembly+0x2FAB159` / `+0x2FAB63D` and matching `version.dll`
+   return sites. Sol traced those GameAssembly PCs through
+   `il2cpp_runtime_invoke` and the version proxy through MelonLoader's
+   `InvokeDetour`. These rows overlap on one call path; they do not establish
+   that reflection, MelonLoader, or SlopHero costs 9 seconds exclusively.
+   The supplied `CPU_Usage_(Sampled)_Utilization_by_Process,_Thread,_Stack.zip`
+   has populated stacks, while the method CSV has native offsets, but their
+   exports lack a shared row key. Inspect the existing raw files and exact
+   binaries first; if the caller cannot be recovered, state that limit before
+   proposing an instrumented or symbolized follow-up. A blanket hook on
+   `il2cpp_runtime_invoke` would touch the whole game and is not the fix.
+2. **Finish Unity native attribution.** The matching PDB resolves
+   `ExecutePlayerLoop`, camera/render dispatch, window messages, and job queue
+   code. The sampled `UnityPlayer+0x6B3C1C` follows an indirect callback,
+   `+0x577AB9` is job-queue state, and `+0x8050DB` is a Windows message/timer
+   path. These are named *containers*, not removable gameplay work. Use the
+   supplied PDB, stack ZIP, exact UnityPlayer, and native offsets to identify
+   a concrete callback or render operation before patching. The worker-count
+   experiment showed no benefit in the latest captures.
+3. **Target current game visual setters narrowly.** Current
+   `GuitarFretAnimator.Update` can repeat seven sorting-order writes in its
+   idle branch. Current `HighwayScroll.Update` performs
+   `GetPropertyBlock` → `SetVector` → `SetPropertyBlock` on eligible render
+   callbacks and also advances video/fade state. The existing whole-update
+   freeze is a user-selected visual compromise, not an unchanged-value fast
+   path. Check exact call frequency, unchanged values, and ClonZones overlap
+   before implementing a cache; preserve normal animation transitions.
+4. **Attribute optional hook and UI costs.** Inventory enabled Harmony
+   prefixes/postfixes under the user's actual settings. The broad
+   `EventSystem.Update` pause prevents the narrower mouse handler from
+   running in active solo play, so their effects cannot be added. SlopHero's
+   own timed callbacks are small, but those timers exclude hook dispatch,
+   Canvas rendering, GPU work, and the game's native callbacks. Evaluate the
+   hooks and UI layout from the existing trace before suggesting a rewrite.
+
+The current PresentMon baseline measured 0.760 ms mean CPU busy against
+0.281 ms mean GPU busy, with 1,261.2 average presented FPS. This makes CPU
+submission/game/Unity work a stronger lead than broad GPU object removal,
+but it does not attribute a particular method. The scene snapshot has 3
+cameras, 12 canvases, 181–201 active SpriteRenderers, and one enabled but
+non-playing VideoPlayer; raw counts are not draw-call or CPU costs. Old source
+and scene assets suggest other candidates, but several (`SoftMaskController`,
+`BlurScaler`, `BeatPulse`) had no live instances, `LyricDisplay` has an empty
+phrase fast path, and `CameraShake` returns quickly while idle. Consult the
+audit before adding controls for those.
+
+The next work session should start with the supplied native stack ZIP and
+method CSV, inspect the exact `GameAssembly` and Unity paths above, and look
+for a concrete callback that can be changed without touching note timing,
+audio, online state, or 1000 Hz controller polling. In parallel, examine the
+current generated assemblies and older source for visual-only per-frame work
+the game's settings cannot suppress. Batch independent, grounded fixes into
+one reviewable build; preserve existing SlopHero features. If a hot native
+caller remains unidentifiable from these exports, record that specific limit
+and keep working on the independent leads. Do not ask for the same ETL, WPA
+exports, assets, or PDB again.
+
 ## Build and evidence
 
-- Latest tested release: SlopHero **0.4.83**, code commit `07a8217`, on the
-  private `slophero-v1.1-alpha` branch. The uploaded three-run `Latest.log`
-  reports SHA-256 `8DFD151C5664E71831849636E6E95EBC89C603C697DB3300FEDFF95D8AA56E46`,
-  which matches the DLL inside `downloads/SlopHero-0.4.83-alpha.zip`.
-  Clone Hero is **1.1.0.6142**, Unity **2022.3.62f2**, with ClonZones 2.0.0
-  also loaded. There are no SlopHero errors in this log.
+- Latest released build: SlopHero **0.4.83** on the private
+  `slophero-v1.1-alpha` branch. The latest uploaded three-run `Latest.log`
+  is from that version; its SHA-256
+  `8DFD151C5664E71831849636E6E95EBC89C603C697DB3300FEDFF95D8AA56E46`
+  matches the DLL in that release ZIP. Clone Hero is **1.1.0.6142**, Unity
+  **2022.3.62f2**, with ClonZones 2.0.0 also loaded. This log has no
+  SlopHero errors. A small FC-ring cleanup is pending in source; it is not
+  a 0.4.84 release or a substitute for the open research above.
 - The exact UnityPlayer PDB is
   `UnityPlayer_Win64_player_il2cpp_x64.pdb`, GUID
   `6313482A-F658-4F38-906E-79EC0C4DBC51`, age 1. The earlier
@@ -86,6 +170,13 @@ prove causation; the earlier 9.478 ms maximum was a single mixed-bucket
 outlier. A new player neck is still discovered on its next apply pass.
 Canvas HUD sync averaged 0.009–0.018 ms, with one 4.821 ms maximum in run 1;
 the other two maxima were 0.165/0.228 ms. Treat that as an isolated outlier.
+
+The 0.4.83 capture showed 597 `FC rings` calls at a 0.003 ms average in the
+run with ring customization disabled. The pending source cleanup skips these
+empty calls while other visual settings are active, and still runs once to
+restore ring state after the user turns customization off. This is a small mod
+  cleanup with no measured frame-rate effect; do not release it alone as the
+answer to the broader optimization request.
 
 The capture's callback intervals are measured inside the mod. They do not
 measure displayed FPS, GPU time, or the full cost of Unity Canvas rendering.

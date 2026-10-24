@@ -3,6 +3,14 @@
 Read [docs/performance-handoff.md](docs/performance-handoff.md) before changing
 performance code. [docs/performance-audit.md](docs/performance-audit.md) is a
 chronological research record; older "next steps" there may be superseded.
+The handoff's **Still open: evidence to turn into code** section is essential.
+The existing Sloptifine switches implement only part of Sol's research. The
+unresolved `il2cpp_runtime_invoke` caller, Unity native attribution, and
+current-game visual setters remain investigations; do not describe them as
+implemented or ship a tiny mod cleanup as the complete optimization batch.
+Use the existing binaries, symbols, source archive, and captures to pursue
+several independent leads before building. A diagnostic log or another
+capture request alone is not the performance work the user asked for.
 The handoff indexes current mod code, older source, exact-game binaries,
 Unity symbols, logs, captures, and local raw uploads. `references/` and
 `/workspace/attachments` are not committed to Git; in a fresh environment,
@@ -29,3 +37,6 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
+An unreleased FC-ring no-op cleanup is in the source tree. The latest actual
+download is 0.4.83; there is no published 0.4.84 build. Keep those statuses
+separate when continuing the work.

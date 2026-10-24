@@ -1,6 +1,16 @@
 # Performance audit notes
 
-This is a chronological research record. For the current 0.4.83 state,
+### Unreleased FC ring maintenance cleanup
+
+The latest v0.4.83 three-run timing capture showed `RingColors.Update` being
+called in all 597 visual passes of the run where FC ring customization was
+off, despite having no cached rings to restore. The pending source change dispatches that
+routine only while customization is active or while cached rings remain to be
+restored after switching it off. This removes empty mod-side work while other
+visual settings are active. The measured per-call average was 0.003 ms; the
+change is a small cleanup, and it has no measured FPS or frame-pacing gain.
+
+This is a chronological research record. For the current 0.4.83 release,
 three-run comparison, and next actions, start with
 [performance-handoff.md](performance-handoff.md). Earlier proposed next steps
 below may already be implemented or superseded.
