@@ -1,5 +1,10 @@
 # Performance audit notes
 
+The first raw PresentMon baseline for v0.4.75 and its CPU/GPU interpretation
+are in [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
+It records 37,717 actual presented frames and the next native/Unity targets;
+use it before inferring gains from older Unity callback or WPA samples.
+
 ### v0.4.75 trace findings and mouse-path verification
 
 The supplied CPU export covers about 31 seconds. Its largest identified

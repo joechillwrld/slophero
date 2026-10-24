@@ -22,6 +22,7 @@ internal sealed class WhammyTextureThrottle
     private readonly List<MethodInfo> captureMethods = new();
     private MethodInfo? applyMethod;
     private MethodInfo? setPixelsMethod;
+    private MethodInfo? setPixelsImplMethod;
     private Texture? targetTexture;
     private IntPtr targetTexturePointer;
     private string lastTargetType = "not observed";
@@ -31,6 +32,10 @@ internal sealed class WhammyTextureThrottle
     private long skippedUploads;
     private long matchedColumnWrites;
     private long skippedColumnWrites;
+    private long matchedImplColumnWrites;
+    private long skippedImplColumnWrites;
+    private bool columnHookEverInstalled;
+    private bool implHookEverInstalled;
     private int globalTextureId;
     private bool installed;
     private bool failed;
@@ -39,7 +44,7 @@ internal sealed class WhammyTextureThrottle
     private bool gameplayActive;
 
     internal bool IsInstalled => installed;
-    internal bool IsColumnWriteHookInstalled => setPixelsMethod != null;
+    internal bool IsColumnWriteHookInstalled => setPixelsMethod != null || setPixelsImplMethod != null;
 
     internal void Update(HarmonyLib.Harmony harmony, bool enabled, bool isGameplay)
     {
@@ -87,7 +92,7 @@ internal sealed class WhammyTextureThrottle
         string matchState = matchedApplyCalls > 0
             ? "Texture2D.Apply calls matched the captured Unity object"
             : "no matching Texture2D.Apply calls were observed";
-        MelonLogger.Msg($"Sloptifine whammy upload experiment: wrapper={lastTargetType}, matchedApply={matchedApplyCalls}, allowed={allowedUploads}, skipped={skippedUploads}, columnSetPixelsHook={setPixelsMethod != null}, matchedWhammyColumnWrites={matchedColumnWrites}, skippedWhammyColumnWrites={skippedColumnWrites}; {matchState}; CPU upload cap, 200 Hz. GPU compute dispatch is unchanged.");
+        MelonLogger.Msg($"Sloptifine whammy upload experiment: wrapper={lastTargetType}, matchedApply={matchedApplyCalls}, allowed={allowedUploads}, skipped={skippedUploads}, columnHooksEverInstalled={columnHookEverInstalled}/{implHookEverInstalled}, matchedWhammyColumnWrites={matchedColumnWrites}, skippedWhammyColumnWrites={skippedColumnWrites}, implMatches={matchedImplColumnWrites}, implSkips={skippedImplColumnWrites}; {matchState}; CPU upload cap, 200 Hz. GPU compute dispatch is unchanged.");
     }
 
     private void InstallCaptureHooks(HarmonyLib.Harmony harmony)
@@ -174,6 +179,7 @@ internal sealed class WhammyTextureThrottle
                 nameof(BeforeWhammyColumnWrite), BindingFlags.Static | BindingFlags.NonPublic)!);
             harmony.Patch(setPixels, prefix: prefix);
             setPixelsMethod = setPixels;
+            columnHookEverInstalled = true;
         }
         catch (Exception ex)
         {
@@ -184,6 +190,35 @@ internal sealed class WhammyTextureThrottle
             }
             // The Apply cap still works when this Unity overload is absent.
             MelonLogger.Warning($"Sloptifine could not skip redundant whammy pixel writes; retaining the Apply-only cap: {ex.Message}");
+        }
+
+        // Unity's newer SetPixels overloads can route to this shared native
+        // implementation without entering the five-argument wrapper above.
+        // Patch it separately, with the same exact texture/shape guard. A
+        // missing implementation leaves the existing Apply cap in place.
+        MethodInfo? setPixelsImpl = null;
+        try
+        {
+            setPixelsImpl = typeof(Texture2D).GetMethod("SetPixelsImpl",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                types: new[] { typeof(int), typeof(int), typeof(int), typeof(int),
+                    typeof(Il2CppStructArray<Color>), typeof(int), typeof(int) }, modifiers: null)
+                ?? throw new MissingMethodException("Texture2D.SetPixelsImpl(int, int, int, int, Color[], int, int)");
+            var implPrefix = new HarmonyMethod(typeof(WhammyTextureThrottle).GetMethod(
+                nameof(BeforeWhammyColumnWriteImpl), BindingFlags.Static | BindingFlags.NonPublic)!);
+            harmony.Patch(setPixelsImpl, prefix: implPrefix);
+            setPixelsImplMethod = setPixelsImpl;
+            implHookEverInstalled = true;
+        }
+        catch (Exception ex)
+        {
+            if (setPixelsImpl != null)
+            {
+                try { harmony.Unpatch(setPixelsImpl, HarmonyPatchType.All, harmony.Id); }
+                catch { /* The Apply cap remains the fallback. */ }
+            }
+            MelonLogger.Warning($"Sloptifine could not gate lower-level whammy pixel writes; retaining other whammy hooks: {ex.Message}");
         }
     }
 
@@ -196,6 +231,12 @@ internal sealed class WhammyTextureThrottle
         }
         catch (Exception ex) { MelonLogger.Warning($"Sloptifine whammy SetPixels-hook cleanup failed: {ex.Message}"); }
         setPixelsMethod = null;
+        try
+        {
+            if (setPixelsImplMethod != null) harmony.Unpatch(setPixelsImplMethod, HarmonyPatchType.All, harmony.Id);
+        }
+        catch (Exception ex) { MelonLogger.Warning($"Sloptifine whammy SetPixelsImpl-hook cleanup failed: {ex.Message}"); }
+        setPixelsImplMethod = null;
         try
         {
             if (applyMethod != null) harmony.Unpatch(applyMethod, HarmonyPatchType.All, harmony.Id);
@@ -277,24 +318,39 @@ internal sealed class WhammyTextureThrottle
     private static bool BeforeWhammyColumnWrite(Texture2D __instance, int x, int y,
         int blockWidth, int blockHeight, Il2CppStructArray<Color> colors)
     {
+        return ShouldWriteColumn(__instance, x, y, blockWidth, blockHeight, colors, fromImpl: false);
+    }
+
+    private static bool BeforeWhammyColumnWriteImpl(Texture2D __instance, int x, int y,
+        int w, int h, Il2CppStructArray<Color> pixel, int miplevel, int frame)
+    {
+        if (miplevel != 0 || frame != 0) return true;
+        return ShouldWriteColumn(__instance, x, y, w, h, pixel, fromImpl: true);
+    }
+
+    private static bool ShouldWriteColumn(Texture2D texture, int x, int y,
+        int width, int height, Il2CppStructArray<Color> colors, bool fromImpl)
+    {
         // The older renderer writes each frame as a single column at y=0
         // across all 24 instrument lanes. Row clears are 1024x1 and must
         // continue to run; unrelated texture writes also pass through.
-        if (x < 0 || y != 0 || blockWidth != 1 || blockHeight != 24
+        if (x < 0 || y != 0 || width != 1 || height != 24
             || colors == null || colors.Length != 24)
             return true;
 
         WhammyTextureThrottle? instance = active;
         if (instance == null || !instance.requested || !instance.gameplayActive
-            || instance.targetTexturePointer == IntPtr.Zero || __instance.Pointer != instance.targetTexturePointer)
+            || instance.targetTexturePointer == IntPtr.Zero || texture.Pointer != instance.targetTexturePointer)
             return true;
 
         instance.matchedColumnWrites++;
+        if (fromImpl) instance.matchedImplColumnWrites++;
         long last = instance.lastUploadTimestamp;
         if (last == 0 || Stopwatch.GetTimestamp() - last >= MinimumUploadIntervalTicks)
             return true;
 
         instance.skippedColumnWrites++;
+        if (fromImpl) instance.skippedImplColumnWrites++;
         return false;
     }
 }
