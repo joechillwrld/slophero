@@ -37,7 +37,8 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.86. It extends the default-off solo UI-event
-pause to disable Unity's live EventSystem component, based on the measured
-raycast call path. This is a candidate CPU-work reduction without a matched
-FPS result; it is not the complete native optimization project.
+The latest packaged build is 0.4.87. It caches SlopHero's configured joystick
+binding lookup while preserving Rewired's polling rate. Version 0.4.86 extends
+the default-off solo UI-event pause to disable Unity's live EventSystem
+component, based on the measured raycast call path. Neither change has a
+matched FPS result; this is not the complete native optimization project.

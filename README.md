@@ -1,11 +1,14 @@
-# SlopHero 0.4.86 alpha
+# SlopHero 0.4.87 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.86
+build, compiled against its loader and generated assemblies. Version 0.4.87
+resolves configured joystick bindings once per second instead of enumerating
+the joystick list on every mod update. It leaves Rewired's polling rate and
+the game's instrument input untouched. Version 0.4.86
 uses the existing default-off UI-event pause to disable the Unity EventSystem
 component during eligible solo songs, removing its per-frame update dispatch
 as well as mouse raycasts. It restores the component and prior UI selection on
@@ -90,7 +93,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.86 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.86-alpha.zip)
+[Download SlopHero v0.4.87 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.87-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

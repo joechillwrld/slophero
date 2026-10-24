@@ -2022,3 +2022,45 @@ contributes only about 22 ms in the sample, `LyricDisplay.Update` about 4 ms,
 rows do not support broad patches to those features. The native camera/culling
 branch remains the larger unresolved engine area; its Unity calls are shared
 render/cull scheduling, not a safe target to skip wholesale.
+
+### v0.4.87 screening of input, rendering, visual setters, and optional hooks
+
+I reviewed the four live leads together against the exact-build WPA export,
+the matching UnityPlayer symbols, current native mappings, mod hook scopes,
+and the latest runtime log. The 2,116 ms Rewired row is inclusive weight in
+Rewired's own `InputManager_Base.DoUpdate`; it is not SlopHero hotkey cost. The
+mod's `InputBinding.Pressed` did add a separate full `Joysticks` list scan for
+each configured joystick hotkey on every `Core.OnUpdate`. Version 0.4.87 caches
+the matching joystick wrapper and repeats that ID lookup once per second, with
+re-resolution after Rewired becomes unready. It still asks `GetButton` on each
+existing hotkey poll and does not change Rewired's configured 1000 Hz hardware
+polling, guitar input, or note timing. The likely gain is limited to mod-side
+lookup overhead; there is no matched FPS measurement.
+
+The render/cull rows (`PlayerRender`, `RenderManager::RenderCameras`,
+`Camera::CustomRender`, `Camera::CustomCull`, scene extraction) remain broad,
+nested Unity costs. The static scene has a background camera that clears the
+screen and owns the video layer, a separate HUD camera, and a runtime-created
+camera in the live snapshot. The capture does not identify a particular camera
+or renderer as redundant. Disabling a camera, culling layer, or render queue
+based on aggregate inclusive weights would risk removing the highway, video,
+or HUD without a proven saving, so no native render bypass was added.
+
+The highway and fret candidates also lack a safe narrower patch point in this
+setup. `HighwayScroll.Update`'s property block changes with song time and the
+same native update advances fades/video; the existing whole-update option is
+already a visible freeze. `GuitarFretAnimator.Update`'s repeated sorting writes
+are behind ClonZones' settle gate in the supplied runtime. A second hook would
+either duplicate that gate or add setter interception overhead. The exported
+exclusive timing does not show either target as a material frame cost. Keep
+both as measured leads rather than add another default-off switch without a
+clear boundary.
+
+Finally, the broad EventSystem pause introduced in 0.4.86 is the strong UI
+target: when active, it removes the entire event dispatch and raycast path, so
+the mouse-only hook cannot add an independent saving during that scope. In
+other states the mouse-only option still works. The worker cap and whammy gate
+remain default-off because prior runs did not establish a win. This review
+found one narrow input-side optimization and no evidence-backed reason to
+change controller polling, scoring, Unity camera/cull scheduling, or the
+ClonZones-owned fret path.

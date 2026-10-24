@@ -58,6 +58,7 @@ the Sloptifine pages and preserve their documented scope:
 | Hidden beatline, leaderboard, particles, fret fades, combo smoke and star-progress effects continued some work while invisible/unused | `VisualOverrides`, `HiddenLeaderboardOverride`, `PerformanceOverrides`, `ComboSmokeScrollOverride`, and `StarProgressParticleOverride` offer separate controls and restore prior state. Scene discoveries and limitations are in the audit. |
 | Exact Gameplay scene script map shows hidden leaderboard layout and offline spectator polling | The existing default-off hidden leaderboard switch now pauses six `AspectRatioFitter` updates while the score list is invisible and `SpectatorCount.FixedUpdate` while offline. It restores both when needed and checks component states only once per second during stable visibility. No frame gain is measured yet. |
 | Old source showed a per-tick cheat-code scan; current component lookup was unreliable | `CheatScannerOverride` targets `CheatManager.Update()` directly, only during eligible offline solo play. It does not replace guitar input or disable the component. |
+| SlopHero's restart/practice shortcuts resolved a joystick ID by scanning the full Rewired joystick list on every mod update | Since v0.4.87, `InputBinding` caches the matching joystick wrapper and refreshes that lookup once per second (and after Rewired becomes unready). The `GetButton` state query still runs at the same mod-update cadence; Rewired's configured device polling is unchanged. This reduces duplicate lookup work, not the measured 2.1 seconds inside Rewired's own `DoUpdate`. |
 | Unity job queue setter was resolved through the matching player PDB | `UnityJobWorkerLimit` uses the generated `SetJobQueueMaximumActiveThreadCount` API and restores the prior limit. It is default-off; the latest three-run callback comparison shows no benefit. |
 | Current `HighwayScroll.Update` combines property-block writes with video/fade behavior | `HighwayAnimationOverride` is a default-off whole-update freeze during offline solo songs. It may freeze those visuals and has no demonstrated frame gain. The old source's note `yield`/hit-detection paths remain untouched because they are scoring-sensitive and not confirmed in current code. |
 
@@ -251,7 +252,7 @@ online behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.86** on the private
+- Latest packaged build: SlopHero **0.4.87** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.85 (SHA-256
   `1FCC576612A1973E6E90D3ED692F6B50A0E2A7C4503D00C7575D3D4C2F5F4CB6`);
@@ -262,13 +263,16 @@ online behavior, 1000 Hz input polling, and existing SlopHero features.
   switch, and adds a default-off restart-required drum MIDI shutdown using the
   game cleanup path. Version 0.4.86 extends the existing default-off solo UI
   event pause to disable the live EventSystem component during eligible
-  offline gameplay and restore it plus menu selection on exit. The code builds
-  with zero warnings/errors and core checks pass (101 checks). This is a
-  measured-path optimization candidate, not a measured FPS gain; no 0.4.86
-  in-game run has been supplied yet. The 0.4.86 DLL SHA-256 is
-  `0EF5736EEE178FE067AFBF2C0278A244084301C8BC1042EF9E482ADE577A505E`, and
-  the ZIP SHA-256 is
-  `40FAD8B7644D602991821FA2CE3E6A0FD8F74535E64E0174AB436775DDD33506`.
+  offline gameplay and restore it plus menu selection on exit. Version 0.4.87
+  avoids scanning Rewired's joystick list for SlopHero hotkeys on every mod
+  update; it does not change controller polling or the game's input path. Both
+  are candidates without matched PresentMon A/B results. The 0.4.86 hashes
+  remain below as historical package evidence. The current 0.4.87 package
+  builds with zero warnings/errors and core checks pass (101 checks). The
+  package SHA-256 is
+  `29F9CC2A13B1E7D99A15D9E137E16E3B358CA8488276EC47FE84666BCD5315A6`, and
+  the DLL SHA-256 is
+  `82B3B7E4DF57E2A4BBAFEAE2B7DEACEFF3A9496DA9DF5F43252CBFF7B1D0E1E4`.
   Version 0.4.84 ships the
   FC-ring no-op cleanup and extends the default-off hidden leaderboard switch
   to pause its six layout fitters

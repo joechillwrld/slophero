@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.86", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.87", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -363,8 +363,8 @@ public sealed partial class Core : MelonMod
             // transition readiness refresh at 20 Hz.
             bool shortcutContext = gameplay && gameplayInitialized && !transition
                 && !settingsOpen && !moveHud && resizeTarget < 0 && Application.isFocused;
-            bool restartPressed = shortcutContext && InputBinding.Pressed(restartButton.Value, ref restartBinding);
-            bool practicePressed = shortcutContext && InputBinding.Pressed(practiceButton.Value, ref practiceBinding);
+            bool restartPressed = shortcutContext && InputBinding.Pressed(restartButton.Value, ref restartBinding, now);
+            bool practicePressed = shortcutContext && InputBinding.Pressed(practiceButton.Value, ref practiceBinding, now);
             bool statsRefreshDue = gameplay && gameplayInitialized && now >= nextStats;
             bool gameStateRefreshDue = now >= nextGameStateRefresh;
             if (!shortcutContext && !gameplay)

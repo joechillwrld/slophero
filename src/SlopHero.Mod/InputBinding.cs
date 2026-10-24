@@ -12,6 +12,8 @@ internal static class InputBinding
         public KeyCode Key;
         public int JoystickId;
         public int Button;
+        public double NextJoystickResolve;
+        public Joystick? Joystick;
         public bool IsJoystick;
         public bool Valid;
     }
@@ -19,7 +21,7 @@ internal static class InputBinding
     private static readonly KeyCode[] Keys = Enum.GetValues<KeyCode>().Distinct()
         .Where(k => k != KeyCode.None && (int)k < (int)KeyCode.JoystickButton0).ToArray();
 
-    public static bool Pressed(string binding, ref Cache cache)
+    public static bool Pressed(string binding, ref Cache cache, double now)
     {
         if (!string.Equals(cache.Text, binding, StringComparison.Ordinal))
         {
@@ -27,15 +29,43 @@ internal static class InputBinding
         }
         if (!cache.Valid) return false;
         if (!cache.IsJoystick) return Input.GetKey(cache.Key);
-        if (!ReInput.isReady) return false;
-        var joysticks = ReInput.controllers.Joysticks;
-        for (int i = 0; i < ReInput.controllers.joystickCount; i++)
+        if (!ReInput.isReady)
+        {
+            // Rewired can rebuild its controller list during startup or a
+            // device reset. Drop the old wrapper so the next ready pass binds
+            // a fresh controller rather than touching a stale native object.
+            cache.Joystick = null;
+            cache.NextJoystickResolve = now;
+            return false;
+        }
+
+        // ReInput already polls the physical device at the user's configured
+        // rate. SlopHero only needs the configured button's current state; do
+        // not enumerate every connected joystick on every Unity update just
+        // to resolve the same device ID. Refresh occasionally for hot-plug and
+        // controller-list changes without changing input sampling frequency.
+        if (cache.Joystick == null || now >= cache.NextJoystickResolve)
+        {
+            cache.Joystick = FindJoystick(cache.JoystickId);
+            cache.NextJoystickResolve = now + 1.0;
+        }
+
+        var joystick = cache.Joystick;
+        return joystick != null && joystick.isConnected
+            && cache.Button < joystick.buttonCount && joystick.GetButton(cache.Button);
+    }
+
+    private static Joystick? FindJoystick(int id)
+    {
+        var controllers = ReInput.controllers;
+        var joysticks = controllers.Joysticks;
+        int count = controllers.joystickCount;
+        for (int i = 0; i < count; i++)
         {
             var joystick = joysticks[i];
-            if (joystick.id == cache.JoystickId && cache.Button < joystick.buttonCount)
-                return joystick.GetButton(cache.Button);
+            if (joystick.id == id) return joystick;
         }
-        return false;
+        return null;
     }
 
     private static Cache Parse(string binding)
