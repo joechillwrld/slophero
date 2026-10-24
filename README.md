@@ -1,18 +1,19 @@
-# SlopHero 0.4.75 alpha
+# SlopHero 0.4.76 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that keep gameplay timing, controller polling, and existing mod
 features intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.75
-adds a zero-allocation counter for mouse UI calls actually bypassed by the
-raycast experiment, reported at shutdown so its engagement is visible in the
-normal log. Version 0.4.74 attempted an additional 1×24 CPU pixel-write
-gate, but current-game disassembly shows that the whammy path writes through
-`NativeArray<byte>` and the observed write-hook match count was zero. The
-unproductive write hook has been removed; the default-off texture-upload cap
-remains available. Version 0.4.73
+build, compiled against its loader and generated assemblies. Version 0.4.76
+removes the zero-match whammy pixel-write hooks after current-game disassembly
+showed that whammy data is written through a raw byte buffer. The existing
+default-off texture-upload cap remains. Version 0.4.75 added a zero-allocation
+counter for mouse UI calls actually bypassed by the raycast experiment,
+reported at shutdown so its engagement is visible in the normal log. Version
+0.4.74 added a 1×24 CPU pixel-write gate based on the older source. Current
+game disassembly shows the whammy path writes through `NativeArray<byte>`; the
+hook saw no matches and was removed in 0.4.76. Version 0.4.73
 fixes the mouse-raycast experiment to intercept the integer overload that
 Clone Hero actually calls during gameplay; the old wrapper hook only appeared
 installed and did not stop the measured path. Version 0.4.72 checks the two
@@ -43,7 +44,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.75 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.75-alpha.zip)
+[Download SlopHero v0.4.76 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.76-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
