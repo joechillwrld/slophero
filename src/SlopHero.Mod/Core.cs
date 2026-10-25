@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.88", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.89", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -122,6 +122,7 @@ public sealed partial class Core : MelonMod
         lastGameplayUiSuspendState = null;
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
+        legacyMouseEvents.Clear();
         highwayAnimations.Clear(HarmonyInstance);
         lastHighwayPauseSetting = null;
         nextOptionalHookSettingsPass = 0;
@@ -194,6 +195,7 @@ public sealed partial class Core : MelonMod
         lastGameplayUiSuspendState = null;
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
+        legacyMouseEvents.Clear();
         highwayAnimations.Clear(HarmonyInstance);
         lastHighwayPauseSetting = null;
         nextOptionalHookSettingsPass = 0;
@@ -262,6 +264,7 @@ public sealed partial class Core : MelonMod
                 if (settingsOpen || moveHud || resizeTarget >= 0)
                 {
                     mouseUiGameplay.Disable();
+                    legacyMouseEvents.Disable();
                     cheatScanner.Disable();
                     gameplayUiEvents.Disable();
                     highwayAnimations.SetSuppressed(false);
@@ -308,6 +311,7 @@ public sealed partial class Core : MelonMod
                 UpdateCursor();
             }
             if (!Application.isFocused && mouseUiGameplay.IsInstalled) mouseUiGameplay.Disable();
+            if (!Application.isFocused && legacyMouseEvents.IsInstalled) legacyMouseEvents.Disable();
             if (!Application.isFocused) highwayAnimations.SetSuppressed(false);
             if (capture != null)
             {
@@ -454,10 +458,11 @@ public sealed partial class Core : MelonMod
             }
             lastStatsSongPlaying = songPlaying;
             bool skipMouseUiRequested = skipGameplayMouseUi.Value;
-            bool mouseUiGameplayActive = skipMouseUiRequested && ready && songPlaying && !game!.isPaused && !game.isSongOver
+            bool activeSongMouseSuppression = ready && songPlaying && !game!.isPaused && !game.isSongOver
                 && game.coroutinesRunning == 0 && !transition && !settingsOpen && !moveHud
                 && resizeTarget < 0 && Application.isFocused;
-            mouseUiGameplay.Update(HarmonyInstance, skipMouseUiRequested, mouseUiGameplayActive);
+            mouseUiGameplay.Update(HarmonyInstance, skipMouseUiRequested, skipMouseUiRequested && activeSongMouseSuppression);
+            legacyMouseEvents.Update(skipLegacyMouseEvents.Value, activeSongMouseSuppression);
             if (ready) CompletePracticeTransition(game!);
             bool allow = shortcutCandidate && isOfflineSolo;
             if (restartHold.Update(allow && restartPressed, allow, now, Duration))
@@ -558,6 +563,7 @@ public sealed partial class Core : MelonMod
         {
             // Disable on a binding failure instead of retrying bad game calls every frame.
             mouseUiGameplay.Clear(HarmonyInstance);
+            legacyMouseEvents.Clear();
             whammyTextureThrottle.Clear(HarmonyInstance);
             unityJobWorkerLimit.Clear();
             compatible = false;
@@ -576,6 +582,7 @@ public sealed partial class Core : MelonMod
         var pause = game.pauseMenu?.GetComponent<PauseMenu>();
         if (pause == null) { Notice("Could not find the game's restart handler."); return; }
         mouseUiGameplay.Disable();
+        legacyMouseEvents.Disable();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
         restartHold.RequireRelease();
@@ -596,6 +603,7 @@ public sealed partial class Core : MelonMod
         sourceManager = game.Pointer;
         practiceWaitState = "";
         mouseUiGameplay.Disable();
+        legacyMouseEvents.Disable();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
         restartHold.RequireRelease();
@@ -951,8 +959,8 @@ public sealed partial class Core : MelonMod
 
     public override void OnDeinitializeMelon()
     {
-        mouseUiGameplay.LogSummary();
         mouseUiGameplay.Clear(HarmonyInstance);
+        legacyMouseEvents.Clear();
         gameplayUiEvents.Clear(HarmonyInstance);
         highwayAnimations.Clear(HarmonyInstance);
         rings.Clear(HarmonyInstance);

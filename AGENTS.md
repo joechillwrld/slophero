@@ -37,8 +37,13 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.87. It caches SlopHero's configured joystick
-binding lookup while preserving Rewired's polling rate. Version 0.4.86 extends
+The latest packaged build is 0.4.89. It adds a default-off exact-build native
+detour that skips Unity's legacy camera mouse callbacks only during active
+gameplay, and removes the mouse-raycast hook's per-call diagnostic counter
+increment. It preserves Rewired's polling rate and instrument input. Version
+0.4.88 adds the default-off TMP scale-update experiment. Version 0.4.87
+caches SlopHero's configured joystick binding lookup while preserving
+Rewired's polling rate. Version 0.4.86 extends
 the default-off solo UI-event pause to disable Unity's live EventSystem
 component, based on the measured raycast call path. Neither change has a
 matched FPS result; this is not the complete native optimization project.

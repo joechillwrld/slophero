@@ -24,6 +24,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> disableStarProgressParticles = null!;
     private MelonPreferences_Entry<bool> stopMidiInput = null!, disableMidiForSession = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!, useCanvasCounterHud = null!, freezeComboSmokeScroll = null!;
     private MelonPreferences_Entry<bool> skipGameplayMouseUi = null!;
+    private MelonPreferences_Entry<bool> skipLegacyMouseEvents = null!;
     private MelonPreferences_Entry<bool> throttleWhammyTexture = null!;
     private MelonPreferences_Entry<bool> pauseGameplayCheatScanner = null!;
     private MelonPreferences_Entry<bool> pauseGameplayUiProcessing = null!;
@@ -40,6 +41,7 @@ public sealed partial class Core
     private readonly HiddenLeaderboardOverride hiddenLeaderboard = new();
     private readonly ComboSmokeScrollOverride comboSmokeScroll = new();
     private readonly MouseUiGameplayOverride mouseUiGameplay = new();
+    private readonly LegacyMouseEventsDetour legacyMouseEvents = new();
     private readonly WhammyTextureThrottle whammyTextureThrottle = new();
     private readonly StarProgressParticleOverride starProgressParticles = new();
     private readonly CheatScannerOverride cheatScanner = new();
@@ -134,6 +136,7 @@ public sealed partial class Core
         useCanvasCounterHud = preferences.CreateEntry("PerformanceCanvasCounterHud", false);
         freezeComboSmokeScroll = preferences.CreateEntry("PerformanceFreezeComboSmokeScroll", false);
         skipGameplayMouseUi = preferences.CreateEntry("PerformanceSkipGameplayMouseUi", false);
+        skipLegacyMouseEvents = preferences.CreateEntry("PerformanceSkipLegacyMouseEvents", false);
         throttleWhammyTexture = preferences.CreateEntry("PerformanceThrottleWhammyTexture", false);
         pauseGameplayCheatScanner = preferences.CreateEntry("PerformancePauseGameplayCheatScanner", false);
         pauseGameplayUiProcessing = preferences.CreateEntry("PerformancePauseGameplayUiProcessing", false);
@@ -247,7 +250,7 @@ public sealed partial class Core
                             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
                             || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                         SongSpeedControl.TryRead(out int speedSetting);
-                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret/starProgress)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}/{disableStarProgressParticles.Value}[starSuppressed={starProgressParticles.IsSuppressed}], pausedFretFadeScripts={performance.PausedFretFadeCount}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI(discovery/session)={stopMidiInput.Value}/{disableMidiForSession.Value}, Discord={disableDiscordPresence.Value}, cheatScanner={pauseGameplayCheatScanner.Value}[state={cheatScanner.Status}], gameplayUiEvents={pauseGameplayUiProcessing.Value}[suspended={gameplayUiEvents.IsSuspended}], highwayPause={pauseHighwayAnimations.Value}[hook={highwayAnimations.IsInstalled},suppressed={highwayAnimations.IsSuppressed}], mouseUiSkip={skipGameplayMouseUi.Value}[hook={mouseUiGameplay.IsInstalled},suppressed={mouseUiGameplay.IsSuppressed}], whammyDirtyGate={throttleWhammyTexture.Value}[hooks={whammyTextureThrottle.IsInstalled}], nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret/starProgress)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}/{disableStarProgressParticles.Value}[starSuppressed={starProgressParticles.IsSuppressed}], pausedFretFadeScripts={performance.PausedFretFadeCount}, hiddenLeaderboard={suspendHiddenLeaderboard.Value}, freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI(discovery/session)={stopMidiInput.Value}/{disableMidiForSession.Value}, Discord={disableDiscordPresence.Value}, cheatScanner={pauseGameplayCheatScanner.Value}[state={cheatScanner.Status}], gameplayUiEvents={pauseGameplayUiProcessing.Value}[suspended={gameplayUiEvents.IsSuspended}], highwayPause={pauseHighwayAnimations.Value}[hook={highwayAnimations.IsInstalled},suppressed={highwayAnimations.IsSuppressed}], mouseUiSkip={skipGameplayMouseUi.Value}[hook={mouseUiGameplay.IsInstalled},suppressed={mouseUiGameplay.IsSuppressed}], legacyMouseEvents={skipLegacyMouseEvents.Value}[hook={legacyMouseEvents.IsInstalled},suppressed={legacyMouseEvents.IsSuppressed}], whammyDirtyGate={throttleWhammyTexture.Value}[hooks={whammyTextureThrottle.IsInstalled}], nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                         LogGameplaySnapshot();
                         timings.Start();
                     }
@@ -351,14 +354,15 @@ public sealed partial class Core
             case 9:
                 SectionHeader("Engine and scheduler experiments", x, y);
                 Toggle(skipGameplayMouseUi, "Skip mouse UI raycasts during gameplay", x, y + 26);
-                Toggle(throttleWhammyTexture, "Skip duplicate whammy texture uploads", x, y + 60);
-                Toggle(pauseGameplayCheatScanner, "Pause cheat-code scanner during solo songs", x, y + 94);
-                Toggle(pauseGameplayUiProcessing, "Pause UI events during solo songs (also pauses UI navigation)", x, y + 128);
-                Toggle(pauseHighwayAnimations, "Freeze highway, video, and track-fade visuals in solo play", x, y + 162);
-                Toggle(reduceUnityJobWorkers, "Use one fewer Unity job worker during offline solo songs", x, y + 196);
-                Toggle(disableMidiForSession, "Disable drum MIDI input (restart to restore)", x, y + 232);
+                Toggle(skipLegacyMouseEvents, "Skip legacy camera mouse events during gameplay", x, y + 56);
+                Toggle(throttleWhammyTexture, "Skip duplicate whammy texture uploads", x, y + 86);
+                Toggle(pauseGameplayCheatScanner, "Pause cheat-code scanner during solo songs", x, y + 116);
+                Toggle(pauseGameplayUiProcessing, "Pause UI events during solo songs (also pauses UI navigation)", x, y + 146);
+                Toggle(pauseHighwayAnimations, "Freeze highway, video, and track-fade visuals in solo play", x, y + 176);
+                Toggle(reduceUnityJobWorkers, "Use one fewer Unity job worker during offline solo songs", x, y + 206);
+                Toggle(disableMidiForSession, "Disable drum MIDI input (restart to restore)", x, y + 236);
                 Toggle(staticTmpScaleDuringSong, "Skip TMP scale checks in offline solo play", x, y + 266);
-                GUI.Label(new Rect(x + 22, y + 300, 610, 92), "Experimental; default off. TMP layout and graphic rebuilds stay enabled. Scale-changing or animated labels are left alone; changes restore on pause, menus, online play, scene changes, or unload. The worker limit restores on the same transitions. Drum MIDI shutdown requires a restart to restore.");
+                GUI.Label(new Rect(x + 22, y + 300, 610, 118), "Experimental; default off. Legacy mouse callbacks from Clone Hero or other mods are skipped only during active gameplay; vanilla callbacks return on pause, menus, or focus loss. Mouse UI raycasts are a separate switch. TMP layout and graphic rebuilds stay enabled. Scale-changing or animated labels are left alone; changes restore on pause, menus, scene changes, or unload. The worker limit restores on those transitions. Drum MIDI shutdown requires a restart to restore.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -809,6 +813,7 @@ public sealed partial class Core
             Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
             Bool("PerformanceFreezeComboSmokeScroll", freezeComboSmokeScroll);
             Bool("PerformanceSkipGameplayMouseUi", skipGameplayMouseUi);
+            Bool("PerformanceSkipLegacyMouseEvents", skipLegacyMouseEvents);
             Bool("PerformanceThrottleWhammyTexture", throttleWhammyTexture);
             Bool("PerformancePauseGameplayCheatScanner", pauseGameplayCheatScanner);
             Bool("PerformancePauseGameplayUiProcessing", pauseGameplayUiProcessing);
@@ -857,6 +862,7 @@ public sealed partial class Core
         Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
         Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
         Bool("PerformanceSkipGameplayMouseUi", skipGameplayMouseUi);
+        Bool("PerformanceSkipLegacyMouseEvents", skipLegacyMouseEvents);
         Bool("PerformanceThrottleWhammyTexture", throttleWhammyTexture);
         Bool("PerformancePauseGameplayCheatScanner", pauseGameplayCheatScanner);
         Bool("PerformancePauseGameplayUiProcessing", pauseGameplayUiProcessing);

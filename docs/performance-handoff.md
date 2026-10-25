@@ -61,7 +61,7 @@ the Sloptifine pages and preserve their documented scope:
 | SlopHero's restart/practice shortcuts resolved a joystick ID by scanning the full Rewired joystick list on every mod update | Since v0.4.87, `InputBinding` caches the matching joystick wrapper and refreshes that lookup once per second (and after Rewired becomes unready). The `GetButton` state query still runs at the same mod-update cadence; Rewired's configured device polling is unchanged. This reduces duplicate lookup work, not the measured 2.1 seconds inside Rewired's own `DoUpdate`. |
 | Unity job queue setter was resolved through the matching player PDB | `UnityJobWorkerLimit` uses the generated `SetJobQueueMaximumActiveThreadCount` API and restores the prior limit. It is default-off; the latest three-run callback comparison shows no benefit. |
 | Current `HighwayScroll.Update` combines property-block writes with video/fade behavior | `HighwayAnimationOverride` is a default-off whole-update freeze during offline solo songs. It may freeze those visuals and has no demonstrated frame gain. The old source's note `yield`/hit-detection paths remain untouched because they are scoring-sensitive and not confirmed in current code. |
-| TMP's SDF scale queue repeatedly checks text transforms | The worktree adds a default-off offline-solo experiment. It marks active Gameplay labels without Animator/Animation parents static, checks cached scales at 4 Hz, and restores their original flags on pause, menu/editor, focus loss, online transition, scene exit, or unload. The source compiles with no warnings; layout, graphic-rebuild, and culling queues remain active. It is not in the packaged DLL and has no runtime result. |
+| TMP's SDF scale queue repeatedly checks text transforms | v0.4.88 packages the default-off offline-solo experiment. It marks active Gameplay labels without Animator/Animation parents static, checks cached scales at 4 Hz, and restores their original flags on pause, menu/editor, focus loss, online transition, scene exit, or unload. Layout, graphic-rebuild, and culling queues remain active. It has no runtime result yet. |
 
 ClonZones installs a `GuitarFretAnimator.Update` settle gate in the user's
 setup, which may overlap with another fret hook. Current `HighwayScroll` also
@@ -203,6 +203,158 @@ methods; skipping it could suppress unrelated game lifecycle, UI, scoring,
 and mod callbacks. The useful target would be one specific caller or callback
 whose own cost is high, not the common dispatch bridge.
 
+### Rendering follow-up (2026-10-25)
+
+The exact Gameplay scene and generated current-build `SongBackground` class
+narrow the background-render lead. `Background Cam` is the screen-clear
+camera and owns layer 13; `HUDCam` renders layers 5 and 12 without clearing.
+Both serialized cameras use the Forward path with HDR/MSAA and occlusion
+culling disabled, and neither targets a render texture. A third gameplay
+camera is supplied at runtime, so the scene file alone cannot attribute the
+full `RenderCameras` WPA branch to a specific camera.
+
+On `Background Image`, Unity's `Image` component is disabled. The enabled
+`VideoPlayer` has no serialized clip or URL, does not play on awake, and waits
+for an explicit prepare/play path. The `SongBackground` class has `Start` and
+`OnDestroy` but no per-frame `Update`; its image/video work is driven by
+song-selection and playback callbacks. The supplied runtime snapshot also
+reported one enabled but non-playing video player. This does not support an
+always-on background video tick as a target. Disabling the background camera
+itself would remove its screen clear and song-background layer, and would be
+visibly wrong.
+
+The same image object has an enabled `AspectRatioFitter`, so I checked its
+exact current-build implementation rather than assuming it recalculates every
+frame. `AspectRatioFitter.Update` at GameAssembly RVA `0x2AA2850` tests its
+`m_DelayedSetDirty` flag and returns immediately when clear; only a pending
+layout change calls `UpdateRect`. On a stable hidden image this leaves a tiny
+callback/branch, not continuous layout work. Disabling and re-enabling the
+component would also invalidate layout, so there is no case for adding another
+hook without a trace that attributes meaningful cost to it.
+
+The WPA tree still makes camera rendering/culling the strongest Unity-side
+lead: `PlayerRender` is 11,463 ms inclusive, `RenderCameras` 10,344 ms,
+`Camera::CustomRender` 5,440 ms, and its `Camera::CustomCull` sibling 4,654
+ms. `CullResults::GetOrCreateSharedRendererScene` is 2,314 ms and
+`ExtractSceneRenderNodeQueue` 2,006 ms. These are overlapping sampled weights,
+not exclusive costs, and the trace does not name the camera or renderers
+responsible. Existing scene counts (3 live cameras, 12 canvases, 181–201
+enabled SpriteRenderers) cannot identify draw cost; measured GPU busy time is
+also substantially below CPU busy time. The 283 ms SpriteMask job remains too
+small to justify a new toggle.
+
+The user does not use chart backgrounds, and Clone Hero already exposes
+background image/video controls. A Sloptifine duplicate-disable switch would
+not currently target a measured recurring cost and could only save decoding
+or uploads when a video is actually active. No background or camera override
+was added. To reopen that branch, first compare a matched video-background-on
+run with an otherwise identical no-video run, or obtain per-camera CPU/GPU
+render attribution. Keep the existing camera masks, gameplay notes, and
+instrument visuals intact while pursuing renderer-side gains.
+
+### ETW aggregation and raycast pass (2026-10-25)
+
+The stack CSV export groups identical stacks and replaces unresolved
+GameAssembly frames with `<PDB not found>` without retaining their RVAs. Those
+lost frame addresses cannot be recovered from that CSV, so re-exporting the
+same stack view will not make its collapsed GameAssembly paths more specific.
+The existing ETWAnalyzer method CSV does retain each sampled GameAssembly
+instruction RVA. `tools/symbolize_etw_methods.py` joins those rows to the exact
+build's Il2CppDumper `script.json`; it mapped 3,191 of 21,945 rows in the
+supplied `Sloptifine-CPU.csv`. The detailed output keeps original timing
+columns and adds a method name, signature, and offset into the mapped method.
+Its 0x2000 default limit leaves the distant shared-dispatch offsets unresolved
+instead of guessing a method. Add `--summary-csv` for a second, flat report
+that combines instruction-RVA rows by exact method entry and sorts by `CPU ms`:
+
+```text
+python tools/symbolize_etw_methods.py Sloptifine-CPU.csv script.json Sloptifine-CPU-symbolized.csv --summary-csv Sloptifine-CPU-by-method.csv
+```
+
+The detailed file is best for tracing individual hot instruction offsets; the
+flat report is best for sorting candidate methods. The flat report is still
+aggregated sample weight, not raw timestamped samples, and its totals should
+not be added to WPA's inclusive caller/callee weights.
+
+The exact raycast chain is now easy to isolate in that output:
+`EventSystem.Update` (1,610 ms), `StandaloneInputModule.Process` (1,484 ms),
+`ProcessMouseEvent(int)` (1,451 ms), `GetMousePointerEventData(int)` (1,394
+ms), `EventSystem.RaycastAll` (1,358 ms), `GraphicRaycaster.Raycast` (1,105
+and 914 ms across its two overloads), and
+`RectangleContainsScreenPoint` (906 ms). These rows are nested/overlapping
+weights from the same older 31.1-second capture, not additive costs or a
+current FPS result.
+
+The exact Gameplay scene has four enabled `GraphicRaycaster`s and no
+`PhysicsRaycaster`. Three are single-Image canvases named `HUD Drag Handle`;
+the fourth is on a canvas with no serialized Graphic component. This narrows
+the UI raycast inventory, but the scene data does not reveal the handles'
+runtime `raycastTarget` or editing visibility. The existing default-off
+mouse-only hook remains the safest complete suppression: it bypasses
+`ProcessMouseEvent(int)` before pointer-data allocation and all raycasters,
+while preserving keyboard/controller navigation and the separate Rewired
+instrument polling. The broad EventSystem option also suppresses those
+raycasts, but is not additive and pauses UI navigation too. I removed the
+mouse hook's per-call skipped-count increment; the active prefix now only
+checks its cached state and returns, so no diagnostic write runs on each
+suppressed frame.
+
+There is no useful global "disable aggregation" switch for WPA's sampled-CPU
+stack table: it groups matching call stacks by design. To focus it, select a
+short time window on the existing graph and then copy the expanded table rows;
+this limits the grouped window without pretending the result is raw events.
+The current stack CSV has irreversibly lost unresolved GameAssembly frame IPs.
+The retained method CSV is the better existing artifact for exact function
+attribution; the mapper added no new logging and requires no new capture.
+
+The raycast bypass already exists in v0.4.88 as **Skip mouse UI raycasts
+during gameplay**. It patches the measured `ProcessMouseEvent(int)` path before
+pointer-data creation and `GraphicRaycaster` calls, while preserving keyboard,
+controller navigation, Rewired instrument polling, and controller polling
+rate. It is default-off. Do not enable the separate broad EventSystem pause at
+the same time when judging the mouse-only effect, since the broad option
+already prevents this path from running. I removed the mouse hook's per-call
+diagnostic increment; the suppressed path now only reads its cached state and
+returns. This trims hook overhead but is not a measured FPS gain. No extra
+raycaster or camera was disabled because the scene snapshot cannot prove those
+objects are idle or safe to remove.
+
+### Separate legacy camera mouse path (2026-10-25)
+
+The exact-build method export reveals another mouse path that the
+`StandaloneInputModule.ProcessMouseEvent(int)` patch does not reach:
+`UnityEngine.SendMouseEvents.DoSendMouseEvents` at RVA `0x28C4CD0`, with about
+315 CPU ms in the same 31-second profile. Its disassembly calls `UpdateMouse`,
+enumerates the camera list, checks camera target/display/rect/event masks,
+builds screen-point rays, updates hit records, and dispatches the legacy mouse
+events. `Camera.ScreenPointToRay` is another 124 ms method row in this export;
+these are sampled weights and must not be added as if they were independent.
+
+I resolved the scene's external MonoScript references through the supplied
+`globalgamemanagers.assets`. The serialized Gameplay scene contains no 2D or
+3D collider components, and its mapped active scripts have no Clone Hero
+`OnMouseDown`/`OnMouseUp`/`OnMouseEnter`/`OnMouseExit`/`OnMouseOver` handlers.
+The only collider components in the reassembled resources are a 2D circle and
+box on the Pong ball and paddle prefabs. This makes legacy camera mouse-event
+dispatch a plausible unnecessary song-time path, but runtime-spawned objects
+or external mods could still register callbacks.
+
+This is separate from the EventSystem graphic-raycast switch and does not
+touch Rewired's mouse polling or instrument/controller polling. The generated
+Il2Cpp UnityEngine assemblies do not expose this internal class, so Harmony
+reflection cannot target it. The prototype instead uses MonoMod's native
+detour at GameAssembly RVA `0x28C4CD0`, after the existing exact-game hash guard
+and an additional 17-byte function-prologue check. Its delegate matches the
+IL2CPP signature (`int skipRTCameras`, hidden `MethodInfo*`) and returns
+without dispatching callbacks only during active gameplay. The detour is
+undone on pause, settings/menu use, focus loss, restart/practice transitions,
+scene changes, and unload; disabling the preference also removes it. It is
+default-off. I verified repeated Apply/Undo behavior against a local native
+probe and confirmed the prologue bytes against the uploaded exact-build
+GameAssembly, but it has not yet run inside Clone Hero on Windows. External
+mods may rely on `OnMouse*` callbacks, and the 315 ms sample weight is not a
+measured frame-rate gain.
+
 Within the gameplay window, the stack table does name several managed callbacks: SlopHero
 `Core.OnUpdate` totals about 101 ms, `ClonZones.Core.OnUpdate` about 55 ms,
 and MelonLoader `ComponentSiblingFix` about 183 ms across the 31-second view.
@@ -265,7 +417,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.88** on the private
+- Latest packaged build: SlopHero **0.4.89** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.87 (SHA-256
   `f1f2b1b5411260cfcd0e1025a6e114da3a356cecaf147e206d5cd67861517cf0`).
@@ -287,9 +439,18 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
   are candidates without matched PresentMon A/B results. Version 0.4.88 adds
   the default-off offline-solo TMP scale-update experiment described above.
   The 0.4.88 build has zero warnings/errors and core checks pass (101 checks).
-  The packaged DLL has not been tested in Clone Hero yet. Its package SHA-256
-  is `527b5367bceb523a64375ad958360356eb0a72a28353636e57c1078f976c054d`,
-  and the DLL SHA-256 is
+  Version 0.4.89 adds the separate default-off native legacy mouse-event
+  detour described above and removes the mouse-raycast hook's per-call
+  diagnostic counter increment. The .89 build has zero warnings and errors;
+  core checks pass (101 checks). Its native hook has only been tested against
+  a local native probe, not the Windows game process, and neither new change
+  has a matched PresentMon A/B result. The .89 package SHA-256 is
+  `2e6684d416794205fb6ddc04ccd9972d95a85dfc54967019448844c0aecc0697`, and
+  the DLL SHA-256 is
+  `e355fab889392b898f8342701c1d5c2385aaf21e49d93fac130c5fa1c41d63a0`.
+  The 0.4.88 package SHA-256 is
+  `527b5367bceb523a64375ad958360356eb0a72a28353636e57c1078f976c054d`, and
+  its DLL SHA-256 is
   `57611b4fc606ad7c01af89ec1bc866b8afe15d7c01743d555e73684713656b33`.
   The 0.4.87 package hashes are retained in Git history.
   Version 0.4.84 ships the

@@ -1,11 +1,19 @@
-# SlopHero 0.4.88 alpha
+# SlopHero 0.4.89 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.88 adds
+build, compiled against its loader and generated assemblies. Version 0.4.89 adds
+a separate default-off Sloptifine switch for Unity's legacy camera mouse-event
+dispatch. It detours the exact supplied GameAssembly build and skips `OnMouse*`
+callbacks only during active chart play; vanilla callbacks return on pause,
+menus, settings, focus loss, scene transitions, and unload. It is independent
+of the EventSystem mouse-UI raycast switch and leaves Rewired/controller/guitar
+polling alone. Other mods may rely on legacy callbacks, and this native hook
+has not yet been tested inside Clone Hero on Windows. No FPS gain is claimed
+without a matched capture. Version 0.4.88 adds
 a default-off TMP scale-update experiment to Sloptifine 2. During offline solo
 play it marks only stable, unanimated Gameplay labels static, skipping their
 per-frame SDF scale checks while leaving TMP layout, graphics, and culling
@@ -100,7 +108,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.88 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.88-alpha.zip)
+[Download SlopHero v0.4.89 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.89-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
