@@ -39,10 +39,16 @@ internal sealed class OptionalHudAnimationsOverride
             RestoreGlows();
             ResetGlowReferences();
         }
+        bool findPb = hidePb && pbCanvas == null && now >= nextPbDiscovery;
+        bool findGlows = hideGlows && glowRoot == IntPtr.Zero && game != null && now >= nextGlowDiscovery;
+        // A scene-wide IL2CPP object search can be costly. Both opt-in
+        // features share the one result on discovery/retry passes.
+        Animator[]? sceneAnimators = findPb || findGlows
+            ? UnityEngine.Object.FindObjectsOfType<Animator>().ToArray() : null;
         if (!hidePb) RestorePb();
         else
         {
-            if (pbCanvas == null && now >= nextPbDiscovery) DiscoverPb(now);
+            if (findPb) DiscoverPb(now, sceneAnimators!);
             if (pbCanvas != null && pbAnimator != null && (!pbSuppressed || reconcile))
             {
                 if (pbCanvas.enabled) pbCanvas.enabled = false;
@@ -55,8 +61,7 @@ internal sealed class OptionalHudAnimationsOverride
         if (!hideGlows) RestoreGlows();
         else
         {
-            if (glowRoot == IntPtr.Zero && game != null && now >= nextGlowDiscovery)
-                DiscoverGlows(now);
+            if (findGlows) DiscoverGlows(game!, now, sceneAnimators!);
             if (glowRoot != IntPtr.Zero && (!glowSuppressed || reconcile))
             {
                 foreach (var state in glowAnimators)
@@ -92,29 +97,30 @@ internal sealed class OptionalHudAnimationsOverride
         nextGlowDiscovery = 0;
     }
 
-    private void DiscoverPb(double now)
+    private void DiscoverPb(double now, Animator[] sceneAnimators)
     {
         nextPbDiscovery = now + 1;
         // Resolve the live controller rather than assuming the serialized
         // Gameplay hierarchy path is unchanged after scene initialization.
-        var displays = UnityEngine.Object.FindObjectsByType<HighScoreDisplay>(
-            FindObjectsInactive.Include, FindObjectsSortMode.None);
-        HighScoreDisplay? display = null;
+        // The game's snapshot already uses this generated Animator search;
+        // FindObjectsByType's inactive overload is not available in this
+        // IL2CPP build and throws "Method unstripping failed" at runtime.
+        Animator? animator = null;
         int gameplayDisplays = 0;
-        foreach (var candidate in displays)
+        foreach (var candidate in sceneAnimators)
         {
-            if (candidate == null || candidate.gameObject.scene.name != "Gameplay") continue;
+            if (candidate == null || candidate.gameObject.scene.name != "Gameplay"
+                || candidate.GetComponent<HighScoreDisplay>() == null) continue;
             gameplayDisplays++;
-            if (display != null)
+            if (animator != null)
             {
                 ReportMissing(ref pbDiscoveryMisses, "personal-best popup",
                     pbDiscoveryMisses == 2 ? $"Gameplay displays={gameplayDisplays}" : "");
                 return;
             }
-            display = candidate;
+            animator = candidate;
         }
-        var canvas = display?.GetComponent<Canvas>();
-        var animator = display?.GetComponent<Animator>();
+        var canvas = animator?.GetComponent<Canvas>();
         if (canvas == null || animator == null)
         {
             ReportMissing(ref pbDiscoveryMisses, "personal-best popup",
@@ -128,19 +134,25 @@ internal sealed class OptionalHudAnimationsOverride
         pbAnimatorEnabled = animator.enabled;
     }
 
-    private void DiscoverGlows(double now)
+    private void DiscoverGlows(GameManager game, double now, Animator[] sceneAnimators)
     {
         nextGlowDiscovery = now + 1;
         // The live player hierarchy can differ from the prefab path. The
         // current scene has two named side-glow Animators, both parented under
         // the guitar player; locate that pair directly.
         Animator? leftAnimator = null, rightAnimator = null;
+        var guitarRoots = new HashSet<IntPtr>();
+        if (game.playerObjects != null)
+            foreach (var player in game.playerObjects)
+                if (player != null && player.TryCast<GuitarPlayer>() != null)
+                    guitarRoots.Add(player.transform.Pointer);
         List<string>? observed = glowDiscoveryMisses == 2 ? new List<string>(4) : null;
-        foreach (var animator in UnityEngine.Object.FindObjectsByType<Animator>(
-            FindObjectsInactive.Include, FindObjectsSortMode.None))
+        foreach (var animator in sceneAnimators)
         {
             if (animator == null || animator.gameObject.scene.name != "Gameplay") continue;
-            bool underGuitar = animator.GetComponentInParent<GuitarPlayer>() != null;
+            bool underGuitar = false;
+            for (var parent = animator.transform; parent != null; parent = parent.parent)
+                if (guitarRoots.Contains(parent.Pointer)) { underGuitar = true; break; }
             if (observed != null && observed.Count < 6)
                 observed.Add($"{animator.gameObject.name}:{(underGuitar ? "guitar" : "other")}");
             if (!underGuitar) continue;

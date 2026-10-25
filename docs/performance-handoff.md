@@ -423,9 +423,11 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 - Latest packaged build: SlopHero **0.4.102** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.101 (SHA-256
-  `8361a5c0873b28ce1e18f39cf9e952c5debf2a71d3a72b80ae77b82db7590f36`)
-  and is analyzed below. The earlier 0.4.100 log has SHA-256
+  0.4.102 (SHA-256
+  `dd91a809156a86dab321d7563aef1d07b6f8c9e8f498812394ad0e039cf9e0c6`)
+  and is analyzed below. The earlier 0.4.101 log has SHA-256
+  `8361a5c0873b28ce1e18f39cf9e952c5debf2a71d3a72b80ae77b82db7590f36`.
+  The earlier 0.4.100 log has SHA-256
   `4516179dc70583a82f5358c028afe03104f8cec06a3cc3b5c0f73aadec32cf75`.
   The earlier 0.4.99 log has SHA-256
   `c679d72bc53c5d6acb6dc679d74ab77d0177ab78b735905edd482080f1ab061e`.
@@ -1191,3 +1193,51 @@ paths. A failed lookup continues to leave the game components untouched; the
 one-time missing-target warning now includes the observed Gameplay component
 count or Animator names if discovery still fails. The match needs a runtime test;
 the log cannot tell why the earlier paths failed.
+
+## v0.4.102 log, unreleased lookup fix, and separate score-path screen
+
+The 0.4.102 log confirms both optional visual preferences were on. On the
+first eligible pass, `OptionalHudAnimationsOverride` failed with `Method
+unstripping failed`, restored its component states, and latched itself off for
+the scene. Neither option ran. The first of two 30-second timing windows has
+1,559 scheduled render callbacks/s and a 59.8 ms maximum simulation gap.
+There is no presented-FPS capture or causal tie to the optional feature.
+The unreleased worktree removes the new `FindObjectsByType<T>(FindObjectsInactive,
+FindObjectsSortMode)` call and generic `GetComponentInParent<GuitarPlayer>`
+lookup. It uses `FindObjectsOfType<Animator>()`, already used successfully by
+the Gameplay snapshot that reported three live Animators, and checks guitar
+ancestry against `GameManager.playerObjects` by transform pointer. The PB
+target requires an Animator and `HighScoreDisplay` on one Gameplay object;
+the side-glow pair requires left/right Animator names and a shared parent.
+Both still fail open. When both switches need discovery in one pass, they now
+share one Animator scene search instead of performing two. Runtime activation
+remains unverified.
+
+In parallel, I compared the older source's `ScoreManager.FixedUpdate` and
+`HighScoreDisplay` with exact-build methods and the WPA method export. The
+older source calls `SpriteFont.SetSprites` on each score tick, suggesting
+redundant work. The current `ScoreManager.Update` at RVA `0x1286B0` has a
+cached-value comparison at `+0x142` before calling `SpriteFont` at
+`0x224EE0`; the older unconditional call cannot be assumed current. The
+current `HighScoreDisplay` no longer declares `Update`. `ScoreManager.Update`
+has ~27 ms inclusive sample weight in the older 31-second method export,
+while `LyricDisplay.Update` has ~6 ms. Neither supports a scoring/UI detour
+on present evidence. The current StarProgress call remains a possible
+separate investigation, but its native method updates scoring visuals and
+has no isolated cost in the supplied export. Do not throttle it based on the
+older source.
+
+Further old-source screening covered `StarProgress.SetProgress`,
+`SongSelect.Update`/`SongListAdder.DoListLayout`, `MainMenu.Update`,
+`Client_GameplayScene.Update`, and `GuitarNoteRenderer.Update`.
+`StarProgress.SetProgress` in the older source already returns when score
+matches `lastScore`; the exact current method at RVA `0x2DF7F0` also compares
+its cached score at `+0x215` before updating progress. `SongListAdder` checks
+canvas height and row count each frame but only rebuilds list components when
+the count changes. The older network gameplay scene caches its GameManager
+and local player after startup rather than searching each active frame.
+MainMenu's observed path polls a few menu keys. The old guitar note renderer
+walks visible notes and writes moving transforms/property blocks; the current
+renderer also gates some work on `OnDemandRendering`, so freezing its whole
+update would break note motion and has no measured justification. These
+findings rule out several blanket skips, not the broader render/cull work.
