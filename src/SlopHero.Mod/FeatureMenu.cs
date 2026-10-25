@@ -369,14 +369,14 @@ public sealed partial class Core
                 Toggle(skipLegacyMouseEvents, "Skip legacy camera mouse events during gameplay", x, y + 56);
                 Toggle(throttleWhammyTexture, "Skip duplicate whammy texture uploads", x, y + 86);
                 Toggle(pauseGameplayCheatScanner, "Pause cheat-code scanner during solo songs", x, y + 116);
-                Toggle(pauseGameplayUiProcessing, "Pause UI events during solo songs (also pauses UI navigation)", x, y + 146);
+                Toggle(pauseGameplayUiProcessing, "Pause UI events and hidden HUD handles in solo songs", x, y + 146);
                 Toggle(pauseHighwayAnimations, "Freeze highway, video, and track-fade visuals in solo play", x, y + 176);
                 Toggle(reduceUnityJobWorkers, "Use one fewer Unity job worker during offline solo songs", x, y + 206);
                 Toggle(disableMidiForSession, "Disable drum MIDI input (restart to restore)", x, y + 236);
                 Toggle(staticTmpScaleDuringSong, "Skip TMP scale checks in offline solo play", x, y + 266);
                 Toggle(pauseRewiredMousePolling, "Pause Rewired mouse polling in solo songs", x, y + 296);
-                Toggle(cacheSpriteAttachTransforms, "Cache unchanged SpriteAttach transforms in solo songs", x, y + 326);
-                GUI.Label(new Rect(x + 22, y + 356, 610, 112), "Experimental; default off. Mouse-bound controls pause only during active offline solo songs; keyboard and controller polling stay enabled. SpriteAttach runs normally whenever its camera, sprite, layout, scale factors, or output transforms change. Legacy mouse callbacks are a separate switch. TMP layout/rebuilds stay enabled; animated labels are checked at 20 Hz. Drum MIDI shutdown requires a restart to restore.");
+                Toggle(cacheSpriteAttachTransforms, "Cache unchanged SpriteAttach transforms (may lower FPS)", x, y + 326);
+                GUI.Label(new Rect(x + 22, y + 356, 610, 112), "Experimental; default off. Pausing UI events also pauses its three transparent HUD drag-handle Canvases and built-in UI navigation during solo songs. Keyboard and controller polling stay enabled. The SpriteAttach cache can cost more than the native update it skips; leave it off unless it helps your game. TMP layout/rebuilds stay enabled. Drum MIDI shutdown requires a restart to restore.");
                 break;
         }
         if (editApply != null) DrawValueEditor();

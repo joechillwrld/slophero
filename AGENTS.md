@@ -37,7 +37,11 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.96. It extends the default-off hidden
+The latest packaged build is 0.4.97. It extends the default-off gameplay
+UI-event pause to suspend the three transparent HUD drag-handle Canvases
+during eligible solo songs; they restore when visible or UI events resume.
+The optional SpriteAttach cache remains default-off because its full input
+comparison can cost more than the native update. Version 0.4.96 extends the default-off hidden
 leaderboard option to pause 24 score-list TMP labels only while the list is
 fully invisible offline, and now also pauses 30 score-list Image components.
 It additionally pauses the list's dedicated world-space Canvas, CanvasScaler,

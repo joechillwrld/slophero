@@ -63,7 +63,7 @@ the Sloptifine pages and preserve their documented scope:
 | Unity job queue setter was resolved through the matching player PDB | `UnityJobWorkerLimit` uses the generated `SetJobQueueMaximumActiveThreadCount` API and restores the prior limit. It is default-off; the latest three-run callback comparison shows no benefit. |
 | Current `HighwayScroll.Update` combines property-block writes with video/fade behavior | `HighwayAnimationOverride` is a default-off whole-update freeze during offline solo songs. It may freeze those visuals and has no demonstrated frame gain. The old source's note `yield`/hit-detection paths remain untouched because they are scoring-sensitive and not confirmed in current code. |
 | TMP's SDF scale queue repeatedly checks text transforms | v0.4.88 packages the default-off offline-solo experiment; its v0.4.89 log changed zero labels. The current worktree includes labels under Animator/Animation parents and checks those at 20 Hz, while ordinary labels stay at 4 Hz. Any detected scale change restores TMP's per-frame scale updates and excludes that label for the scene. The scene-wide discovery uses unsorted `FindObjectsByType`; TMP layout, graphic-rebuild, and culling queues stay active. Scale animation could briefly soften text; the prototype has no measured frame-time result yet. |
-| Rewired's mouse-only sampler and `SpriteAttach.Update` have small WPA self-CPU rows | v0.4.91 adds two separate default-off options, limited to offline solo guitar Quickplay. The Rewired prefix skips only the mouse snapshot (seven buttons, three axes); keyboard/controller and 1000 Hz instrument polling stay active, while mouse-bound actions pause. The SpriteAttach cache verifies camera/screen/sprite/scale inputs and outputs, including the exact-build packed scale input at RVA `0x64C60`; missing bindings fail open to vanilla. The new v0.4.91 log confirms both install without errors. Its two cache-on callback windows are slightly slower than a later cache-off window, but these are not presented frames or a controlled A/B. Keep the cache default-off; its interop checks may exceed the native work it skips. |
+| Rewired's mouse-only sampler and `SpriteAttach.Update` have small WPA self-CPU rows | v0.4.91 adds two separate default-off options, limited to offline solo guitar Quickplay. The Rewired prefix skips only the mouse snapshot (seven buttons, three axes); keyboard/controller and 1000 Hz instrument polling stay active, while mouse-bound actions pause. The SpriteAttach cache verifies camera/screen/sprite/scale inputs and outputs, including the exact-build packed scale input at RVA `0x64C60`; missing bindings fail open to vanilla. The latest v0.4.96 log also shows slower callback spacing with the cache installed, on different charts. Leave it off: interop checks plausibly cost more than the tiny native update. |
 
 ClonZones installs a `GuitarFretAnimator.Update` settle gate in the user's
 setup, which may overlap with another fret hook. Current `HighwayScroll` also
@@ -421,11 +421,13 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.96** on the private
+- Latest packaged build: SlopHero **0.4.97** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.95 (SHA-256
-  `686ab1bc9132560aaed79a8a2880502d63d91dd938bba68ab83ecd29c7ea11a2`).
-  Its timing windows and camera activation are analyzed below. The earlier
+  0.4.96 (SHA-256
+  `a7d1d54480fa2c5b36ec4d4eef81d778ee8bf442f87d21e39e91035ea2819`)
+  and is analyzed below. An earlier 0.4.95 log (SHA-256
+  `686ab1bc9132560aaed79a8a2880502d63d91dd938bba68ab83ecd29c7ea11a2`)
+  records the previous timing windows. The earlier
   0.4.91 log (SHA-256
   `9a036617279b5d5c175b1ca060868f4f06a7d9409b65d318238d511708a44d5d`)
   confirms the Rewired mouse and SpriteAttach hooks installed without errors.
@@ -917,3 +919,53 @@ frame-time effect yet. It also now checks labels under animation parents at
 4 Hz interval. On any observed scale change, TMP updates are restored for that
 label for the rest of the scene. This broader default-off prototype may briefly
 soften text during scale animation and has not been tested in-game.
+
+## v0.4.96 SpriteAttach comparison and v0.4.97 hidden HUD handles
+
+The latest uploaded 0.4.96 log (SHA-256
+`a7d1d54480fa2c5b36ec4d4eef81d778ee8bf442f87d21e39e91035ea2819`)
+has two 30-second timing windows. The first has the SpriteAttach cache off:
+1,477 scheduled render callbacks/s, p99 at most 1.01 ms, with 181 enabled
+SpriteRenderers. The second installs the cache: 1,418 callbacks/s, p99 at most
+1.06 ms, with 190 enabled SpriteRenderers. The single largest callback gaps
+are 71.5 and 114.2 ms. These are CPU callback intervals, not presented-frame
+FPS, and the chart/renderer populations differ. There is no SlopHero hook
+error. The hidden leaderboard option reports `canvasSuspended=True` in both
+windows, confirming its exact-scene guard engages and the parent Canvas is
+paused while the score list is alpha zero.
+
+The exact GameAssembly disassembly resolves why the SpriteAttach option can
+lose FPS. `SpriteAttach.Update` at RVA `0x1B8E20` calls
+`OnDemandRendering.get_willCurrentFrameRender` at RVA `0x2895320` and exits
+before its expensive work on non-render ticks. The mod's Harmony prefix still
+runs on every tick. On rendered ticks, `State.Matches` reads camera matrices,
+two screen dimensions, two rects, sprite bounds, positions, anchors, an
+IL2CPP array and each target's scale through many managed/native property
+calls. On misses, the native method then runs and the postfix recaptures the
+same inputs. The old WPA method view sampled only 275 ms in this native method
+over 31 seconds, roughly 0.007 ms per rendered frame at 1,200 renders/s even
+with perfect elimination. The cache remains default-off and is labeled as
+potentially slower; the supplied data does not justify a more invasive
+SpriteAttach patch or a claim that the cache improves FPS.
+
+I also inspected all three built-in HUD drag-handle Canvases in the exact
+Gameplay `level2` asset. Each is enabled, world-space, and contains a single
+enabled `Image` whose serialized color is `(1, 1, 1, 0)`. Their parent roots
+are `HUD Drag Handle Root`, `Input Viewer Drag Handle Root`, and
+`Leaderboard HUD Drag Handle Root` under `HUDCam`. These are distinct from
+the leaderboard Canvas and from the visible input-viewer sprites. Version
+0.4.97 extends the existing default-off **Pause UI events** switch: during
+its eligible offline solo scope, it discovers only that exact three-root,
+one-Graphic shape and pauses a Canvas only while its Image is still invisible.
+It rechecks at the existing 20 Hz state cadence, restores a Canvas if its
+Image becomes visible, and restores all immediately when the UI pause ends,
+F8 opens the settings, or the scene unloads. No controller polling, guitar
+renderers, or game score objects are altered. The exact asset proves the
+initial target shape; runtime behavior and presented-frame effect still need
+Windows validation. This is an independent render/culling path alongside the
+existing leaderboard Canvas work, though its likely gain is modest compared
+with Unity's whole camera-render branch.
+The 0.4.97 build has zero warnings/errors against the supplied references,
+all 114 core checks pass, and its ZIP contains `Mods/SlopHero.dll`. ZIP
+SHA-256: `fa8b9fd140113161058c694cf6352c2335b02110c7262ef1e37e0fd91fca1bd2`;
+DLL SHA-256: `7e6c73f7dc1c6dae7cb3e9d971ead3b4cd9955aaa30c42e539494f8dd633f244`.

@@ -14,6 +14,7 @@ namespace SlopHero.Mod;
 /// </summary>
 internal sealed class GameplayUiEventOverride
 {
+    private readonly HiddenHudDragCanvasOverride hiddenDragCanvases = new();
     private static GameplayUiEventOverride? active;
     private MethodInfo? updateMethod;
     private PropertyInfo? selectedObjectProperty;
@@ -35,6 +36,7 @@ internal sealed class GameplayUiEventOverride
         if (!requested)
         {
             suspend = false;
+            hiddenDragCanvases.Clear();
             RestoreComponent();
             Restore(harmony);
             failed = false;
@@ -46,10 +48,12 @@ internal sealed class GameplayUiEventOverride
         if (usingPrefix)
         {
             suspend = shouldSuspend;
+            hiddenDragCanvases.Update(shouldSuspend);
             return;
         }
 
         SetComponentSuspended(shouldSuspend);
+        hiddenDragCanvases.Update(shouldSuspend && disabledByUs);
     }
 
     // F8 and Escape use this immediate path so the settings/menu UI is live in
@@ -57,12 +61,14 @@ internal sealed class GameplayUiEventOverride
     internal void Disable()
     {
         suspend = false;
+        hiddenDragCanvases.Restore();
         RestoreComponent();
     }
 
     internal void Clear(HarmonyLib.Harmony harmony)
     {
         suspend = false;
+        hiddenDragCanvases.Clear();
         RestoreComponent();
         Restore(harmony);
         failed = false;
