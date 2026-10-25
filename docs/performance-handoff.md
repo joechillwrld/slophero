@@ -1204,14 +1204,33 @@ the scene. Neither option ran. The first of two 30-second timing windows has
 There is no presented-FPS capture or causal tie to the optional feature.
 The unreleased worktree removes the new `FindObjectsByType<T>(FindObjectsInactive,
 FindObjectsSortMode)` call and generic `GetComponentInParent<GuitarPlayer>`
-lookup. It uses `FindObjectsOfType<Animator>()`, already used successfully by
-the Gameplay snapshot that reported three live Animators, and checks guitar
-ancestry against `GameManager.playerObjects` by transform pointer. The PB
-target requires an Animator and `HighScoreDisplay` on one Gameplay object;
-the side-glow pair requires left/right Animator names and a shared parent.
-Both still fail open. When both switches need discovery in one pass, they now
-share one Animator scene search instead of performing two. Runtime activation
-remains unverified.
+lookup. A further exact-scene/reference check found a more fundamental bug:
+the optional-visual code aliased `Animator` to Clone Hero's custom
+`Il2Cpp.Animator`, while both the PB notification and the side glows use
+`UnityEngine.Animator`. The current IL2CPP `StarPowerController.animatorLeft`
+and `.animatorRight` fields are typed as `UnityEngine.Animator`; the supplied
+Gameplay scene's `HighScoreDisplay` serialized animator reference points to
+the native Animator on the same PB object. In all four current Star Power
+prefabs, the controller's two serialized references resolve to native Animator
+components on `SpSideGlows L` and `SpSideGlows R`. That type mismatch would prevent
+discovery even after replacing the unsupported search overload.
+
+The current local fix finds the active `HighScoreDisplay` once per discovery
+attempt, verifies it belongs to Gameplay, and gets its Canvas and
+`UnityEngine.Animator`. For the glows it starts from the local guitar player,
+gets its `StarPowerController`, and reads the two serialized Animator fields.
+It still validates the expected side-glow names and shared parent before
+touching their children. Neither feature needs a full Animator scene scan;
+both fail open. The unreleased mod compiles with zero warnings and the Core
+checks pass (114/114). Runtime activation and FPS effect remain unverified.
+
+The same type audit found an independent safety issue in the default-off TMP
+scale experiment. Its ancestor check recognized Clone Hero's custom
+`Il2Cpp.Animator` and Unity's legacy `Animation`, but missed
+`UnityEngine.Animator`; the current PB notification uses that native type.
+The local fix recognizes both Animator types and checks text beneath either
+at the experiment's 20 Hz animated-label cadence. This does not turn the
+experiment on or alter text during normal use.
 
 In parallel, I compared the older source's `ScoreManager.FixedUpdate` and
 `HighScoreDisplay` with exact-build methods and the WPA method export. The
@@ -1241,3 +1260,106 @@ walks visible notes and writes moving transforms/property blocks; the current
 renderer also gates some work on `OnDemandRendering`, so freezing its whole
 update would break note motion and has no measured justification. These
 findings rule out several blanket skips, not the broader render/cull work.
+The active Gameplay scene also contains `PracticeSectionDisplay.FixedUpdate`,
+but exact-build disassembly of its RVA `0x2E92A0` returns immediately when its
+section list is null. It has no mapped sampled cost in the supplied method
+export. The older `MainMenu.CycleThroughBuildTag` coroutine waits 15–120
+seconds between label writes, and `SongScan` polls its worker only while a
+scan is running; neither is a persistent song-frame candidate.
+
+The wider 31-second method export puts `MultiplierScaler.Update` at ~57 ms,
+`PlayerCamera.Update` at ~20 ms, `HighwayScroll.Update` at ~22 ms, and
+`GuitarFretAnimator.Update` at ~1 ms. The exact current `SongProgress.FixedUpdate`
+still writes two transforms as score progress advances, but has no mapped
+sampled cost in that export. An extra Harmony call at every tick could
+outweigh a blanket skip of these small methods, and song-progress writes
+must remain synchronized with practice seeking. The current resource assets
+place 31 active serialized sprites under a guitar's `Combo` visual branch,
+including FC ring, ghost meter, streak ticks, and two smoke sprites. The
+existing combo-smoke switch pauses its UV scripts. Any further removal from
+that branch would hide gameplay feedback and needs a separate user choice.
+
+A mechanical scan of the older source's `Update`/`LateUpdate`/`FixedUpdate`
+bodies found an apparent per-frame `new byte[3]` in `GHLNoteRenderer.Update`.
+The current exact-build `GHLNoteRenderer` no longer overrides `Update`; it
+inherits the shared guitar-note renderer path instead. The other old note
+renderer `new` expressions in `Update` construct value-type vectors rather
+than managed arrays. This rules out porting an old GHL allocation patch to
+the current version. The old `HighwayScroll.Update` writes through
+`Renderer.material`, whereas the current build uses a property block and its
+method accounts for only ~22 ms in the 31-second export; a blanket material
+cache rewrite would target obsolete code.
+
+## Unshipped Star Power branch prototype and broader screen
+
+The user approved branch deactivation behind the existing default-off
+side-glow switch. In the exact current Guitar Player prefab, the two
+`SpSideGlows L/R` branches contain two native Unity Animators, eight
+`AnimatorColorBehavior` scripts, and cosmetic SpriteRenderers. The
+`StarPowerController` is on the active `Updated SP Animation` parent, beside
+`CenterGlow`. The local prototype reads the controller's serialized Animator
+references, validates the names and shared parent, saves each branch's
+`activeSelf`, and calls `SetActive(false)` only during eligible offline solo
+play. It restores the saved states on pause, menu opening, scope exit, and
+scene cleanup. Re-enabling a branch can restart its animation. The 31-second
+method export maps `AnimatorColorBehavior.Update` to ~22 ms sampled CPU across
+all instances, without proving how much belongs to this guitar. Runtime
+activation and presented-frame effect are unverified.
+
+A further static screen of the exact assets found 61 enabled SpriteRenderers
+with zero serialized alpha and active ancestors across all resource prefabs.
+Most are Star Power side glows across the player variants; this is **not** a
+live count and a zero-alpha sprite can later become visible. The current
+Gameplay scene itself has zero such active SpriteRenderers. Three zero-alpha
+resource sprites are under the score's high-score overlay and one is
+`CenterGlow`; they are separate animation targets, not safe additions to the
+side-glow switch without mapping their state transitions.
+
+The mapped 31-second method view puts other non-input managed work in
+`EventSystem.Update`/mouse raycasts (~1.8 s inclusive),
+`TMP_UpdateManager.DoRebuilds` (~320 ms), `SpriteAttach.Update` (~275 ms),
+and the necessary guitar-note renderer (~261 ms). Existing default-off
+switches already target the mouse path; the SpriteAttach cache has sometimes
+cost more than the native method. The guitar prefab also contains ten
+`CustomFadeProperties` components (no mapped sample row), five
+`GuitarFretAnimator`s (tiny mapped cost), and five `SpriteAttach`s. This does
+not justify another blanket skip. It does, however, justify one narrower
+change: SlopHero's existing Hide fret strings setting already disables all
+renderers beneath those five string objects, while their five `SpriteAttach`
+scripts continue camera/viewport alignment work. The unshipped worktree now
+pauses only those five scripts as part of the hide setting, remembering each
+enabled state and restoring it when strings are shown or overrides end. It
+does not touch the separate `SpriteAttach` scripts on the SP bar and rock
+meter. The ~275 ms mapped `SpriteAttach.Update` row covers all instances, so
+it is an upper bound for this narrower saving, not its measured effect. The
+exact Gameplay scene has no serialized
+component declaring `OnGUI`, so the ~123 ms `GUIUtility.BeginGUI` row cannot
+be assigned to a removable game GUI script from that scene.
+
+The exact player camera prefabs are **perspective** (layer-9 mask), whereas
+the Gameplay `HUDCam` is **orthographic** (layers 5 and 12). The background
+camera is a third, orthographic clear camera. Merging the player and HUD
+cameras would require transforming the HUD geometry and preserving its render
+order; simply combining their masks would change the visuals. The existing
+default-off background-camera experiment is the bounded camera prototype.
+The Unity WPA render/cull weights still lack per-camera or per-renderer
+attribution, so they cannot justify a broader camera removal.
+
+The prefab's active guitar SpriteRenderers are already concentrated on two
+material references: 60 use material path ID 21 and 56 use 23; only 16 use
+the other five references. There are two active `SortingGroup` components
+under the guitar (`Combo` and `RockMeter/arrow`). This static composition
+does not prove runtime batching, but it weakens the idea that the guitar
+highway spends most of its render time switching among hundreds of materials.
+Removing either sorting group could disturb streak/arrow layer order.
+
+Several of the large obfuscated GameAssembly method rows are Rewired input
+internals, not mystery gameplay visual loops: the exact dump identifies
+`psesWFItqOzeBgCDVCsQpYLqlFby` as `PlatformInputManager` (its `Update`
+row is ~468 ms), and `LrrjYPtZvfrRqrFyVCtNgkRgRJHw` as `IInputSource`
+(~564 ms for one mapped method). Their weights sit within the broader
+`Rewired.InputManager_Base.DoUpdate` (~2.58 s) chain and cannot be added.
+They are not targets for lowering the user's 1000 Hz controller rate. The
+older online `Client_GameplayScene.Update` contains `GameObject.Find`, but
+only while waiting for the `GameManager` before the network song starts; it
+is not a per-frame lookup throughout active gameplay.

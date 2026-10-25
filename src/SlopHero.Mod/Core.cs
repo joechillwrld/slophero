@@ -1048,6 +1048,7 @@ public sealed partial class Core : MelonMod
         timings.Finish();
         aprilFools.Restore();
         visuals.RestoreBeatRenderers();
+        visuals.RestoreStringAttach();
         performance.Clear();
         starProgressParticles.Clear();
         comboSmokeScroll.Clear();

@@ -39,9 +39,22 @@ For a documentation-only change, update the docs without inventing a new
 binary version.
 The latest packaged build is 0.4.102. The unshipped worktree replaces an
 unsupported Unity inactive-object lookup that failed IL2CPP unstripping in
-0.4.102. The older ScoreManager source does not justify replacing the current
-score-display path, which already guards at least one sprite-font update when
-unchanged. Version 0.4.102 looks up the personal-best display
+0.4.102 and corrects an Animator type mismatch: the PB popup and side glows
+use `UnityEngine.Animator`, while Clone Hero also has an unrelated custom
+`Il2Cpp.Animator`. The updated lookup uses the live HighScoreDisplay and
+StarPowerController's serialized Animator references, with no scene-wide
+Animator scan. The user approved an unshipped, default-off prototype that
+deactivates the two cosmetic side-glow branches during eligible solo play
+and restores their original active states on pause/exit; the controller
+parent remains live. Runtime behavior and frame impact still need a Windows
+test. The existing Hide fret strings option also now suspends only the five
+cosmetic `SpriteAttach` components on those hidden strings and restores their
+previous enabled states when shown. The older ScoreManager source does not justify replacing the
+current score-display path, which already guards at least one sprite-font
+update when unchanged. The same unshipped type audit corrects the default-off
+TMP scale experiment's animator-ancestor check so it recognizes Unity's
+Animator as well as the game's custom sprite Animator. Version 0.4.102 looks
+up the personal-best display
 and Star Power side glows through live Gameplay components after v0.4.101
 failed to find either target by hierarchy path. Runtime activation still needs
 a Windows test. Version 0.4.101 relaxes the new Sloptifine 3 target

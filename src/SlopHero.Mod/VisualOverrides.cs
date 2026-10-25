@@ -4,12 +4,14 @@ using UnityEngine;
 
 namespace SlopHero.Mod;
 
-// Own only renderer properties. Never deactivate gameplay objects or components.
+// Own cosmetic renderer properties and the attach scripts for hidden strings.
+// Never deactivate player, note, input, or scoring components.
 internal sealed class VisualOverrides
 {
     private readonly Dictionary<IntPtr, (SpriteRenderer Renderer, Color Original)> colors = new();
     private readonly Dictionary<IntPtr, (Renderer Renderer, bool Original)> hidden = new();
     private readonly Dictionary<IntPtr, (BeatRenderer Renderer, bool Original)> suspendedBeatRenderers = new();
+    private readonly Dictionary<IntPtr, (SpriteAttach Attach, bool Original)> suspendedStringAttach = new();
     private readonly Dictionary<IntPtr, ScrollSpeedCompensation> speeds = new();
     private readonly PracticeClockRate practiceClockRate = new();
     private readonly Dictionary<IntPtr, (Il2CppTMPro.TextMeshProUGUI Text, Color Original)> texts = new();
@@ -27,7 +29,7 @@ internal sealed class VisualOverrides
     private double nextPracticeClockSample;
     private readonly HashSet<IntPtr> hiddenPlayers = new();
     private bool fullSongSpeedSyncPending = true;
-    public bool HasOverrides => hidden.Count != 0 || suspendedBeatRenderers.Count != 0
+    public bool HasOverrides => hidden.Count != 0 || suspendedBeatRenderers.Count != 0 || suspendedStringAttach.Count != 0
         || colors.Count != 0 || speeds.Count != 0 || texts.Count != 0;
     public bool NeedsUpdate => fullSongSpeedSyncPending || HasOverrides;
     public void RestoreBeatRenderers()
@@ -38,9 +40,18 @@ internal sealed class VisualOverrides
         }
         suspendedBeatRenderers.Clear();
     }
+    public void RestoreStringAttach()
+    {
+        foreach (var state in suspendedStringAttach.Values)
+        {
+            try { if (state.Attach != null) state.Attach.enabled = state.Original; } catch { }
+        }
+        suspendedStringAttach.Clear();
+    }
     public void Clear()
     {
         RestoreBeatRenderers();
+        RestoreStringAttach();
         colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); starFaceSprites.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = oldConstantSpeed = false; practiceClockSampling = false; nextPracticeClockSample = 0; nextScoreColorRefresh = nextPlayerPass = 0; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null;
     }
     private SpriteRenderer[] Sprites(GameObject go)
@@ -89,7 +100,13 @@ internal sealed class VisualOverrides
         if (r == null) return;
         if (enabled)
         {
-            if (hidden.ContainsKey(r.Pointer)) return;
+            // The game can re-enable a renderer after it was hidden. Keep the
+            // requested visual state and the attached-script state aligned.
+            if (hidden.ContainsKey(r.Pointer))
+            {
+                if (r.enabled) r.enabled = false;
+                return;
+            }
             hidden.Add(r.Pointer, (r, r.enabled));
             r.enabled = false;
         }
@@ -114,6 +131,22 @@ internal sealed class VisualOverrides
         {
             old.Renderer.enabled = old.Original;
         }
+    }
+    private void SuspendStringAttach(GameObject go, bool suspend)
+    {
+        // A current guitar prefab puts one SpriteAttach on each of its five
+        // cosmetic fret-string objects. Hiding every renderer in that branch
+        // makes its camera/viewport alignment work unnecessary until shown.
+        var attach = go.GetComponent<SpriteAttach>();
+        if (attach == null) return;
+        if (suspend)
+        {
+            if (!suspendedStringAttach.ContainsKey(attach.Pointer))
+                suspendedStringAttach.Add(attach.Pointer, (attach, attach.enabled));
+            if (attach.enabled) attach.enabled = false;
+        }
+        else if (suspendedStringAttach.Remove(attach.Pointer, out var old) && old.Attach != null)
+            old.Attach.enabled = old.Original;
     }
     private void Tint(SpriteRenderer? r, bool enabled, Color color)
     {
@@ -223,11 +256,13 @@ internal sealed class VisualOverrides
         if (!practiceNow && fullSongSpeedSyncPending)
             fullSongSpeedSyncPending = !SyncFullSongSpeed(game);
         if (!sides && !strings && !beats && !score && !constantSpeed && hidden.Count == 0
-            && suspendedBeatRenderers.Count == 0 && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
+            && suspendedBeatRenderers.Count == 0 && suspendedStringAttach.Count == 0
+            && colors.Count == 0 && texts.Count == 0 && speeds.Count == 0) return;
         bool playerPassNeeded = sides != oldSides || strings != oldStrings || beats != oldBeats
-            || practiceChanged || constantSpeed != oldConstantSpeed || refreshScoreColors;
+            || practiceChanged || constantSpeed != oldConstantSpeed || refreshScoreColors
+            || (!strings && suspendedStringAttach.Count != 0);
         bool playerEffectsActive = sides || strings || beats || constantSpeed
-            || hidden.Count != 0 || speeds.Count != 0;
+            || hidden.Count != 0 || suspendedStringAttach.Count != 0 || speeds.Count != 0;
         // Score-only customization needs the player accuracy text at 5 Hz.
         // It does not need the otherwise unconditional 10-Hz scan of every
         // player, neck, and note renderer between color refreshes.
@@ -243,20 +278,28 @@ internal sealed class VisualOverrides
                     var b = p.beatRenderer;
                     SuspendBeatRenderer(b, beats && pauseHiddenBeatlineUpdates);
                     bool newPlayer = !hiddenPlayers.Contains(p.Pointer);
-                    if (newPlayer || sides != oldSides || strings != oldStrings || beats != oldBeats)
+                    bool staticChanged = newPlayer || sides != oldSides || strings != oldStrings || beats != oldBeats;
+                    var neck = staticChanged || strings || oldStrings ? p.neckController : null;
+                    var fretStrings = neck?.fretStrings;
+                    if (staticChanged)
                     {
                         Hide(p.trackSidebarLeft?.field_Private_SpriteRenderer_0, sides);
                         Hide(p.trackSidebarRight?.field_Private_SpriteRenderer_0, sides);
-                        var neck = p.neckController;
-                        var fretStrings = neck?.fretStrings;
-                        if (fretStrings != null && (strings || oldStrings))
-                            foreach (var go in fretStrings)
-                                if (go != null) foreach (var r in Strings(go)) Hide(r, strings);
                         var beatSprites = b?.field_Protected_Il2CppReferenceArray_1_SpriteRenderer_0;
                         if (beatSprites != null && (beats || oldBeats))
                             foreach (var r in beatSprites) Hide(r, beats);
                         if (b != null && beatSprites != null && neck != null && fretStrings != null) hiddenPlayers.Add(p.Pointer);
                     }
+                    // A scene transition or practice reset may re-enable the
+                    // hidden renderer while this preference stays on. Recheck
+                    // only at the existing 10 Hz player pass, not each frame.
+                    if (fretStrings != null && (strings || oldStrings))
+                        foreach (var go in fretStrings)
+                            if (go != null)
+                            {
+                                foreach (var r in Strings(go)) Hide(r, strings);
+                                SuspendStringAttach(go, strings);
+                            }
                     if (refreshScoreColors) TintText(p.AccuracyText, score, scoreText);
                     bool compensate = speedCompensationActive;
                     if (!compensate && speeds.Count == 0 && !practiceChanged) continue;
@@ -296,6 +339,7 @@ internal sealed class VisualOverrides
             }
             finally { timings.End(4, playerTiming); }
         }
+        if (!strings && suspendedStringAttach.Count != 0) RestoreStringAttach();
         oldSides = sides; oldStrings = strings; oldBeats = beats;
         oldPractice = practiceNow; oldConstantSpeed = constantSpeed;
         if (!score && !restoreScore) return;

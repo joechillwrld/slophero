@@ -289,7 +289,7 @@ public sealed partial class Core
                 Toggle(hideSides, "Hide highway sides", x, y); Toggle(hideStrings, "Hide fret strings", x, y + 40);
                 Toggle(hideBeats, "Hide beatlines", x, y + 80);
                 Toggle(lockSpeed, "Constant practice note speed (experimental)", x, y + 130);
-                GUI.Label(new Rect(x, y + 180, 540, 100), "Visual changes preserve gameplay and note timing.\nPractice speed compensation applies only in practice.\nTurn an option off to restore its normal appearance.");
+                GUI.Label(new Rect(x, y + 180, 540, 100), "Visual changes preserve gameplay and note timing.\nHiding fret strings also pauses their alignment scripts.\nPractice speed compensation applies only in practice.\nTurn an option off to restore its normal appearance.");
                 break;
             case 4:
                 Toggle(tintFc, "Custom FC / perfect FC rings", x, y);
@@ -388,7 +388,7 @@ public sealed partial class Core
                 Toggle(hideStarPowerSideGlows, "Hide Star Power side glows during solo songs", x, y + 26);
                 Toggle(hidePbPopup, "Hide personal-best popup during solo songs", x, y + 56);
                 GUI.Label(new Rect(x + 22, y + 96, 610, 76),
-                    "Experimental; default off. Pauses only these visuals during active offline solo songs. Star Power, score, and note gameplay stay active. Visuals restore when paused or after the song.");
+                    "Experimental; default off. Side-glow branches deactivate during active offline solo songs and restore on pause or song exit; their animation may restart. The Star Power controller, score, and notes stay active.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -1296,6 +1296,7 @@ public sealed partial class Core
         catch (Exception ex)
         {
             visuals.RestoreBeatRenderers();
+            visuals.RestoreStringAttach();
             visualError = true;
             LoggerInstance.Error($"Visual overrides paused after an error; counters and controls remain available: {ex}");
             Notice("Visual overrides stopped after an error. Send Latest.log.");

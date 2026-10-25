@@ -1,27 +1,22 @@
 using Il2Cpp;
 using UnityEngine;
-using Animator = Il2Cpp.Animator;
+using UnityAnimator = UnityEngine.Animator;
 
 namespace SlopHero.Mod;
 
 /// <summary>
 /// Exact-scene, optional visual-only suppression. The score notification
-/// controller and StarPowerController stay active; only their own graphics
-/// and animation components are paused in eligible offline solo play.
+/// controller and StarPowerController stay active; only their own visual
+/// branches are paused in eligible offline solo play.
 /// </summary>
 internal sealed class OptionalHudAnimationsOverride
 {
-    private readonly record struct RendererState(SpriteRenderer Component, bool Enabled);
-    private readonly record struct AnimatorState(Animator Component, bool Enabled);
-    private readonly record struct ColorState(AnimatorColorBehavior Component, bool Enabled);
-
     private Canvas? pbCanvas;
     private bool pbCanvasEnabled;
-    private Animator? pbAnimator;
+    private UnityAnimator? pbAnimator;
     private bool pbAnimatorEnabled;
-    private RendererState[] glowRenderers = Array.Empty<RendererState>();
-    private AnimatorState[] glowAnimators = Array.Empty<AnimatorState>();
-    private ColorState[] glowColors = Array.Empty<ColorState>();
+    private GameObject? leftGlow, rightGlow;
+    private bool leftGlowWasActive, rightGlowWasActive;
     private IntPtr glowRoot;
     private bool pbSuppressed, glowSuppressed;
     private double nextPbDiscovery, nextGlowDiscovery, nextReconcile;
@@ -34,21 +29,17 @@ internal sealed class OptionalHudAnimationsOverride
     public void Apply(GameManager? game, bool hidePb, bool hideGlows, double now)
     {
         bool reconcile = now >= nextReconcile;
-        if (glowRoot != IntPtr.Zero && (glowAnimators.Length == 0 || glowAnimators[0].Component == null))
+        if (glowRoot != IntPtr.Zero && (leftGlow == null || rightGlow == null))
         {
             RestoreGlows();
             ResetGlowReferences();
         }
         bool findPb = hidePb && pbCanvas == null && now >= nextPbDiscovery;
         bool findGlows = hideGlows && glowRoot == IntPtr.Zero && game != null && now >= nextGlowDiscovery;
-        // A scene-wide IL2CPP object search can be costly. Both opt-in
-        // features share the one result on discovery/retry passes.
-        Animator[]? sceneAnimators = findPb || findGlows
-            ? UnityEngine.Object.FindObjectsOfType<Animator>().ToArray() : null;
         if (!hidePb) RestorePb();
         else
         {
-            if (findPb) DiscoverPb(now, sceneAnimators!);
+            if (findPb) DiscoverPb(now);
             if (pbCanvas != null && pbAnimator != null && (!pbSuppressed || reconcile))
             {
                 if (pbCanvas.enabled) pbCanvas.enabled = false;
@@ -61,16 +52,13 @@ internal sealed class OptionalHudAnimationsOverride
         if (!hideGlows) RestoreGlows();
         else
         {
-            if (findGlows) DiscoverGlows(game!, now, sceneAnimators!);
-            if (glowRoot != IntPtr.Zero && (!glowSuppressed || reconcile))
+            if (findGlows) DiscoverGlows(game!, now);
+            if (glowRoot != IntPtr.Zero && leftGlow != null && rightGlow != null
+                && (!glowSuppressed || reconcile))
             {
-                foreach (var state in glowAnimators)
-                    if (state.Component != null && state.Component.enabled) state.Component.enabled = false;
-                foreach (var state in glowColors)
-                    if (state.Component != null && state.Component.enabled) state.Component.enabled = false;
-                foreach (var state in glowRenderers)
-                    if (state.Component != null && state.Component.enabled) state.Component.enabled = false;
-                if (!glowSuppressed) MelonLoader.MelonLogger.Msg($"Sloptifine paused Star Power side-glow visuals ({glowAnimators.Length} animators, {glowColors.Length} color scripts, {glowRenderers.Length} sprites).");
+                if (leftGlow.activeSelf) leftGlow.SetActive(false);
+                if (rightGlow.activeSelf) rightGlow.SetActive(false);
+                if (!glowSuppressed) MelonLoader.MelonLogger.Msg("Sloptifine paused the two Star Power side-glow branches.");
                 glowSuppressed = true;
             }
         }
@@ -91,40 +79,27 @@ internal sealed class OptionalHudAnimationsOverride
     private void ResetGlowReferences()
     {
         glowRoot = IntPtr.Zero;
-        glowAnimators = Array.Empty<AnimatorState>();
-        glowColors = Array.Empty<ColorState>();
-        glowRenderers = Array.Empty<RendererState>();
+        leftGlow = rightGlow = null;
+        leftGlowWasActive = rightGlowWasActive = false;
         nextGlowDiscovery = 0;
     }
 
-    private void DiscoverPb(double now, Animator[] sceneAnimators)
+    private void DiscoverPb(double now)
     {
         nextPbDiscovery = now + 1;
-        // Resolve the live controller rather than assuming the serialized
-        // Gameplay hierarchy path is unchanged after scene initialization.
-        // The game's snapshot already uses this generated Animator search;
-        // FindObjectsByType's inactive overload is not available in this
-        // IL2CPP build and throws "Method unstripping failed" at runtime.
-        Animator? animator = null;
-        int gameplayDisplays = 0;
-        foreach (var candidate in sceneAnimators)
-        {
-            if (candidate == null || candidate.gameObject.scene.name != "Gameplay"
-                || candidate.GetComponent<HighScoreDisplay>() == null) continue;
-            gameplayDisplays++;
-            if (animator != null)
-            {
-                ReportMissing(ref pbDiscoveryMisses, "personal-best popup",
-                    pbDiscoveryMisses == 2 ? $"Gameplay displays={gameplayDisplays}" : "");
-                return;
-            }
-            animator = candidate;
-        }
-        var canvas = animator?.GetComponent<Canvas>();
+        // Both this display and the side glows use UnityEngine.Animator. The
+        // game also has an unrelated custom Il2Cpp.Animator sprite script;
+        // resolving that type would never find these visual targets.
+        // The serialized Gameplay display is active and has the Canvas and
+        // Unity animator on the same object.
+        var display = UnityEngine.Object.FindObjectOfType<HighScoreDisplay>();
+        bool inGameplay = display != null && display.gameObject.scene.name == "Gameplay";
+        var canvas = inGameplay ? display!.GetComponent<Canvas>() : null;
+        var animator = inGameplay ? display!.GetComponent<UnityAnimator>() : null;
         if (canvas == null || animator == null)
         {
             ReportMissing(ref pbDiscoveryMisses, "personal-best popup",
-                pbDiscoveryMisses == 2 ? $"Gameplay displays={gameplayDisplays}; Canvas={canvas != null}; Animator={animator != null}" : "");
+                pbDiscoveryMisses == 2 ? $"Gameplay display={inGameplay}; Canvas={canvas != null}; Unity Animator={animator != null}" : "");
             return;
         }
         pbDiscoveryMisses = 0;
@@ -134,57 +109,49 @@ internal sealed class OptionalHudAnimationsOverride
         pbAnimatorEnabled = animator.enabled;
     }
 
-    private void DiscoverGlows(GameManager game, double now, Animator[] sceneAnimators)
+    private void DiscoverGlows(GameManager game, double now)
     {
         nextGlowDiscovery = now + 1;
-        // The live player hierarchy can differ from the prefab path. The
-        // current scene has two named side-glow Animators, both parented under
-        // the guitar player; locate that pair directly.
-        Animator? leftAnimator = null, rightAnimator = null;
-        var guitarRoots = new HashSet<IntPtr>();
+        // The current StarPowerController serializes direct references to its
+        // left and right Unity animators. This avoids a scene-wide
+        // search and keeps the lookup scoped to the local guitar player.
+        UnityAnimator? leftAnimator = null, rightAnimator = null;
         if (game.playerObjects != null)
             foreach (var player in game.playerObjects)
-                if (player != null && player.TryCast<GuitarPlayer>() != null)
-                    guitarRoots.Add(player.transform.Pointer);
-        List<string>? observed = glowDiscoveryMisses == 2 ? new List<string>(4) : null;
-        foreach (var animator in sceneAnimators)
-        {
-            if (animator == null || animator.gameObject.scene.name != "Gameplay") continue;
-            bool underGuitar = false;
-            for (var parent = animator.transform; parent != null; parent = parent.parent)
-                if (guitarRoots.Contains(parent.Pointer)) { underGuitar = true; break; }
-            if (observed != null && observed.Count < 6)
-                observed.Add($"{animator.gameObject.name}:{(underGuitar ? "guitar" : "other")}");
-            if (!underGuitar) continue;
-            if (animator.gameObject.name == "SpSideGlows L") leftAnimator = animator;
-            else if (animator.gameObject.name == "SpSideGlows R") rightAnimator = animator;
-        }
+                if (player != null && player.enabled && player.TryCast<GuitarPlayer>() != null)
+                {
+                    var controller = player.gameObject.GetComponentInChildren<StarPowerController>(true);
+                    if (controller == null) continue;
+                    leftAnimator = controller.animatorLeft;
+                    rightAnimator = controller.animatorRight;
+                    break;
+                }
         if (leftAnimator != null && rightAnimator != null
+            && leftAnimator.gameObject.name == "SpSideGlows L"
+            && rightAnimator.gameObject.name == "SpSideGlows R"
             && leftAnimator.transform.parent != null && rightAnimator.transform.parent != null
             && leftAnimator.transform.parent.Pointer == rightAnimator.transform.parent.Pointer)
         {
             // Only these branches are side glows. The sibling CenterGlow
             // sprite is a separate visual and stays active.
-            var colors = leftAnimator.GetComponentsInChildren<AnimatorColorBehavior>(true).ToArray()
-                .Concat(rightAnimator.GetComponentsInChildren<AnimatorColorBehavior>(true).ToArray()).ToArray();
-            var renderers = leftAnimator.GetComponentsInChildren<SpriteRenderer>(true).ToArray()
-                .Concat(rightAnimator.GetComponentsInChildren<SpriteRenderer>(true).ToArray()).ToArray();
-            if (renderers.Length == 0)
+            int rendererCount = leftAnimator.GetComponentsInChildren<SpriteRenderer>(true).Length
+                + rightAnimator.GetComponentsInChildren<SpriteRenderer>(true).Length;
+            if (rendererCount == 0)
             {
                 ReportMissing(ref glowDiscoveryMisses, "Star Power side glows",
-                    glowDiscoveryMisses == 2 ? $"animators={string.Join(",", observed ?? new List<string>())}; renderers=0" : "");
+                    glowDiscoveryMisses == 2 ? "side-glow renderers=0" : "");
                 return;
             }
             glowDiscoveryMisses = 0;
             glowRoot = leftAnimator.transform.parent.Pointer;
-            glowAnimators = new[] { new AnimatorState(leftAnimator, leftAnimator.enabled),
-                new AnimatorState(rightAnimator, rightAnimator.enabled) };
-            glowColors = colors.Select(c => new ColorState(c, c != null && c.enabled)).ToArray();
-            glowRenderers = renderers.Select(r => new RendererState(r, r != null && r.enabled)).ToArray();
+            leftGlow = leftAnimator.gameObject;
+            rightGlow = rightAnimator.gameObject;
+            leftGlowWasActive = leftGlow.activeSelf;
+            rightGlowWasActive = rightGlow.activeSelf;
             return;
         }
         ReportMissing(ref glowDiscoveryMisses, "Star Power side glows",
-            glowDiscoveryMisses == 2 ? $"animators={string.Join(",", observed ?? new List<string>())}" : "");
+            glowDiscoveryMisses == 2 ? $"left={leftAnimator?.gameObject.name ?? "missing"}; right={rightAnimator?.gameObject.name ?? "missing"}" : "");
     }
 
     private static void ReportMissing(ref int misses, string target, string detail)
@@ -206,15 +173,10 @@ internal sealed class OptionalHudAnimationsOverride
     private void RestoreGlows()
     {
         if (!glowSuppressed) return;
-        foreach (var state in glowAnimators)
-            try { if (state.Component != null && state.Component.enabled != state.Enabled) state.Component.enabled = state.Enabled; }
-            catch { }
-        foreach (var state in glowColors)
-            try { if (state.Component != null && state.Component.enabled != state.Enabled) state.Component.enabled = state.Enabled; }
-            catch { }
-        foreach (var state in glowRenderers)
-            try { if (state.Component != null && state.Component.enabled != state.Enabled) state.Component.enabled = state.Enabled; }
-            catch { }
+        try { if (leftGlow != null && leftGlow.activeSelf != leftGlowWasActive) leftGlow.SetActive(leftGlowWasActive); }
+        catch { }
+        try { if (rightGlow != null && rightGlow.activeSelf != rightGlowWasActive) rightGlow.SetActive(rightGlowWasActive); }
+        catch { }
         glowSuppressed = false;
     }
 }

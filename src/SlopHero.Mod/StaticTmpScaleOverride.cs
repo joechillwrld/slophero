@@ -1,7 +1,8 @@
 using Il2Cpp;
 using Il2CppTMPro;
 using UnityEngine;
-using Animator = Il2Cpp.Animator;
+using SpriteAnimator = Il2Cpp.Animator;
+using UnityAnimator = UnityEngine.Animator;
 using LegacyAnimation = UnityEngine.Animation;
 
 namespace SlopHero.Mod;
@@ -147,9 +148,12 @@ internal sealed class StaticTmpScaleOverride
     {
         for (Transform? node = text.transform; node != null; node = node.parent)
         {
-            // Any Animator/Animation in the chain can animate scale later in
-            // the song, so conservatively keep those TMP labels registered.
-            if (node.GetComponent<Animator>() != null || node.GetComponent<LegacyAnimation>() != null)
+            // The game has both Unity's Animator (the PB popup uses it) and a
+            // custom sprite Animator script. Either may animate a parent, so
+            // check those labels at the faster safety cadence.
+            if (node.GetComponent<UnityAnimator>() != null
+                || node.GetComponent<SpriteAnimator>() != null
+                || node.GetComponent<LegacyAnimation>() != null)
                 return true;
         }
         return false;
