@@ -2213,3 +2213,32 @@ keyed by native pointer and do not depend on result order. Build validation
 passes with zero warnings and 101 core checks. This remains an in-game
 prototype: no FPS result is measured, and a scale animation may briefly soften
 its TMP label before the next check.
+
+### v0.4.91 input and SpriteAttach prototypes (2026-10-25)
+
+The supplied WPA method export attributes about 317 ms self CPU over 31.1
+seconds to `Rewired.ThreadSafeUnityInput.Mouse.Update`, which snapshots seven
+mouse buttons and three axes. Version 0.4.91 adds a separate default-off
+`Pause Rewired mouse polling in solo songs` switch. Its Harmony prefix exists
+only during an active offline solo guitar Quickplay song, and skips only that
+mouse snapshot. Keyboard, joystick/controller, instrument polling, online play,
+and note timing are outside the hook. Mouse-bound actions pause while enabled.
+The candidate amount is small and does not predict an FPS gain.
+
+The same export attributes about 275 ms self CPU over 31.1 seconds to
+`SpriteAttach.Update`. The exact v1.1.0.6142 disassembly reads screen
+dimensions, camera rect/pixel rect and matrices, the attached and camera
+positions, reference-sprite bounds and world matrix, anchor/offset values,
+`PlayerCamera` scale, a packed static Vector2 scale input (helper RVA
+`0x64C60`), per-target scale factors, and target transforms. The default-off
+`Cache unchanged SpriteAttach transforms in solo songs` prototype records these
+values and the last rotation/scales written. It skips native Update only when
+the current inputs and outputs still match. Missing objects or any read error
+restore vanilla execution; the hook installs only for eligible offline solo
+guitar Quickplay and is removed outside that scope. This cache checks several
+Unity properties on every call and can cost more than the work it skips. Both
+switches compile against the supplied generated assemblies; the release build
+has zero compiler warnings/errors and the core checks pass (114). Neither
+prototype has been runtime-tested or has a matched PresentMon A/B result, so
+neither is a demonstrated FPS or frame-time improvement. Test the switches
+separately before combining them.

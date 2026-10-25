@@ -37,11 +37,17 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.89. It adds a default-off exact-build native
-detour that skips Unity's legacy camera mouse callbacks only during active
-gameplay, and removes the mouse-raycast hook's per-call diagnostic counter
-increment. It preserves Rewired's polling rate and instrument input. Version
-0.4.88 adds the default-off TMP scale-update experiment. Version 0.4.87
+The latest packaged build is 0.4.91. It adds default-off Rewired mouse-only
+polling pause and an exact-build `SpriteAttach.Update` input/output cache,
+both limited to offline solo guitar Quickplay. The mouse switch leaves
+keyboard/controller and 1000 Hz instrument polling intact; mouse-bound actions
+pause during a song. The cache checks camera/sprite/layout inputs and prior
+outputs on every call, so its net performance is unproven and could be
+negative; it fails open to vanilla. Both are runtime-unverified prototypes.
+Version 0.4.89 added a default-off exact-build native detour that skips Unity's
+legacy camera mouse callbacks only during active gameplay, and removed the
+mouse-raycast hook's per-call diagnostic counter increment. Version 0.4.88
+adds the default-off TMP scale-update experiment. Version 0.4.87
 caches SlopHero's configured joystick binding lookup while preserving
 Rewired's polling rate. Version 0.4.86 extends
 the default-off solo UI-event pause to disable Unity's live EventSystem

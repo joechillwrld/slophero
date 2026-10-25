@@ -63,6 +63,7 @@ the Sloptifine pages and preserve their documented scope:
 | Unity job queue setter was resolved through the matching player PDB | `UnityJobWorkerLimit` uses the generated `SetJobQueueMaximumActiveThreadCount` API and restores the prior limit. It is default-off; the latest three-run callback comparison shows no benefit. |
 | Current `HighwayScroll.Update` combines property-block writes with video/fade behavior | `HighwayAnimationOverride` is a default-off whole-update freeze during offline solo songs. It may freeze those visuals and has no demonstrated frame gain. The old source's note `yield`/hit-detection paths remain untouched because they are scoring-sensitive and not confirmed in current code. |
 | TMP's SDF scale queue repeatedly checks text transforms | v0.4.88 packages the default-off offline-solo experiment; its v0.4.89 log changed zero labels. The current worktree includes labels under Animator/Animation parents and checks those at 20 Hz, while ordinary labels stay at 4 Hz. Any detected scale change restores TMP's per-frame scale updates and excludes that label for the scene. The scene-wide discovery uses unsorted `FindObjectsByType`; TMP layout, graphic-rebuild, and culling queues stay active. Scale animation could briefly soften text; the prototype has no measured frame-time result yet. |
+| Rewired's mouse-only sampler and `SpriteAttach.Update` have small WPA self-CPU rows | v0.4.91 adds two separate default-off options, limited to offline solo guitar Quickplay. The Rewired prefix skips only the mouse snapshot (seven buttons, three axes); keyboard/controller and 1000 Hz instrument polling stay active, while mouse-bound actions pause. The SpriteAttach cache verifies camera/screen/sprite/scale inputs and outputs, including the exact-build packed scale input at RVA `0x64C60`; missing bindings fail open to vanilla. Both are prototypes without runtime or matched PresentMon results; the checks themselves may erase the SpriteAttach savings. Test separately before combining. |
 
 ClonZones installs a `GuitarFretAnimator.Update` settle gate in the user's
 setup, which may overlap with another fret hook. Current `HighwayScroll` also
@@ -420,7 +421,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.90** on the private
+- Latest packaged build: SlopHero **0.4.91** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.89 (SHA-256
   `6bfd5b29167d86e05e37996606bc6b72df03f96e0c228bba954df27c65b0c596`).
@@ -464,6 +465,16 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
   enabled. ZIP SHA-256:
   `bb3ce4111e99cb975637ba2da2d270f64fc0d8ec6c4e26058b97227341a19161`; DLL
   SHA-256: `eb3fe04566269d1f95a34f0202871043976a50463c227d9797e1c2fe91211c81`.
+  Version 0.4.91 adds the separate default-off Rewired mouse-snapshot pause
+  and exact-build `SpriteAttach.Update` input/output cache described above.
+  It builds with zero warnings/errors and core checks pass (114). Both remain
+  runtime-unverified experiments without matched frame captures. The mouse
+  switch leaves keyboard/controller and 1000 Hz instrument polling untouched;
+  mouse-bound actions pause during its offline-solo scope. The SpriteAttach
+  cache fails open to vanilla and may have negative net performance because
+  it checks Unity inputs every call. ZIP SHA-256:
+  `cb8f15d86b0dc01250134780e79029820595fb0d90c580a96bcc8795a09c4951`; DLL
+  SHA-256: `b51773181fe2f9a48953b62a51d011c678117f84d5be4378effb1cb4accbc5be`.
   The 0.4.88 package SHA-256 is
   `527b5367bceb523a64375ad958360356eb0a72a28353636e57c1078f976c054d`, and
   its DLL SHA-256 is

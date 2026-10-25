@@ -31,6 +31,8 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> pauseHighwayAnimations = null!;
     private MelonPreferences_Entry<bool> reduceUnityJobWorkers = null!;
     private MelonPreferences_Entry<bool> staticTmpScaleDuringSong = null!;
+    private MelonPreferences_Entry<bool> pauseRewiredMousePolling = null!;
+    private MelonPreferences_Entry<bool> cacheSpriteAttachTransforms = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
     private readonly VisualOverrides visuals = new();
@@ -49,6 +51,8 @@ public sealed partial class Core
     private readonly HighwayAnimationOverride highwayAnimations = new();
     private readonly UnityJobWorkerLimit unityJobWorkerLimit = new();
     private readonly StaticTmpScaleOverride staticTmpScale = new();
+    private readonly RewiredMousePollingOverride rewiredMousePolling = new();
+    private readonly SpriteAttachCacheOverride spriteAttachCache = new();
     private readonly RuntimeTimings timings = new();
     private string songText = "", editText = "", editLabel = "", editError = "";
     private Action<string>? editApply;
@@ -143,6 +147,8 @@ public sealed partial class Core
         pauseHighwayAnimations = preferences.CreateEntry("PerformancePauseHighwayAnimations", false);
         reduceUnityJobWorkers = preferences.CreateEntry("PerformanceReduceUnityJobWorkers", false);
         staticTmpScaleDuringSong = preferences.CreateEntry("PerformanceStaticTmpScaleDuringSong", false);
+        pauseRewiredMousePolling = preferences.CreateEntry("PerformancePauseRewiredMousePolling", false);
+        cacheSpriteAttachTransforms = preferences.CreateEntry("PerformanceCacheSpriteAttachTransforms", false);
         var legacyFreezeLyricsScroll = preferences.CreateEntry("PerformanceFreezeLyricsBackgroundScroll", false);
         if (legacyFreezeLyricsScroll.Value)
         {
@@ -362,7 +368,9 @@ public sealed partial class Core
                 Toggle(reduceUnityJobWorkers, "Use one fewer Unity job worker during offline solo songs", x, y + 206);
                 Toggle(disableMidiForSession, "Disable drum MIDI input (restart to restore)", x, y + 236);
                 Toggle(staticTmpScaleDuringSong, "Skip TMP scale checks in offline solo play", x, y + 266);
-                GUI.Label(new Rect(x + 22, y + 300, 610, 118), "Experimental; default off. Legacy mouse callbacks from Clone Hero or other mods are skipped only during active gameplay; vanilla callbacks return on pause, menus, or focus loss. Mouse UI raycasts are a separate switch. TMP layout and graphic rebuilds stay enabled; labels under animation are checked at 20 Hz and restored if their scale changes, though text may briefly soften. Settings restore on pause, menus, scene changes, or unload. Drum MIDI shutdown requires a restart to restore.");
+                Toggle(pauseRewiredMousePolling, "Pause Rewired mouse polling in solo songs", x, y + 296);
+                Toggle(cacheSpriteAttachTransforms, "Cache unchanged SpriteAttach transforms in solo songs", x, y + 326);
+                GUI.Label(new Rect(x + 22, y + 356, 610, 112), "Experimental; default off. Mouse-bound controls pause only during active offline solo songs; keyboard and controller polling stay enabled. SpriteAttach runs normally whenever its camera, sprite, layout, scale factors, or output transforms change. Legacy mouse callbacks are a separate switch. TMP layout/rebuilds stay enabled; animated labels are checked at 20 Hz. Drum MIDI shutdown requires a restart to restore.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -820,6 +828,8 @@ public sealed partial class Core
             Bool("PerformancePauseHighwayAnimations", pauseHighwayAnimations);
             Bool("PerformanceReduceUnityJobWorkers", reduceUnityJobWorkers);
             Bool("PerformanceStaticTmpScaleDuringSong", staticTmpScaleDuringSong);
+            Bool("PerformancePauseRewiredMousePolling", pauseRewiredMousePolling);
+            Bool("PerformanceCacheSpriteAttachTransforms", cacheSpriteAttachTransforms);
         }
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
@@ -869,6 +879,8 @@ public sealed partial class Core
         Bool("PerformancePauseHighwayAnimations", pauseHighwayAnimations);
         Bool("PerformanceReduceUnityJobWorkers", reduceUnityJobWorkers);
         Bool("PerformanceStaticTmpScaleDuringSong", staticTmpScaleDuringSong);
+        Bool("PerformancePauseRewiredMousePolling", pauseRewiredMousePolling);
+        Bool("PerformanceCacheSpriteAttachTransforms", cacheSpriteAttachTransforms);
         if (values.ContainsKey("PerformanceFreezeComboSmokeScroll"))
             Bool("PerformanceFreezeComboSmokeScroll", freezeComboSmokeScroll);
         else

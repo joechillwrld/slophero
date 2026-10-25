@@ -1,14 +1,21 @@
-# SlopHero 0.4.90 alpha
+# SlopHero 0.4.91 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.90
-keeps the TMP scale-update experiment default-off and broadens it to labels
-under Animator/Animation parents. Ordinary labels are checked at 4 Hz and
-animated-parent labels at 20 Hz; a detected scale change restores TMP's
+build, compiled against its loader and generated assemblies. Version 0.4.91
+adds two default-off offline-solo experiments: pause Rewired's mouse-only
+snapshot while preserving keyboard, controller, and 1000 Hz instrument input;
+and cache `SpriteAttach.Update` only while its camera, viewport, sprite,
+scaling inputs, and output transforms stay unchanged. The cache is limited to
+the supplied exact game build and fails open to vanilla updates. Both options
+These prototypes may have little or negative performance impact until tested
+in-game; test one at a time before combining them. Version 0.4.90 keeps the TMP
+scale-update experiment default-off and broadens it to
+labels under Animator/Animation parents. Ordinary labels are checked at 4 Hz
+and animated-parent labels at 20 Hz; a detected scale change restores TMP's
 per-frame scale checks for that label. TMP layout, graphics, and culling
 updates remain active. Scale animation could soften text briefly before the
 next check; this prototype has no measured FPS gain yet. The one-time TMP
@@ -112,7 +119,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.90 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.90-alpha.zip)
+[Download SlopHero v0.4.91 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.91-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

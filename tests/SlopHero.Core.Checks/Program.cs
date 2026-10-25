@@ -57,6 +57,25 @@ Check(!PracticeReadiness.CanSelect(true, true, true, true, true, 1),
     "Initialization coroutines block selection");
 Check(PracticeReadiness.CanSelect(true, true, true, true, true, 0),
     "Fully initialized practice scene allows selection");
+bool MouseSamplerScope(bool requested = true, bool ready = true, bool playing = true,
+    bool paused = false, bool songOver = false, int coroutines = 0, int players = 1,
+    int mode = 0, bool setlist = false, bool transition = false, bool menu = false,
+    bool focused = true, bool online = false)
+    => OfflineSoloSongScope.IsEligible(requested, ready, playing, paused, songOver,
+        coroutines, players, mode, setlist, transition, menu, focused, online);
+Check(MouseSamplerScope(), "Mouse sampler is eligible in active offline solo Quickplay");
+Check(!MouseSamplerScope(requested: false), "Mouse sampler preference defaults off");
+Check(!MouseSamplerScope(online: true), "Mouse sampler never suppresses online play");
+Check(!MouseSamplerScope(players: 2), "Mouse sampler leaves multiplayer polling intact");
+Check(!MouseSamplerScope(mode: 1), "Mouse sampler is limited to guitar game mode");
+Check(!MouseSamplerScope(setlist: true), "Mouse sampler leaves setlists intact");
+Check(!MouseSamplerScope(paused: true), "Mouse sampler resumes while paused");
+Check(!MouseSamplerScope(songOver: true), "Mouse sampler resumes at song end");
+Check(!MouseSamplerScope(coroutines: 1), "Mouse sampler resumes during transitions");
+Check(!MouseSamplerScope(transition: true), "Mouse sampler resumes during mod transitions");
+Check(!MouseSamplerScope(menu: true), "Mouse sampler resumes while SlopHero settings are open");
+Check(!MouseSamplerScope(focused: false), "Mouse sampler resumes when the game loses focus");
+Check(!MouseSamplerScope(ready: false), "Mouse sampler fails open until game state is ready");
 var speed = new ScrollSpeedCompensation();
 Check(speed.Update(10, .5f, true) == 20, "Half game-clock rate compensates inferred renderer speed");
 Check(speed.Update(20, .5f, true) == 20, "Repeated frames preserve compensated speed");
