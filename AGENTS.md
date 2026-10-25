@@ -37,7 +37,11 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.98. It avoids brief Unity worker-count
+The latest packaged build is 0.4.99. It moves the optional TMP candidate scan
+to Gameplay scene initialization when already enabled, and keeps the native
+legacy-mouse and mouse-UI skips offline solo. The PresentMon report tool now
+supports one-second presented-FPS windows from raw captures. Runtime impact
+is not yet measured. Version 0.4.98 avoids brief Unity worker-count
 reconfiguration, stops TMP work after finding no eligible Gameplay labels,
 and skips empty mod IMGUI callbacks while the Canvas counter is visible.
 These have no matched presented-FPS result yet. Version 0.4.97 extends the default-off gameplay

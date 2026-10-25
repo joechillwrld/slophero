@@ -421,10 +421,10 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.98** on the private
+- Latest packaged build: SlopHero **0.4.99** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.97 (SHA-256
-  `2c5b6e1cec94d46b314cb30c387bce6e7f7e870453434a0d5ef150a203dc0b0d`)
+  0.4.98 (SHA-256
+  `596e071ba8f4fbda8de36e22852a60f5dc2f111b4a83bc96ef8ca10cb3a13ce1`)
   and is analyzed below. An earlier 0.4.95 log (SHA-256
   `686ab1bc9132560aaed79a8a2880502d63d91dd938bba68ab83ecd29c7ea11a2`)
   records the previous timing windows. The earlier
@@ -1010,3 +1010,59 @@ ZIP SHA-256:
 `229bba8ed9fee6f0a82e909afd09a9f9a81471407fcd1dd17ffa9c7bb34a8c19`;
 DLL SHA-256:
 `f432d0f1fb0331b6a421244a4b610fa73e6cf5f9985d999f08f39fe3555ffbe6`.
+
+## v0.4.98 runtime log and v0.4.99 follow-up
+
+The new `Latest.log` (SHA-256 above) loads 0.4.98 with no SlopHero hook
+exception. The optional worker-count experiment activates about 0.4–0.5 s
+after the song begins, rather than changing the pool during the brief
+120–150 ms startup states seen in 0.4.97. TMP scale discovery runs only
+three times in the first 30-second timing capture, then zero times in the
+second. Its first scan takes 24.630 ms and finds no eligible label, so it
+offers no steady-state benefit on this user's Gameplay scene. Version 0.4.99
+prepares that candidate list at Gameplay scene initialization if the option
+is already enabled, before the song loop; enabling the option mid-song retains
+the prior first-use scan. The setting and per-label restoration remain intact.
+
+The first capture's largest simulation Update is 58.539 ms; the second's is
+17.503 ms. The 24.630 ms TMP scan is in LateUpdate, so the log does **not**
+prove it caused the 58.539 ms Update gap. Several optional hooks activate in
+the opening fraction of a second, including the native legacy-mouse detour
+and the Rewired mouse prefix, but the timing buckets do not attribute that
+Update gap to one of them. The 1,558 and 1,540 scheduled render callbacks/s
+are not presented FPS, and the two captures do not establish a causal gain.
+The second song reports SpriteAttach cache installation during transition;
+there is no matched raw PresentMon comparison of that experiment.
+
+The older WPA map still makes Unity camera render/cull the largest attributed
+render branch, while the exact current guitar-note renderer already checks
+Unity's render decision. Do not skip scoring, input, or the whole note loop.
+The optional legacy camera mouse and mouse-UI skips were not explicitly
+conditioned on offline solo in `Core`; 0.4.99 applies that gate, matching the
+other UI optimizations and restoring vanilla behavior online. This corrects
+scope; it does not predict an offline FPS gain.
+
+Actual presented-frame analysis remains external: `tools/presentmon_report.py
+--fps-windows capture.csv` now prints counts of actual presents in each
+complete one-second interval, alongside frame-time percentiles and CPU/GPU
+busy. The supplied older raw capture gives 37,717 presents over 29.900 s,
+about 1,261.4 presents/s overall, with one-second windows that vary. It is
+from v0.4.75 and cannot be used as an A/B result for 0.4.99. A mod-side
+Unity callback counter would not measure DXGI presentation.
+
+Next investigation order: (1) attribute the first-song 58 ms Update gap with
+existing timing scopes or a matched native trace before changing hook timing;
+(2) isolate actual render/cull work by live camera and renderer, without
+altering note visibility or user-enabled HUD; (3) revisit the current whammy
+raw-byte/write and texture-upload path only if a trace shows redundant work
+beyond the existing upload gate. The previous method exports contain large
+inclusive Rewired and IL2CPP dispatcher rows; those are shared input/callback
+paths and cannot be safely throttled from their aggregate weights.
+
+Version 0.4.99 builds against the supplied references with zero warnings and
+errors, passes all 114 core checks, and packages only `Mods/SlopHero.dll`.
+The PresentMon report prints 29 complete one-second FPS windows from the
+older 29.9-second raw capture. ZIP SHA-256:
+`27921e125c1ff3a3a28b64084e83b9877273b7cec595c99810fd8d91c5045059`;
+DLL SHA-256:
+`f63bca6dce0a968dc510f5c9842e2a964d5c1f7cfc814001fd30bd1c965c5f1f`.

@@ -2,6 +2,7 @@
 """Summarize raw Intel PresentMon per-frame CSVs for repeatable A/B captures.
 
 Usage: python tools/presentmon_report.py baseline.csv candidate.csv
+       python tools/presentmon_report.py --fps-windows capture.csv
 The -stats.csv summary is insufficient: this tool needs the raw per-frame file.
 """
 
@@ -52,6 +53,7 @@ def describe(values):
 def analyze(path):
     values = {name: [] for name in METRICS}
     modes, chains, processes = Counter(), Counter(), Counter()
+    fps_windows = Counter()
     spikes = []
     first_time = last_time = None
     rows = 0
@@ -68,6 +70,7 @@ def analyze(path):
             if timestamp is not None:
                 first_time = timestamp if first_time is None else first_time
                 last_time = timestamp
+                fps_windows[int(timestamp - first_time)] += 1
             for name in METRICS:
                 metric = number(row.get(name))
                 if metric is not None:
@@ -79,7 +82,7 @@ def analyze(path):
     if rows == 0 or not values["MsBetweenPresents"]:
         raise ValueError(f"{path}: no frame timings found")
     duration = (last_time - first_time) if first_time is not None and last_time is not None else None
-    return rows, duration, values, modes, chains, processes, spikes
+    return rows, duration, values, modes, chains, processes, spikes, fps_windows
 
 
 def fmt(value):
@@ -88,10 +91,12 @@ def fmt(value):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--fps-windows", action="store_true",
+                        help="show actual presents counted in each complete one-second window")
     parser.add_argument("csv", nargs="+", type=Path, help="raw pmcap CSV, not -stats.csv")
     args = parser.parse_args()
     for path in args.csv:
-        rows, duration, values, modes, chains, processes, spikes = analyze(path)
+        rows, duration, values, modes, chains, processes, spikes, fps_windows = analyze(path)
         print(f"\n{path.name}: {rows} frames, {fmt(duration)} s, "
               f"{fmt(rows / duration if duration and duration > 0 else None)} presents/s")
         print(f"  process={dict(processes)}; present mode={dict(modes)}; swapchains={dict(chains)}")
@@ -100,6 +105,10 @@ def main():
         print("  frames >=2/3/5/10 ms: " + "/".join(
             str(sum(v >= limit for v in values["MsBetweenPresents"]))
             for limit in (2, 3, 5, 10)))
+        if args.fps_windows and duration is not None:
+            for second in range(int(duration)):
+                print(f"  presented FPS {second:>3}-{second + 1:<3} s: "
+                      f"{fps_windows[second]} presents/s")
         for timestamp, frame, cpu, gpu in sorted(spikes, key=lambda row: row[1], reverse=True)[:10]:
             print(f"  spike at {fmt(timestamp)} s: present={fmt(frame)} ms, "
                   f"CPU busy={fmt(cpu)} ms, GPU busy={fmt(gpu)} ms")

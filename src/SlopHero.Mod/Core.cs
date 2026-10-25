@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.98", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.99", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -182,6 +182,16 @@ public sealed partial class Core : MelonMod
         if (string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase))
         {
             gameplayInitialized = true;
+            if (compatible && staticTmpScaleDuringSong.Value)
+            {
+                try { staticTmpScale.Prepare(); }
+                catch (Exception ex)
+                {
+                    staticTmpScale.Clear();
+                    staticTmpScaleError = true;
+                    LoggerInstance.Warning($"TMP scene preparation stopped; vanilla text updates remain enabled: {ex.Message}");
+                }
+            }
         }
     }
 
@@ -421,9 +431,11 @@ public sealed partial class Core : MelonMod
             bool workerLimitCandidate = workerLimitRequested && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0;
+            bool skipMouseUiRequested = skipGameplayMouseUi.Value;
+            bool skipLegacyMouseRequested = skipLegacyMouseEvents.Value;
             bool needsOfflineSoloGate = pauseHighwayRequested || pauseCheatsActive || pauseUiRequested
                 || workerLimitRequested || mouseSamplerRequested || spriteAttachCacheRequested
-                || backgroundCameraRequested;
+                || backgroundCameraRequested || skipMouseUiRequested || skipLegacyMouseRequested;
             bool soloOptimizationCandidate = needsOfflineSoloGate && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0
@@ -475,12 +487,11 @@ public sealed partial class Core : MelonMod
                 finalStatsRefreshUntil = now + 1;
             }
             lastStatsSongPlaying = songPlaying;
-            bool skipMouseUiRequested = skipGameplayMouseUi.Value;
             bool activeSongMouseSuppression = ready && songPlaying && !game!.isPaused && !game.isSongOver
                 && game.coroutinesRunning == 0 && !transition && !settingsOpen && !moveHud
-                && resizeTarget < 0 && Application.isFocused;
+                && resizeTarget < 0 && Application.isFocused && isOfflineSolo;
             mouseUiGameplay.Update(HarmonyInstance, skipMouseUiRequested, skipMouseUiRequested && activeSongMouseSuppression);
-            legacyMouseEvents.Update(skipLegacyMouseEvents.Value, activeSongMouseSuppression);
+            legacyMouseEvents.Update(skipLegacyMouseRequested, activeSongMouseSuppression);
             // These three experiments share the same offline solo gate. Read
             // the IL2CPP game properties once, and only when one is requested.
             bool scopedExperimentRequested = mouseSamplerRequested || spriteAttachCacheRequested
