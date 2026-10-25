@@ -421,12 +421,15 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.92** on the private
+- Latest packaged build: SlopHero **0.4.93** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.91 (SHA-256
-  `9a036617279b5d5c175b1ca060868f4f06a7d9409b65d318238d511708a44d5d`).
-  It confirms the Rewired mouse and SpriteAttach hooks install without errors;
-  the three timing windows are analyzed below. The earlier 0.4.89 log (SHA-256
+  0.4.92 (SHA-256
+  `da127fa224b26ada8a126568654dee3c0c094c50fd7828fa78a7ce612893dcd1`).
+  Its timing windows and camera activation are analyzed below. The earlier
+  0.4.91 log (SHA-256
+  `9a036617279b5d5c175b1ca060868f4f06a7d9409b65d318238d511708a44d5d`)
+  confirms the Rewired mouse and SpriteAttach hooks installed without errors.
+  The earlier 0.4.89 log (SHA-256
   `6bfd5b29167d86e05e37996606bc6b72df03f96e0c228bba954df27c65b0c596`)
   confirms the legacy mouse detour's install/restore path. The 0.4.87 log (SHA-256
   `f1f2b1b5411260cfcd0e1025a6e114da3a356cecaf147e206d5cd67861517cf0`)
@@ -668,6 +671,27 @@ switch could not add work avoidance in those windows, even in the captures
 where its own preference was enabled. The legacy camera mouse-event option
 was enabled in two windows and disabled in two, but the mod callback timings
 are not a controlled measure of its effect on presented frames.
+
+## v0.4.93 SpriteAttach cache correction
+
+The optional `SpriteAttach.Update` cache previously ran its full `Capture`
+postfix even when its prefix had skipped the game's update. On a cache hit,
+that repeated the camera, sprite, matrix, and target-transform reads that the
+cache was intended to avoid. The prefix now passes a Harmony `__state` flag to
+the postfix; only an update that this cache allowed recaptures state. A later change
+to any input or cached output still causes the original method to run. While
+the setting remains on, pause and menu transitions now make the hook pass
+through instead of unpatching and repatching it; scene exit and turning the
+setting off still remove it. This avoids patch setup on resume but leaves a
+pass-through prefix/postfix while the opted-in scene is paused.
+
+The Rewired mouse, SpriteAttach, and background-camera experiments also now
+share one `OfflineSoloSongScope` evaluation per 20 Hz state refresh. When all
+three are off, the IL2CPP fields for that gate are not read. These are source
+level reductions, with no Windows runtime result or measured FPS gain yet.
+The v0.4.93 build has zero warnings/errors and the 114 core checks pass.
+ZIP SHA-256: `3eb6cc993a0f292b672a0aff75991071ba409f631cd83de5cbf9c7b1c90d88f5`;
+DLL SHA-256: `cf8e22fdc216419d41cfdee92e6e659dc6af79cf1c2db30010ba14cf5405ef99`.
 
 ## WPA hot-callback attribution follow-up
 

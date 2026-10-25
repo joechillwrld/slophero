@@ -174,12 +174,21 @@ internal sealed class SpriteAttachCacheOverride
 
     internal void Update(HarmonyLib.Harmony harmony, bool requested, bool eligibleOfflineSoloSong)
     {
-        if (!requested || !eligibleOfflineSoloSong)
+        if (!requested)
         {
             cacheActive = false;
-            states.Clear();
-            if (!requested || !eligibleOfflineSoloSong) Restore(harmony);
-            if (!requested) { failed = false; failure = null; }
+            Restore(harmony);
+            failed = false;
+            failure = null;
+            return;
+        }
+
+        if (!eligibleOfflineSoloSong)
+        {
+            // Leave the opt-in hook installed until the setting or scene
+            // changes. Repatching it on every pause/resume can hitch the game;
+            // the inactive prefix and postfix pass through to vanilla.
+            Disable();
             return;
         }
 
@@ -314,6 +323,17 @@ internal sealed class SpriteAttachCacheOverride
         => nativeScaleVectorGetter?.Invoke(IntPtr.Zero)
             ?? throw new InvalidOperationException("SpriteAttach native scale input is unavailable.");
 
-    private static bool BeforeUpdate(SpriteAttach __instance) => active?.ShouldRun(__instance) != false;
-    private static void AfterUpdate(SpriteAttach __instance) => active?.Record(__instance);
+    private static bool BeforeUpdate(SpriteAttach __instance, out bool __state)
+    {
+        __state = active?.ShouldRun(__instance) != false;
+        return __state;
+    }
+
+    // A successful cache hit has unchanged inputs and outputs. Recapturing
+    // them after skipping the original would repeat the expensive interop
+    // reads on the very frames this cache is meant to avoid.
+    private static void AfterUpdate(SpriteAttach __instance, bool __state)
+    {
+        if (__state) active?.Record(__instance);
+    }
 }

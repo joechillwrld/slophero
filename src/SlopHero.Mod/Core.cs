@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.92", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.93", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -480,10 +480,12 @@ public sealed partial class Core : MelonMod
                 && resizeTarget < 0 && Application.isFocused;
             mouseUiGameplay.Update(HarmonyInstance, skipMouseUiRequested, skipMouseUiRequested && activeSongMouseSuppression);
             legacyMouseEvents.Update(skipLegacyMouseEvents.Value, activeSongMouseSuppression);
-            bool pauseMouseSampler = OfflineSoloSongScope.IsEligible(
-                mouseSamplerRequested,
-                ready,
-                songPlaying,
+            // These three experiments share the same offline solo gate. Read
+            // the IL2CPP game properties once, and only when one is requested.
+            bool scopedExperimentRequested = mouseSamplerRequested || spriteAttachCacheRequested
+                || backgroundCameraRequested;
+            bool eligibleScopedExperiment = scopedExperimentRequested && OfflineSoloSongScope.IsEligible(
+                requested: true, gameReady: ready, songPlaying: songPlaying,
                 paused: ready && game!.isPaused,
                 songOver: ready && game!.isSongOver,
                 runningCoroutines: ready ? game!.coroutinesRunning : -1,
@@ -494,38 +496,13 @@ public sealed partial class Core : MelonMod
                 settingsOpen: settingsOpen || moveHud || resizeTarget >= 0,
                 focused: Application.isFocused,
                 online: !isOfflineSolo);
+            bool pauseMouseSampler = mouseSamplerRequested && eligibleScopedExperiment;
             rewiredMousePolling.Update(HarmonyInstance, mouseSamplerRequested, pauseMouseSampler);
-            bool cacheSpriteAttach = OfflineSoloSongScope.IsEligible(
-                spriteAttachCacheRequested,
-                ready,
-                songPlaying,
-                paused: ready && game!.isPaused,
-                songOver: ready && game!.isSongOver,
-                runningCoroutines: ready ? game!.coroutinesRunning : -1,
-                playerCount: ready ? game!.actualPlayerCount : 0,
-                gameMode: ready ? (int)game!.globalVariables!.gameMode : -1,
-                playingSetlist: ready && game!.globalVariables!.isPlayingSetlist,
-                transitioning: transition,
-                settingsOpen: settingsOpen || moveHud || resizeTarget >= 0,
-                focused: Application.isFocused,
-                online: !isOfflineSolo);
+            bool cacheSpriteAttach = spriteAttachCacheRequested && eligibleScopedExperiment;
             spriteAttachCache.Update(HarmonyInstance, spriteAttachCacheRequested, cacheSpriteAttach);
             if (spriteAttachCache.ConsumeFailure() is string cacheFailure)
                 LoggerInstance.Warning($"SpriteAttach cache experiment stopped; vanilla updates remain enabled: {cacheFailure}");
-            bool skipBackground = OfflineSoloSongScope.IsEligible(
-                backgroundCameraRequested,
-                ready,
-                songPlaying,
-                paused: ready && game!.isPaused,
-                songOver: ready && game!.isSongOver,
-                runningCoroutines: ready ? game!.coroutinesRunning : -1,
-                playerCount: ready ? game!.actualPlayerCount : 0,
-                gameMode: ready ? (int)game!.globalVariables!.gameMode : -1,
-                playingSetlist: ready && game!.globalVariables!.isPlayingSetlist,
-                transitioning: transition,
-                settingsOpen: settingsOpen || moveHud || resizeTarget >= 0,
-                focused: Application.isFocused,
-                online: !isOfflineSolo);
+            bool skipBackground = backgroundCameraRequested && eligibleScopedExperiment;
             backgroundCamera.Update(backgroundCameraRequested, skipBackground, game);
             if (backgroundCamera.ConsumeFailure() is string backgroundFailure)
                 LoggerInstance.Warning($"Background camera experiment stopped; original cameras restored: {backgroundFailure}");

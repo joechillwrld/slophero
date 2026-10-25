@@ -37,7 +37,13 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.91. It adds default-off Rewired mouse-only
+The latest packaged build is 0.4.93. It corrects the optional SpriteAttach
+cache so a skipped original update no longer recaptures all inputs and outputs;
+the hook stays pass-through on pause and menu transitions until scene exit or
+setting disable. Three experimental offline-solo settings now share one game
+state read. These changes compile, but have no Windows FPS result yet. Version
+0.4.92 adds the default-off background-camera suppression. Version 0.4.91
+adds default-off Rewired mouse-only
 polling pause and an exact-build `SpriteAttach.Update` input/output cache,
 both limited to offline solo guitar Quickplay. The mouse switch leaves
 keyboard/controller and 1000 Hz instrument polling intact; mouse-bound actions

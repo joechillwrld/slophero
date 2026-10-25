@@ -1,11 +1,16 @@
-# SlopHero 0.4.92 alpha
+# SlopHero 0.4.93 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.92
+build, compiled against its loader and generated assemblies. Version 0.4.93
+fixes the optional SpriteAttach cache so a skipped update does not recapture
+the same camera and transform state. The opted-in hook now stays dormant across
+pause/resume instead of being repatched, and three experiments share one
+offline-song state read. These changes have no measured FPS result yet.
+Version 0.4.92
 adds a default-off black-background experiment that skips the full-screen
 background camera during offline solo songs, transferring its screen clear to
 the guitar camera and restoring the original camera settings on pause, menus,
@@ -125,7 +130,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.92 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.92-alpha.zip)
+[Download SlopHero v0.4.93 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.93-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
