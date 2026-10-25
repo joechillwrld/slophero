@@ -662,12 +662,19 @@ PresentMon frame-present measurements. Mouse/UI, worker, HUD, visual, and
 other performance settings overlap in this session, and there is no matching
 PresentMon capture, so neither the camera switch's frame effect nor the
 cause of the large gaps can be isolated. No FPS gain is claimed from this log.
+All four windows also had `gameplayUiEvents=True`; the live EventSystem was
+suspended during each song. That means the mouse-only `ProcessMouseEvent`
+switch could not add work avoidance in those windows, even in the captures
+where its own preference was enabled. The legacy camera mouse-event option
+was enabled in two windows and disabled in two, but the mod callback timings
+are not a controlled measure of its effect on presented frames.
 
 ## WPA hot-callback attribution follow-up
 
 I matched the existing 2026-10-23 `Sloptifine-CPU.csv` method RVAs against the
-supplied `script.json` generated from the exact game binary. This resolves a
-useful part of the previously generic IL2CPP-invoke stack:
+supplied `script.json` generated from the exact game binary. The method export
+identifies a substantial Unity mouse-UI callback family; it does not by itself
+tie those samples to the generic-dispatch PCs in WPA's stack tree:
 
 - `GameAssembly+0x2AD228D` falls inside `EventSystem.Update` (about 1,610 ms
   inclusive CPU weight in the 31.1-second trace).
@@ -677,11 +684,14 @@ useful part of the previously generic IL2CPP-invoke stack:
   `GraphicRaycaster.Raycast` (~1,105 ms), and
   `RectTransformUtility.RectangleContainsScreenPoint` (~906 ms).
 
-These rows overlap along the same call chain and must not be summed. They
-confirm that the WPA stack's hot generic-dispatch PCs are serving real Unity
-mouse UI raycast work. The existing default-off `Pause UI events during solo
-songs` option removes this whole path when it disables the live EventSystem;
-the mouse-only raycast switch cannot add a separate saving in that state.
+These rows overlap along the same call chain and must not be summed. The
+method-level export does not preserve a stack key linking these methods to the
+two generic-dispatch PCs, so it does not establish how much of those PCs'
+weight comes from this path. It does independently identify Unity mouse UI
+raycasting as a substantial callback family. The existing default-off `Pause
+UI events during solo songs` option removes this path when it disables the
+live EventSystem; the mouse-only raycast switch cannot add a separate saving
+in that state.
 
 The same method map places a hot `GameAssembly+0x1EC1AAE` site inside
 `Rewired.InputManager_Base.DoUpdate` (~2,116 ms). Rewired's `ReInput.DoUpdate`
