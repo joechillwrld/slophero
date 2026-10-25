@@ -481,8 +481,9 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
   active offline solo guitar Quickplay. It transfers the background color
   clear to the guitar camera, disables the background camera, and restores
   both on pause, settings, focus loss, scene exit, or option disable. The build
-  has zero warnings/errors and the 114 core checks pass. The camera behavior
-  has not been runtime-tested and no FPS gain is claimed. ZIP SHA-256:
+  has zero warnings/errors and the 114 core checks pass. Its activation and
+  restoration ran in the game without logged errors; the visual behavior and
+  FPS impact are unverified. ZIP SHA-256:
   `ef7507568f3f7bc0b4561048e196527d1ad5fede0eed90ab059add81a5eeb52b`; DLL
   SHA-256: `6718841690e1ff4fc5026d07b7bb06a42ce71519ed58d297aff868ec2e3de4b5`.
   The 0.4.88 package SHA-256 is
@@ -641,8 +642,26 @@ The WPA tree attributes substantial *inclusive* time to
 per-camera cost. The user authorized the default-off black-background option;
 do not claim its cost or benefit from the WPA sum. Compile verification passed
 with zero warnings/errors against the supplied generated assemblies. The
-v0.4.92 package exists, but no Windows runtime test or measured frame benefit
-exists.
+v0.4.92 package exists. The Windows log confirms activation and restoration,
+but visual behavior and measured frame benefit remain unverified.
+
+## v0.4.92 Windows runtime log (2026-10-25)
+
+The new `Latest.log` SHA-256 is
+`da127fa224b26ada8a126568654dee3c0c094c50fd7828fa78a7ce612893dcd1`.
+It reports SlopHero 0.4.92 and matches the supplied v1.1.0.6142 game files.
+`BackgroundCameraOverride` activated repeatedly and logged restoration on
+pause/transition/restart, with no camera-experiment failure or cleanup error.
+This verifies that the live camera lookup and guarded mutation path ran; the
+log alone cannot confirm what the player saw on screen.
+
+Four 30-second SlopHero timing windows report 1,364–1,473 scheduled render
+callbacks/s and p99 callback intervals of 0.96–1.12 ms. Three windows contain
+maximum callback gaps around 59–111 ms. These are possible hitch clues, not
+PresentMon frame-present measurements. Mouse/UI, worker, HUD, visual, and
+other performance settings overlap in this session, and there is no matching
+PresentMon capture, so neither the camera switch's frame effect nor the
+cause of the large gaps can be isolated. No FPS gain is claimed from this log.
 
 ## v0.4.89 legacy mouse-event test
 

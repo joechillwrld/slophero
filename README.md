@@ -10,8 +10,9 @@ adds a default-off black-background experiment that skips the full-screen
 background camera during offline solo songs, transferring its screen clear to
 the guitar camera and restoring the original camera settings on pause, menus,
 focus loss, scene changes, or when disabled. Chart images and videos stay hidden
-while the option is active. The camera behavior has not been runtime-tested and
-no FPS gain is measured yet. Version 0.4.91 adds two default-off offline-solo
+while the option is active. The option has logged activation/restoration in
+game; its visual behavior and FPS impact are not yet verified. Version 0.4.91
+adds two default-off offline-solo
 experiments: pause Rewired's mouse-only snapshot while preserving keyboard,
 controller, and 1000 Hz instrument input; and cache `SpriteAttach.Update` only
 while its camera, viewport, sprite, scaling inputs, and output transforms stay
