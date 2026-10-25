@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.97", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.98", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -244,6 +244,7 @@ public sealed partial class Core : MelonMod
         try
         {
             double now = clock.Elapsed.TotalSeconds;
+            if (noticeUntil > 0 && now >= noticeUntil) noticeUntil = 0;
             if (compatible && !aprilFoolsError && now >= nextAprilFoolsPass)
             {
                 nextAprilFoolsPass = now + .1;
@@ -432,7 +433,7 @@ public sealed partial class Core : MelonMod
             // Unlike UI/input hooks, the worker-count limit is independent of
             // foreground input. Keep it stable while the user alt-tabs during
             // a solo song instead of restoring and reapplying the native pool.
-            unityJobWorkerLimit.Update(workerLimitCandidate && isOfflineSolo);
+            unityJobWorkerLimit.Update(workerLimitCandidate && isOfflineSolo, now);
             highwayAnimations.SetSuppressed(pauseHighwayRequested && activeSoloContext && isOfflineSolo);
             if (cheatScanner.IsInstalled)
             {
@@ -757,6 +758,14 @@ public sealed partial class Core : MelonMod
 
     public override void OnGUI()
     {
+        // With the retained Canvas counter visible, normal solo play has no
+        // IMGUI content. MelonLoader still calls OnGUI for every event, so
+        // avoid entering Unity's GUI event API on this common path. Editing,
+        // song info, notices, and opt-in timing captures keep the full path.
+        if (!timings.Active && compatible && gameplay && counterCanvas.Visible
+            && showHud.Value && !string.IsNullOrEmpty(statsText) && !showSong.Value
+            && !settingsOpen && !moveHud && resizeTarget < 0 && nativeMoveTarget == 0
+            && noticeUntil <= 0) return;
         if (timings.Active && Event.current.type == EventType.Repaint)
             timings.SampleRepaint();
         // Passive HUDs need only the repaint event. Keep full event processing

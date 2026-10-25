@@ -14,21 +14,38 @@ internal sealed class UnityJobWorkerLimit
     private bool failed;
     private int originalCount;
     private int limitedCount;
+    private double eligibleSince = double.NaN;
 
     public bool IsApplied => applied;
 
-    public void Update(bool requested)
+    public void Update(bool requested, double now)
     {
-        if (failed || lastRequested == requested) return;
-        lastRequested = requested;
-        if (requested) Apply();
-        else Restore();
+        if (!requested)
+        {
+            eligibleSince = double.NaN;
+            if (lastRequested != false) Restore();
+            lastRequested = false;
+            return;
+        }
+        if (failed || lastRequested == true || !double.IsFinite(now)) return;
+        if (!double.IsFinite(eligibleSince) || now < eligibleSince)
+        {
+            eligibleSince = now;
+            return;
+        }
+        // Song loading briefly reports an eligible solo state before pausing
+        // again. Reconfiguring Unity's worker pool for those short intervals
+        // can cost more than the entire experimental saving.
+        if (now - eligibleSince < .25) return;
+        lastRequested = true;
+        Apply();
     }
 
     public void Clear()
     {
-        Update(false);
+        Update(false, 0);
         lastRequested = null;
+        eligibleSince = double.NaN;
     }
 
     private void Apply()

@@ -1155,7 +1155,7 @@ public sealed partial class Core
         bool starProgressApplyDue = !starProgressError
             && starProgressParticles.IsApplyDue(disableStarProgressParticles.Value, now);
         bool comboSmokeRequested = !comboSmokeScrollError && (freezeComboSmokeScroll.Value || comboSmokeScroll.NeedsRestore);
-        bool tmpScalePassDue = !staticTmpScaleError
+        bool tmpScalePassDue = !staticTmpScaleError && !staticTmpScale.NoTargetsForScene
             && (staticTmpScaleDuringSong.Value || staticTmpScale.IsActive || staticTmpScale.NeedsRestore);
         bool visualPending = !visualError && (visualRequested || practiceSpeedRequested || visuals.NeedsUpdate
             || ringUpdateDue);

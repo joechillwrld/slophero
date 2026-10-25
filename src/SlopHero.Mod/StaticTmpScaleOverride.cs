@@ -29,6 +29,8 @@ internal sealed class StaticTmpScaleOverride
     public bool IsActive => active;
     public int ModifiedCount => modified.Count;
     public bool NeedsRestore => modified.Count != 0;
+    public bool NoTargetsForScene => discoveryAttempted && candidates.Count == 0
+        && animatedCandidates.Count == 0;
 
     /// <summary>Applies only while eligible; otherwise restores our changes.</summary>
     public void Apply(bool eligible, double realtime)
@@ -45,6 +47,11 @@ internal sealed class StaticTmpScaleOverride
         {
             Discover();
             discoveryAttempted = true;
+        }
+        if (NoTargetsForScene)
+        {
+            active = false;
+            return;
         }
 
         if (realtime >= nextScaleCheck)

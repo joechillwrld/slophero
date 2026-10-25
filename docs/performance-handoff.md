@@ -421,10 +421,10 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.97** on the private
+- Latest packaged build: SlopHero **0.4.98** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.96 (SHA-256
-  `a7d1d54480fa2c5b36ec4d4eef81d778ee8bf442f87d21e39e91035ea2819`)
+  0.4.97 (SHA-256
+  `2c5b6e1cec94d46b314cb30c387bce6e7f7e870453434a0d5ef150a203dc0b0d`)
   and is analyzed below. An earlier 0.4.95 log (SHA-256
   `686ab1bc9132560aaed79a8a2880502d63d91dd938bba68ab83ecd29c7ea11a2`)
   records the previous timing windows. The earlier
@@ -969,3 +969,44 @@ The 0.4.97 build has zero warnings/errors against the supplied references,
 all 114 core checks pass, and its ZIP contains `Mods/SlopHero.dll`. ZIP
 SHA-256: `fa8b9fd140113161058c694cf6352c2335b02110c7262ef1e37e0fd91fca1bd2`;
 DLL SHA-256: `7e6c73f7dc1c6dae7cb3e9d971ead3b4cd9955aaa30c42e539494f8dd633f244`.
+
+## v0.4.97 runtime log and v0.4.98 follow-up
+
+The 0.4.97 `Latest.log` (SHA-256 above) shows two short offline-solo states
+that reconfigure the optional Unity worker pool for only 120 and 150 ms,
+then restore it during song startup. Version 0.4.98 waits for 250 ms of
+continuous eligibility before reducing the worker count, but still restores
+immediately on pause, online play, or scene exit. The same log shows the TMP
+scale experiment repeatedly activating with **zero** eligible Gameplay
+labels. The mod now stops dispatching it after that scene's one-time scan
+returns no labels. These are avoided work and state changes; the log does
+not measure their effect on presented frames.
+
+The first timing window ended after 8.6 seconds of song transitions; its
+1,295 scheduled render callbacks/s and 4,504 HUD repaint calls are not a
+stable FPS comparison. The second 30-second window reports 1,507 scheduled
+render callbacks/s, p99 callback spacing at most 1.00 ms, and 398 HUD
+repaints. Both windows are CPU callback observations, **not presents**.
+Because the normal-play counter uses a retained Canvas, SlopHero now returns
+from empty `OnGUI` events before reading Unity's GUI event when that Canvas
+is visible and no menu, editor, song HUD, notice, or timing capture needs
+IMGUI. No guitar input or game GUI path is skipped.
+
+I also rechecked the exact current-build `BaseGuitarNoteRenderer.Update`:
+it tests `OnDemandRendering.get_willCurrentFrameRender` (RVA `0x2895320`)
+before doing rendered-note work. A second mod-side render gate would repeat
+work rather than remove the necessary note path. The game's `FrameRate.Update`
+(RVA `0x37F3D0`) counts simulation ticks and Unity-scheduled render ticks;
+neither count proves a frame reached the display. The existing
+`tools/presentmon_report.py` uses raw PresentMon `MsBetweenPresents` data for
+actual presented rate and frame intervals. A mod-side "presented FPS" label
+based on Unity callbacks would be misleading. The native render/cull
+branch remains the biggest attributed Unity cost, but this trace still does
+not isolate a removable camera or renderer inside it.
+
+The 0.4.98 build succeeds against the supplied references with zero warnings
+or errors; all 114 core checks pass. Its ZIP contains only `Mods/SlopHero.dll`.
+ZIP SHA-256:
+`229bba8ed9fee6f0a82e909afd09a9f9a81471407fcd1dd17ffa9c7bb34a8c19`;
+DLL SHA-256:
+`f432d0f1fb0331b6a421244a4b610fa73e6cf5f9985d999f08f39fe3555ffbe6`.

@@ -1,11 +1,15 @@
-# SlopHero 0.4.97 alpha
+# SlopHero 0.4.98 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.97
+build, compiled against its loader and generated assemblies. Version 0.4.98
+avoids changing Unity's worker count for brief song-start states, stops
+retrying an optional TMP experiment when the scene has no eligible labels,
+and skips empty mod GUI events while its Canvas counter is showing. These
+changes have not been measured as a presented-FPS gain. Version 0.4.97
 extends the default-off gameplay UI-event pause to suspend the three built-in
 HUD drag-handle Canvases while their only Images are transparent. They restore
 when a handle becomes visible or the UI pause ends. The supplied scene has
@@ -153,7 +157,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.97 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.97-alpha.zip)
+[Download SlopHero v0.4.98 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.98-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

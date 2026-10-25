@@ -37,7 +37,10 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.97. It extends the default-off gameplay
+The latest packaged build is 0.4.98. It avoids brief Unity worker-count
+reconfiguration, stops TMP work after finding no eligible Gameplay labels,
+and skips empty mod IMGUI callbacks while the Canvas counter is visible.
+These have no matched presented-FPS result yet. Version 0.4.97 extends the default-off gameplay
 UI-event pause to suspend the three transparent HUD drag-handle Canvases
 during eligible solo songs; they restore when visible or UI events resume.
 The optional SpriteAttach cache remains default-off because its full input
