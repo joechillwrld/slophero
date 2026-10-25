@@ -766,6 +766,48 @@ optional reduction; it cannot remove most of this input-manager cost. These
 are old WPA inclusive weights, not current-run exclusive method timings or
 presented-frame costs.
 
+## v0.4.94 log and exact-scene research (2026-10-25)
+
+The new `Latest.log` has SHA-256
+`ffe44b7d319bcfd985c42b073cd21d5e50888358b946622963389b118c54cf71`.
+It identifies SlopHero 0.4.94 and the matched Clone Hero build. Two 30-second
+timing windows have 1,451 and 1,466 scheduled render callbacks/s, but those
+are not presented-frame FPS. The largest observed simulation gaps are 32.2 and
+17.6 ms. Core Update averages 0.002 ms, visual overrides 0.014/0.013 ms,
+Canvas HUD sync 0.011/0.010 ms, and HUD repaint 0.068/0.066 ms at their
+respective call rates. The log has no SlopHero exception or hook failure. It
+does not report how many hidden leaderboard labels were disabled, so it cannot
+validate the new v0.4.94 TMP action or establish a frame gain. The broad
+EventSystem pause, black-background camera mode, mouse options, worker limit,
+and hidden-leaderboard option were all enabled together; the windows cannot
+isolate any one of them.
+
+I parsed all 404 MonoBehaviours in the exact uploaded Gameplay `level2` scene,
+including script references whose UnityPy typetree is incomplete, by reading
+only their common serialized header and joining the script path IDs to the
+reuploaded `globalgamemanagers.assets`. I then joined the class names to the
+exact GameAssembly dump's update declarations. These are **serialized active**
+objects, not proof they stayed enabled at runtime:
+
+| Scene path / component | Exact scene | Existing trace / consequence |
+| --- | ---: | --- |
+| `HUDCam` drag-handle roots / `HudDragController.Update` | 3 enabled | Only ~8 ms sampled CPU in 31 s. The old source has a constant HUD-position setter, but current v1.1 native `Update` first calls `Input.get_mousePosition` and compares it with cached coordinates before its longer branch; the old behavior cannot be presumed. |
+| `HUDCam` drag-handle canvases / `GraphicRaycaster` | 3 enabled single-Image canvases | Part of four scene raycasters. The broad EventSystem pause already prevents their ordinary mouse raycasts during eligible songs; disabling raycasters in that same scope cannot yield an additive raycast saving. Their canvas/render cost is not separately measured. |
+| `HUDCam/Leaderboard/Canvas` / `GraphicRaycaster` | 1 enabled | Its score list is alpha zero in the runtime log. v0.4.94 now pauses entry, fitter, and TMP update components while hidden offline. Canvas batching for the remaining leaderboard hierarchy is a separate, unmeasured lead. |
+| `Background Cam/Background Canvas/Background Image` | enabled Canvas, `AspectRatioFitter`, `SongBackground`, and `VideoPlayer`; disabled `Image` | Runtime reports one enabled but non-playing video. The optional black-background mode disables the camera, not the screen-space overlay canvas. Its current residual cost has not been attributed; `AspectRatioFitter.Update` is only ~4 ms in the old 31 s method export, so it is not a large likely saving. |
+| `HUDCam/Menu Canvas/Lyrics` / `LyricDisplay.Update` | 1 enabled | About 4 ms in the earlier method view. Lyric visibility and chart support must be preserved. |
+| `HUDCam/Input Viewer/Drums Input Viewer` / `DrumsInputViewer.Update` | 1 enabled in serialized hierarchy | About 1 ms mapped in the earlier method view. Runtime has zero enabled drum-viewer sprites; a broad drums component kill is not supported by this cost. |
+| `HUDCam/HUD/Score/PB Notification` / `Animator` | 1 enabled | No isolated Animator cost in the supplied trace. Do not infer cost from the static scene count. |
+
+Other active serialized update scripts include `PracticeUI`, `CanvasFader`,
+`SongProgress`, `PracticeSectionDisplay`, `ScoreManager_Versus`, `ScoreManager`,
+and `GameManager`. None has a substantial isolated row in the supplied method
+export, and practice/score/game state must stay correct. This inventory rules
+out several superficially plausible blanket skips. The higher-value unresolved
+path remains Unity's camera render/cull and canvas rebuild work. Existing WPA
+samples do not identify which of the three live cameras or which Canvas caused
+that inclusive cost, so a new global skip would be speculative.
+
 ## v0.4.89 legacy mouse-event test
 
 The 2026-10-25 `Latest.log` SHA-256
