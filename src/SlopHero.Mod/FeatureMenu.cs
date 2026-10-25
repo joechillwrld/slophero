@@ -362,7 +362,7 @@ public sealed partial class Core
                 Toggle(reduceUnityJobWorkers, "Use one fewer Unity job worker during offline solo songs", x, y + 206);
                 Toggle(disableMidiForSession, "Disable drum MIDI input (restart to restore)", x, y + 236);
                 Toggle(staticTmpScaleDuringSong, "Skip TMP scale checks in offline solo play", x, y + 266);
-                GUI.Label(new Rect(x + 22, y + 300, 610, 118), "Experimental; default off. Legacy mouse callbacks from Clone Hero or other mods are skipped only during active gameplay; vanilla callbacks return on pause, menus, or focus loss. Mouse UI raycasts are a separate switch. TMP layout and graphic rebuilds stay enabled. Scale-changing or animated labels are left alone; changes restore on pause, menus, scene changes, or unload. The worker limit restores on those transitions. Drum MIDI shutdown requires a restart to restore.");
+                GUI.Label(new Rect(x + 22, y + 300, 610, 118), "Experimental; default off. Legacy mouse callbacks from Clone Hero or other mods are skipped only during active gameplay; vanilla callbacks return on pause, menus, or focus loss. Mouse UI raycasts are a separate switch. TMP layout and graphic rebuilds stay enabled; labels under animation are checked at 20 Hz and restored if their scale changes, though text may briefly soften. Settings restore on pause, menus, scene changes, or unload. Drum MIDI shutdown requires a restart to restore.");
                 break;
         }
         if (editApply != null) DrawValueEditor();

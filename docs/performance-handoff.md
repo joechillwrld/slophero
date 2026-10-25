@@ -53,6 +53,7 @@ the Sloptifine pages and preserve their documented scope:
 | Research lead | Current implementation |
 | --- | --- |
 | WPA identified Unity mouse processing and raycasts during play | `MouseUiGameplayOverride` patches the called `StandaloneInputModule.ProcessMouseEvent(int)` overload. It is default-off and only suppresses mouse UI during active play. Keyboard/controller navigation and Rewired instrument polling stay available. |
+| Sol's WPA review also found Unity's legacy camera mouse-event path | v0.4.89 adds the separate default-off `LegacyMouseEventsDetour`, which skips `SendMouseEvents.DoSendMouseEvents` only during active chart play and undoes the native detour outside that scope. It validates the exact GameAssembly prologue and is independent of the mouse-UI raycast option. A v0.4.89 log confirms installation with the raycast option off; it does not establish an FPS gain. |
 | Broader Unity UI event work was also costly | `GameplayUiEventOverride` is a separate default-off switch scoped to active offline solo play. Since v0.4.86 it disables the live EventSystem component during that scope and restores it plus the prior selection on pause/menu/scene transitions. If the component cannot be resolved, it falls back to the previous Update prefix. It is not additive with the mouse-only switch while the broad pause is active. |
 | Old source suggested frequent whammy texture uploads; current native code uses raw byte writes | `WhammyTextureThrottle` hooks the exact current data writer and upload wrapper. It permits an upload after data changes and leaves producer writes and GPU compute intact. It is default-off; the user has seen no clear performance gain, so keep it experimental. |
 | Hidden beatline, leaderboard, particles, fret fades, combo smoke and star-progress effects continued some work while invisible/unused | `VisualOverrides`, `HiddenLeaderboardOverride`, `PerformanceOverrides`, `ComboSmokeScrollOverride`, and `StarProgressParticleOverride` offer separate controls and restore prior state. Scene discoveries and limitations are in the audit. |
@@ -61,7 +62,7 @@ the Sloptifine pages and preserve their documented scope:
 | SlopHero's restart/practice shortcuts resolved a joystick ID by scanning the full Rewired joystick list on every mod update | Since v0.4.87, `InputBinding` caches the matching joystick wrapper and refreshes that lookup once per second (and after Rewired becomes unready). The `GetButton` state query still runs at the same mod-update cadence; Rewired's configured device polling is unchanged. This reduces duplicate lookup work, not the measured 2.1 seconds inside Rewired's own `DoUpdate`. |
 | Unity job queue setter was resolved through the matching player PDB | `UnityJobWorkerLimit` uses the generated `SetJobQueueMaximumActiveThreadCount` API and restores the prior limit. It is default-off; the latest three-run callback comparison shows no benefit. |
 | Current `HighwayScroll.Update` combines property-block writes with video/fade behavior | `HighwayAnimationOverride` is a default-off whole-update freeze during offline solo songs. It may freeze those visuals and has no demonstrated frame gain. The old source's note `yield`/hit-detection paths remain untouched because they are scoring-sensitive and not confirmed in current code. |
-| TMP's SDF scale queue repeatedly checks text transforms | v0.4.88 packages the default-off offline-solo experiment. It marks active Gameplay labels without Animator/Animation parents static, checks cached scales at 4 Hz, and restores their original flags on pause, menu/editor, focus loss, online transition, scene exit, or unload. Layout, graphic-rebuild, and culling queues remain active. It has no runtime result yet. |
+| TMP's SDF scale queue repeatedly checks text transforms | v0.4.88 packages the default-off offline-solo experiment; its v0.4.89 log changed zero labels. The current worktree includes labels under Animator/Animation parents and checks those at 20 Hz, while ordinary labels stay at 4 Hz. Any detected scale change restores TMP's per-frame scale updates and excludes that label for the scene. The scene-wide discovery uses unsorted `FindObjectsByType`; TMP layout, graphic-rebuild, and culling queues stay active. Scale animation could briefly soften text; the prototype has no measured frame-time result yet. |
 
 ClonZones installs a `GuitarFretAnimator.Update` settle gate in the user's
 setup, which may overlap with another fret hook. Current `HighwayScroll` also
@@ -351,9 +352,11 @@ undone on pause, settings/menu use, focus loss, restart/practice transitions,
 scene changes, and unload; disabling the preference also removes it. It is
 default-off. I verified repeated Apply/Undo behavior against a local native
 probe and confirmed the prologue bytes against the uploaded exact-build
-GameAssembly, but it has not yet run inside Clone Hero on Windows. External
-mods may rely on `OnMouse*` callbacks, and the 315 ms sample weight is not a
-measured frame-rate gain.
+GameAssembly. The 2026-10-25 v0.4.89 log then confirmed that it installed and
+was active during a song with the separate raycast option off, and restored
+outside active play without a logged error. External mods may rely on
+`OnMouse*` callbacks, and the 315 ms sample weight is not a measured frame-rate
+gain.
 
 Within the gameplay window, the stack table does name several managed callbacks: SlopHero
 `Core.OnUpdate` totals about 101 ms, `ClonZones.Core.OnUpdate` about 55 ms,
@@ -417,16 +420,19 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.89** on the private
+- Latest packaged build: SlopHero **0.4.90** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.87 (SHA-256
-  `f1f2b1b5411260cfcd0e1025a6e114da3a356cecaf147e206d5cd67861517cf0`).
-  Its three 30-second captures report 2,636–2,691 simulation updates/s,
+  0.4.89 (SHA-256
+  `6bfd5b29167d86e05e37996606bc6b72df03f96e0c228bba954df27c65b0c596`).
+  It confirms the legacy mouse detour's in-game install/restore path; its
+  performance limits are described below. The earlier 0.4.87 log (SHA-256
+  `f1f2b1b5411260cfcd0e1025a6e114da3a356cecaf147e206d5cd67861517cf0`)
+  contains three 30-second captures with 2,636–2,691 simulation updates/s,
   `Core.Update` averaging 0.002 ms, visual overrides 0.015 ms, and Canvas sync
   averaging 0.010–0.019 ms. One Canvas sync hit 5.259 ms in the first capture;
-  the following two peak below 0.15 ms. The log confirms configured switches
-  and live scene counts, but does not isolate a switch or measure presented
-  frames/GPU work. The 0.4.83 and
+  the following two peak below 0.15 ms. That older log confirms configured
+  switches and live scene counts, but does not isolate a switch or measure
+  presented frames/GPU work. The 0.4.83 and
   0.4.84 captures below are historical. Clone Hero is **1.1.0.6142**, Unity
   **2022.3.62f2**, with ClonZones 2.0.0 also loaded. Version 0.4.85 separates
   the worker limit from foreground focus, clarifies the MIDI discovery
@@ -442,12 +448,22 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
   Version 0.4.89 adds the separate default-off native legacy mouse-event
   detour described above and removes the mouse-raycast hook's per-call
   diagnostic counter increment. The .89 build has zero warnings and errors;
-  core checks pass (101 checks). Its native hook has only been tested against
-  a local native probe, not the Windows game process, and neither new change
-  has a matched PresentMon A/B result. The .89 package SHA-256 is
+  core checks pass (101 checks). The supplied Windows game log confirms the
+  native hook installs and restores in its intended scope; neither new mouse
+  change has a matched PresentMon A/B result. The .89 package SHA-256 is
   `2e6684d416794205fb6ddc04ccd9972d95a85dfc54967019448844c0aecc0697`, and
   the DLL SHA-256 is
   `e355fab889392b898f8342701c1d5c2385aaf21e49d93fac130c5fa1c41d63a0`.
+  Version 0.4.90 broadens the default-off TMP scale experiment to include
+  labels under Animator/Animation parents, polling those scales at 20 Hz;
+  ordinary labels remain at 4 Hz. A changed scale restores the label's TMP
+  scale queue and excludes it for the scene. Discovery uses an unsorted Unity
+  query. The experiment builds with zero warnings/errors and core checks pass
+  (101 checks). It has not been runtime-tested and has no measured frame-time
+  result; scale animation may briefly soften text when the experiment is
+  enabled. ZIP SHA-256:
+  `bb3ce4111e99cb975637ba2da2d270f64fc0d8ec6c4e26058b97227341a19161`; DLL
+  SHA-256: `eb3fe04566269d1f95a34f0202871043976a50463c227d9797e1c2fe91211c81`.
   The 0.4.88 package SHA-256 is
   `527b5367bceb523a64375ad958360356eb0a72a28353636e57c1078f976c054d`, and
   its DLL SHA-256 is
@@ -556,3 +572,26 @@ Keep each proposed change narrow and reversible. Avoid hot-path logging or
 per-frame hierarchy searches. Preserve every existing SlopHero feature,
 online behavior, and 1000 Hz controller polling. Do not infer a performance
 win until a controlled frame capture supports it.
+
+## v0.4.89 legacy mouse-event test
+
+The 2026-10-25 `Latest.log` SHA-256
+`6bfd5b29167d86e05e37996606bc6b72df03f96e0c228bba954df27c65b0c596` has the
+legacy camera mouse-event option enabled and the mouse-UI raycast option off.
+The native detour installed during active play and reported no install or
+restore errors. Two 30-second SlopHero timing windows report 2,732–2,742
+simulation updates/s and 1,366–1,371 scheduled render callbacks/s, with
+callback interval p50/p95 near 0.39/0.52 ms and 0.72/0.86 ms. The earlier
+raycast-only log was about 0.40/0.54 ms and 0.73/0.88 ms respectively. This
+small difference is not a measured FPS gain; these logs are not a controlled
+PresentMon comparison. The same run reports zero labels changed by the TMP
+scale experiment, making its current filter worth revisiting before further
+experiments. The first run's TMP experiment bucket peaked at 5.104 ms, while
+the second peaked at 0.164 ms. The first-scan enumeration is a plausible cause,
+not a proven attribution. The worktree now uses `FindObjectsByType` with no
+result sorting for that one-time scan; this narrow cleanup has no measured
+frame-time effect yet. It also now checks labels under animation parents at
+20 Hz instead of rejecting them categorically; ordinary labels remain on the
+4 Hz interval. On any observed scale change, TMP updates are restored for that
+label for the rest of the scene. This broader default-off prototype may briefly
+soften text during scale animation and has not been tested in-game.

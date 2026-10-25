@@ -1,26 +1,30 @@
-# SlopHero 0.4.89 alpha
+# SlopHero 0.4.90 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.89 adds
-a separate default-off Sloptifine switch for Unity's legacy camera mouse-event
-dispatch. It detours the exact supplied GameAssembly build and skips `OnMouse*`
-callbacks only during active chart play; vanilla callbacks return on pause,
-menus, settings, focus loss, scene transitions, and unload. It is independent
-of the EventSystem mouse-UI raycast switch and leaves Rewired/controller/guitar
-polling alone. Other mods may rely on legacy callbacks, and this native hook
-has not yet been tested inside Clone Hero on Windows. No FPS gain is claimed
-without a matched capture. Version 0.4.88 adds
-a default-off TMP scale-update experiment to Sloptifine 2. During offline solo
-play it marks only stable, unanimated Gameplay labels static, skipping their
-per-frame SDF scale checks while leaving TMP layout, graphics, and culling
-updates active. It restores on pause, focus loss, menus/editor, online play, or
-scene exit; labels with animated parents or changing scale are skipped. This
-is experimental, has no measured FPS gain yet, and may defer font sharpness
-updates if a label's scale changes between checks. Version 0.4.87
+build, compiled against its loader and generated assemblies. Version 0.4.90
+keeps the TMP scale-update experiment default-off and broadens it to labels
+under Animator/Animation parents. Ordinary labels are checked at 4 Hz and
+animated-parent labels at 20 Hz; a detected scale change restores TMP's
+per-frame scale checks for that label. TMP layout, graphics, and culling
+updates remain active. Scale animation could soften text briefly before the
+next check; this prototype has no measured FPS gain yet. The one-time TMP
+discovery also skips result sorting. Version 0.4.89 adds a separate default-off
+Sloptifine switch for Unity's legacy camera mouse-event dispatch. It detours the
+exact supplied GameAssembly build and skips `OnMouse*` callbacks only during
+active chart play; vanilla callbacks return on pause, menus, settings, focus
+loss, scene transitions, and unload. It is independent of the EventSystem
+mouse-UI raycast switch and leaves Rewired/controller/guitar polling alone.
+Other mods may rely on legacy callbacks, and this native hook was verified
+active and restored in the supplied Windows Latest.log; no FPS gain is claimed
+without a matched capture. Version 0.4.88 adds a default-off TMP scale-update
+experiment to Sloptifine 2. During offline solo play it marks only stable,
+unanimated Gameplay labels static, skipping their per-frame SDF scale checks
+while leaving TMP layout, graphics, and culling updates active. It restores on
+pause, focus loss, menus/editor, online play, or scene exit. Version 0.4.87
 resolves configured joystick bindings once per second instead of enumerating
 the joystick list on every mod update. It leaves Rewired's polling rate and
 the game's instrument input untouched. Version 0.4.86
@@ -108,7 +112,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.89 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.89-alpha.zip)
+[Download SlopHero v0.4.90 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.90-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

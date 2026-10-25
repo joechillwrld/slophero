@@ -2175,3 +2175,41 @@ MIDI device shutdown option already closes drum devices for the session, while
 the 0.2-second discovery task has no named material cost in this trace. Drum
 player/render callbacks are instrument-specific and should not be globally
 disabled for a guitar performance test.
+
+### v0.4.89 legacy mouse-event runtime check (2026-10-25)
+
+The supplied log (`6bfd5b29167d86e05e37996606bc6b72df03f96e0c228bba954df27c65b0c596`)
+loads SlopHero 0.4.89 and reports the exact-build legacy camera mouse detour
+active during a song, with `PerformanceSkipLegacyMouseEvents=true` and the
+separate `PerformanceSkipGameplayMouseUi=false`. The later timing snapshot
+retains the installed hook with suppression false outside active play, and no
+hook error appears. This validates the native feature's install/active-scope
+path on the supplied build.
+
+Two 30-second mod-timing captures report 2,732–2,742 simulation updates/s,
+1,366–1,371 scheduled render callbacks/s, simulation p50/p95 near
+0.39/0.52 ms, and scheduled-render p50/p95 near 0.72/0.86 ms. The earlier
+raycast-only log was near 0.40/0.54 ms and 0.73/0.88 ms. The slight difference
+is not evidence of an FPS gain: the timing buckets are not displayed frame
+times, the chart identity is not logged, and the first capture contains a
+43.6 ms callback outlier. The second capture's maximum is about 7.3 ms.
+
+The same run activates the TMP scale experiment but reports zero changed TMP
+labels twice. Current code excludes labels under any Animator/Animation
+ancestor; it is plausible that this filters all live gameplay labels, but the
+log does not provide the candidate count or prove that is the cause. Revisit
+that candidate filter before counting the option as an active optimization.
+
+### v0.4.90 TMP scale prototype
+
+The v0.4.89 runtime log showed that the original TMP candidate filter changed
+zero labels, so it removed no per-frame scale checks. Version 0.4.90 keeps the
+experiment default-off, includes labels with Animator/Animation ancestors,
+and checks those scales at 20 Hz; labels without animated parents remain at
+4 Hz. When a checked scale differs from its discovery scale, the mod restores
+TMP's scale-update registration and excludes that label for the rest of the
+scene. Discovery now uses unsorted `FindObjectsByType`, since candidates are
+keyed by native pointer and do not depend on result order. Build validation
+passes with zero warnings and 101 core checks. This remains an in-game
+prototype: no FPS result is measured, and a scale animation may briefly soften
+its TMP label before the next check.

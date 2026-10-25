@@ -20,10 +20,11 @@ internal sealed class StaticTmpScaleOverride
     }
 
     private readonly Dictionary<IntPtr, Candidate> candidates = new();
+    private readonly Dictionary<IntPtr, Candidate> animatedCandidates = new();
     private readonly Dictionary<IntPtr, TMP_Text> modified = new();
     private readonly HashSet<IntPtr> excluded = new();
     private bool active, discoveryAttempted;
-    private double nextScaleCheck;
+    private double nextScaleCheck, nextAnimatedScaleCheck;
 
     public bool IsActive => active;
     public int ModifiedCount => modified.Count;
@@ -40,16 +41,59 @@ internal sealed class StaticTmpScaleOverride
         }
 
         active = true;
-        if (realtime < nextScaleCheck) return;
-        nextScaleCheck = realtime + .25;
-
         if (!discoveryAttempted)
         {
             Discover();
             discoveryAttempted = true;
         }
 
-        foreach (var pair in candidates)
+        if (realtime >= nextScaleCheck)
+        {
+            nextScaleCheck = realtime + .25;
+            ApplyCandidates(candidates);
+        }
+        if (realtime >= nextAnimatedScaleCheck)
+        {
+            nextAnimatedScaleCheck = realtime + .05;
+            ApplyCandidates(animatedCandidates);
+        }
+    }
+
+    public void Clear()
+    {
+        RestoreModified();
+        candidates.Clear();
+        animatedCandidates.Clear();
+        excluded.Clear();
+        active = false;
+        discoveryAttempted = false;
+        nextScaleCheck = nextAnimatedScaleCheck = 0;
+    }
+
+    private void Discover()
+    {
+        // The discovery order is irrelevant: candidates are keyed by native
+        // pointer and never presented in hierarchy order. Avoid sorting the
+        // scene-wide result array on this opt-in one-time scan.
+        foreach (var text in UnityEngine.Object.FindObjectsByType<TMP_Text>(FindObjectsSortMode.None))
+        {
+            if (text == null || !text.enabled || !text.gameObject.activeInHierarchy) continue;
+            try
+            {
+                if (!string.Equals(text.gameObject.scene.name, "Gameplay", StringComparison.OrdinalIgnoreCase)
+                    || text.isTextObjectScaleStatic) continue;
+                IntPtr pointer = text.Pointer;
+                if (pointer == IntPtr.Zero || candidates.ContainsKey(pointer) || animatedCandidates.ContainsKey(pointer)) continue;
+                var destination = HasAnimationInParents(text) ? animatedCandidates : candidates;
+                destination.Add(pointer, new Candidate(text, text.transform.lossyScale));
+            }
+            catch { }
+        }
+    }
+
+    private void ApplyCandidates(Dictionary<IntPtr, Candidate> set)
+    {
+        foreach (var pair in set)
         {
             if (excluded.Contains(pair.Key)) continue;
             var candidate = pair.Value;
@@ -62,8 +106,9 @@ internal sealed class StaticTmpScaleOverride
 
             try
             {
-                // If a script changes scale after discovery, immediately
-                // re-register this label and leave it alone for this scene.
+                // Animator/Animation parents are checked at 20 Hz. If a
+                // script changes scale, restore TMP's queue registration and
+                // leave that label alone for the rest of this scene.
                 if (text.transform.lossyScale != candidate.Scale)
                 {
                     RestoreOne(pair.Key, text);
@@ -82,33 +127,6 @@ internal sealed class StaticTmpScaleOverride
                 RestoreOne(pair.Key, text);
                 excluded.Add(pair.Key);
             }
-        }
-    }
-
-    public void Clear()
-    {
-        RestoreModified();
-        candidates.Clear();
-        excluded.Clear();
-        active = false;
-        discoveryAttempted = false;
-        nextScaleCheck = 0;
-    }
-
-    private void Discover()
-    {
-        foreach (var text in UnityEngine.Object.FindObjectsOfType<TMP_Text>())
-        {
-            if (text == null || !text.enabled || !text.gameObject.activeInHierarchy) continue;
-            try
-            {
-                if (!string.Equals(text.gameObject.scene.name, "Gameplay", StringComparison.OrdinalIgnoreCase)
-                    || text.isTextObjectScaleStatic || HasAnimationInParents(text)) continue;
-                IntPtr pointer = text.Pointer;
-                if (pointer != IntPtr.Zero && !candidates.ContainsKey(pointer))
-                    candidates.Add(pointer, new Candidate(text, text.transform.lossyScale));
-            }
-            catch { }
         }
     }
 
