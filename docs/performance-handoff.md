@@ -619,21 +619,21 @@ uses clear flags 4. All three have full-screen rects and target display 0.
 The static background camera's clear flags are 2, full-screen, target display
 0, with transparent black background color. Thus the guitar/HUD cameras do
 **not** replace its color clear; merely disabling `Background Cam` could leave
-the previous frame on screen. A viable opt-in black-background experiment
-would save the live camera's clear flags/color, set the single guitar camera
-to the background camera's solid-color clear, then disable `Background Cam`.
-It would restore both states on pause, scene exit, online/multiplayer, or
-option disable. Apply/restore should be transition-driven, not a per-frame
-hierarchy search or setter call. Runtime camera ordering/rects, image/video
-visibility, and visual behavior still need validation before code ships.
+the previous frame on screen. A new, **unreleased** default-off prototype in
+`BackgroundCameraOverride.cs` handles this only during active offline solo
+guitar Quickplay. It validates camera masks, clear flags, order, rect, display,
+and render-texture targets; transfers the background clear to the guitar
+camera; and disables `Background Cam`. It restores both cameras on pause,
+settings, scene exit, focus loss, or option disable. These changes occur on
+state transitions, with no per-frame hierarchy search or camera setter call.
+The option is on Sloptifine page 1 and participates in settings profiles and
+timing-setting snapshots. Runtime visuals and frame benefit remain untested.
 The WPA tree attributes substantial *inclusive* time to
 `Camera::CustomRender` and `Camera::CustomCull` across cameras, without
-per-camera cost. A future **default-off** background-camera suppression when
-backgrounds are unused might reduce a whole render pass, but it must preserve
-the first camera's screen clear and restore video/image display immediately.
-It needs explicit user consultation before implementation because the game
-camera clear/depth behavior and actual background visibility have not been
-verified. Do not simply disable the camera or claim its cost from the WPA sum.
+per-camera cost. The user authorized the default-off black-background option;
+do not claim its cost or benefit from the WPA sum. Compile verification passed
+with zero warnings/errors against the supplied generated assemblies. No
+packaged build or Windows runtime test exists yet; Luna owns the release.
 
 ## v0.4.89 legacy mouse-event test
 

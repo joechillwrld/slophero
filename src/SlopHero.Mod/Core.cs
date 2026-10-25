@@ -108,6 +108,7 @@ public sealed partial class Core : MelonMod
         staticTmpScale.Clear();
         rewiredMousePolling.Clear(HarmonyInstance);
         spriteAttachCache.Clear(HarmonyInstance);
+        backgroundCamera.Clear();
         staticTmpScaleError = false;
         SongSpeedControl.ResetMenuCache();
         gameplayInitialized = false;
@@ -189,6 +190,7 @@ public sealed partial class Core : MelonMod
         staticTmpScale.Clear();
         rewiredMousePolling.Clear(HarmonyInstance);
         spriteAttachCache.Clear(HarmonyInstance);
+        backgroundCamera.Clear();
         staticTmpScaleError = false;
         SongSpeedControl.ResetMenuCache();
         counterCanvas.Clear();
@@ -271,6 +273,7 @@ public sealed partial class Core : MelonMod
                     legacyMouseEvents.Disable();
                     rewiredMousePolling.Disable();
                     spriteAttachCache.Disable();
+                    backgroundCamera.Restore();
                     cheatScanner.Disable();
                     gameplayUiEvents.Disable();
                     highwayAnimations.SetSuppressed(false);
@@ -320,6 +323,7 @@ public sealed partial class Core : MelonMod
             if (!Application.isFocused && legacyMouseEvents.IsInstalled) legacyMouseEvents.Disable();
             if (!Application.isFocused && rewiredMousePolling.IsInstalled) rewiredMousePolling.Disable();
             if (!Application.isFocused) spriteAttachCache.Disable();
+            if (!Application.isFocused) backgroundCamera.Restore();
             if (!Application.isFocused) highwayAnimations.SetSuppressed(false);
             if (capture != null)
             {
@@ -412,11 +416,13 @@ public sealed partial class Core : MelonMod
             bool workerLimitRequested = reduceUnityJobWorkers.Value;
             bool mouseSamplerRequested = pauseRewiredMousePolling.Value;
             bool spriteAttachCacheRequested = cacheSpriteAttachTransforms.Value;
+            bool backgroundCameraRequested = skipBackgroundCamera.Value;
             bool workerLimitCandidate = workerLimitRequested && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0;
             bool needsOfflineSoloGate = pauseHighwayRequested || pauseCheatsActive || pauseUiRequested
-                || workerLimitRequested || mouseSamplerRequested || spriteAttachCacheRequested;
+                || workerLimitRequested || mouseSamplerRequested || spriteAttachCacheRequested
+                || backgroundCameraRequested;
             bool soloOptimizationCandidate = needsOfflineSoloGate && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0
@@ -506,6 +512,23 @@ public sealed partial class Core : MelonMod
             spriteAttachCache.Update(HarmonyInstance, spriteAttachCacheRequested, cacheSpriteAttach);
             if (spriteAttachCache.ConsumeFailure() is string cacheFailure)
                 LoggerInstance.Warning($"SpriteAttach cache experiment stopped; vanilla updates remain enabled: {cacheFailure}");
+            bool skipBackground = OfflineSoloSongScope.IsEligible(
+                backgroundCameraRequested,
+                ready,
+                songPlaying,
+                paused: ready && game!.isPaused,
+                songOver: ready && game!.isSongOver,
+                runningCoroutines: ready ? game!.coroutinesRunning : -1,
+                playerCount: ready ? game!.actualPlayerCount : 0,
+                gameMode: ready ? (int)game!.globalVariables!.gameMode : -1,
+                playingSetlist: ready && game!.globalVariables!.isPlayingSetlist,
+                transitioning: transition,
+                settingsOpen: settingsOpen || moveHud || resizeTarget >= 0,
+                focused: Application.isFocused,
+                online: !isOfflineSolo);
+            backgroundCamera.Update(backgroundCameraRequested, skipBackground, game);
+            if (backgroundCamera.ConsumeFailure() is string backgroundFailure)
+                LoggerInstance.Warning($"Background camera experiment stopped; original cameras restored: {backgroundFailure}");
             if (ready) CompletePracticeTransition(game!);
             bool allow = shortcutCandidate && isOfflineSolo;
             if (restartHold.Update(allow && restartPressed, allow, now, Duration))
@@ -609,6 +632,7 @@ public sealed partial class Core : MelonMod
             legacyMouseEvents.Clear();
             rewiredMousePolling.Clear(HarmonyInstance);
             spriteAttachCache.Clear(HarmonyInstance);
+            backgroundCamera.Clear();
             whammyTextureThrottle.Clear(HarmonyInstance);
             unityJobWorkerLimit.Clear();
             compatible = false;
@@ -629,6 +653,7 @@ public sealed partial class Core : MelonMod
         mouseUiGameplay.Disable();
         legacyMouseEvents.Disable();
         spriteAttachCache.Disable();
+        backgroundCamera.Restore();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
         restartHold.RequireRelease();
@@ -651,6 +676,7 @@ public sealed partial class Core : MelonMod
         mouseUiGameplay.Disable();
         legacyMouseEvents.Disable();
         spriteAttachCache.Disable();
+        backgroundCamera.Restore();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
         restartHold.RequireRelease();
@@ -1010,6 +1036,7 @@ public sealed partial class Core : MelonMod
         legacyMouseEvents.Clear();
         rewiredMousePolling.Clear(HarmonyInstance);
         spriteAttachCache.Clear(HarmonyInstance);
+        backgroundCamera.Clear();
         gameplayUiEvents.Clear(HarmonyInstance);
         highwayAnimations.Clear(HarmonyInstance);
         rings.Clear(HarmonyInstance);
