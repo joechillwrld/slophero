@@ -663,6 +663,35 @@ other performance settings overlap in this session, and there is no matching
 PresentMon capture, so neither the camera switch's frame effect nor the
 cause of the large gaps can be isolated. No FPS gain is claimed from this log.
 
+## WPA hot-callback attribution follow-up
+
+I matched the existing 2026-10-23 `Sloptifine-CPU.csv` method RVAs against the
+supplied `script.json` generated from the exact game binary. This resolves a
+useful part of the previously generic IL2CPP-invoke stack:
+
+- `GameAssembly+0x2AD228D` falls inside `EventSystem.Update` (about 1,610 ms
+  inclusive CPU weight in the 31.1-second trace).
+- Nearby nested rows map to `StandaloneInputModule.Process` (~1,484 ms),
+  `ProcessMouseEvent` (~1,451 ms), `PointerInputModule.GetMousePointerEventData`
+  (~1,394 ms), `EventSystem.RaycastAll` (~1,358 ms),
+  `GraphicRaycaster.Raycast` (~1,105 ms), and
+  `RectTransformUtility.RectangleContainsScreenPoint` (~906 ms).
+
+These rows overlap along the same call chain and must not be summed. They
+confirm that the WPA stack's hot generic-dispatch PCs are serving real Unity
+mouse UI raycast work. The existing default-off `Pause UI events during solo
+songs` option removes this whole path when it disables the live EventSystem;
+the mouse-only raycast switch cannot add a separate saving in that state.
+
+The same method map places a hot `GameAssembly+0x1EC1AAE` site inside
+`Rewired.InputManager_Base.DoUpdate` (~2,116 ms). Rewired's `ReInput.DoUpdate`
+and controller update loop also appear among the hot rows. This is required
+device polling work, so it does not justify suppressing the controller or
+changing the 1000 Hz polling setting. The mouse-only sampler remains a narrow
+optional reduction; it cannot remove most of this input-manager cost. These
+are old WPA inclusive weights, not current-run exclusive method timings or
+presented-frame costs.
+
 ## v0.4.89 legacy mouse-event test
 
 The 2026-10-25 `Latest.log` SHA-256
