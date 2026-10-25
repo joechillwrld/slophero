@@ -421,10 +421,10 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.94** on the private
+- Latest packaged build: SlopHero **0.4.95** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.92 (SHA-256
-  `da127fa224b26ada8a126568654dee3c0c094c50fd7828fa78a7ce612893dcd1`).
+  0.4.94 (SHA-256
+  `ffe44b7d319bcfd985c42b073cd21d5e50888358b946622963389b118c54cf71`).
   Its timing windows and camera activation are analyzed below. The earlier
   0.4.91 log (SHA-256
   `9a036617279b5d5c175b1ca060868f4f06a7d9409b65d318238d511708a44d5d`)
@@ -793,7 +793,7 @@ objects, not proof they stayed enabled at runtime:
 | --- | ---: | --- |
 | `HUDCam` drag-handle roots / `HudDragController.Update` | 3 enabled | Only ~8 ms sampled CPU in 31 s. The old source has a constant HUD-position setter, but current v1.1 native `Update` first calls `Input.get_mousePosition` and compares it with cached coordinates before its longer branch; the old behavior cannot be presumed. |
 | `HUDCam` drag-handle canvases / `GraphicRaycaster` | 3 enabled single-Image canvases | Part of four scene raycasters. The broad EventSystem pause already prevents their ordinary mouse raycasts during eligible songs; disabling raycasters in that same scope cannot yield an additive raycast saving. Their canvas/render cost is not separately measured. |
-| `HUDCam/Leaderboard/Canvas` / `GraphicRaycaster` | 1 enabled | Its score list is alpha zero in the runtime log. v0.4.94 now pauses entry, fitter, and TMP update components while hidden offline. Canvas batching for the remaining leaderboard hierarchy is a separate, unmeasured lead. |
+| `HUDCam/Leaderboard/Canvas` / `GraphicRaycaster` | 1 enabled | Its score list is alpha zero in the runtime log. v0.4.94 pauses entry, fitter, and TMP components while hidden offline. The remaining 30 enabled `Image` graphics are addressed by v0.4.95; canvas batching for the parent hierarchy remains unmeasured. |
 | `Background Cam/Background Canvas/Background Image` | enabled Canvas, `AspectRatioFitter`, `SongBackground`, and `VideoPlayer`; disabled `Image` | Runtime reports one enabled but non-playing video. The optional black-background mode disables the camera, not the screen-space overlay canvas. Its current residual cost has not been attributed; `AspectRatioFitter.Update` is only ~4 ms in the old 31 s method export, so it is not a large likely saving. |
 | `HUDCam/Menu Canvas/Lyrics` / `LyricDisplay.Update` | 1 enabled | About 4 ms in the earlier method view. Lyric visibility and chart support must be preserved. |
 | `HUDCam/Input Viewer/Drums Input Viewer` / `DrumsInputViewer.Update` | 1 enabled in serialized hierarchy | About 1 ms mapped in the earlier method view. Runtime has zero enabled drum-viewer sprites; a broad drums component kill is not supported by this cost. |
@@ -807,6 +807,27 @@ out several superficially plausible blanket skips. The higher-value unresolved
 path remains Unity's camera render/cull and canvas rebuild work. Existing WPA
 samples do not identify which of the three live cameras or which Canvas caused
 that inclusive cost, so a new global skip would be speculative.
+
+### v0.4.95 hidden score-list graphics
+
+The same exact-scene inventory resolves 30 enabled `UnityEngine.UI.Image`
+components under `HUDCam/Leaderboard/Canvas/ScoreList`, 14 of which have
+active ancestors in the serialized scene, in addition to the 24 TMP labels
+paused in v0.4.94. The existing default-off hidden-leaderboard
+switch now records each image's original enabled state, disables images only
+when the list is active but its `CanvasGroup.alpha <= .001` in offline play,
+and restores them on reveal, online play, option disable, or scene cleanup.
+It does not deactivate the score-list GameObject or touch its network/data
+manager, so the game's reveal path can still run. The old WPA export attributes
+about 731 ms inclusive in 42 seconds to Unity's `UIEventsWillRenderCanvases`
+branch, but does not split that by score list or prove an Image-specific gain.
+This is a source-level reduction and has no Windows runtime or FPS result yet.
+The v0.4.95 build succeeded against the supplied references with zero
+warnings/errors, and all 114 core checks passed. The release ZIP contains
+`Mods/SlopHero.dll`. ZIP SHA-256:
+`406e6f590fb71ea1e83fc28d0077d1a5b760492c4f0a23f6f8ef4dadada41466`;
+DLL SHA-256:
+`a2f79fc4646de6634cad85967f31f039855c705280da3706f74cbc5b25a332b2`.
 
 ## v0.4.89 legacy mouse-event test
 

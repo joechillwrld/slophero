@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace SlopHero.Mod;
 
 /// <summary>
-/// Optional pause for hidden leaderboard entries, layout, and TMP labels.
+/// Optional pause for hidden leaderboard entries, layout, and UI graphics.
 /// Entry data and network requests stay under the game's control. Components
 /// are restored within 50 ms of the list appearing.
 /// </summary>
@@ -15,10 +15,12 @@ internal sealed class HiddenLeaderboardOverride
     private readonly record struct EntryState(InGameLeaderboardEntry Entry, bool Enabled);
     private readonly record struct FitterState(AspectRatioFitter Fitter, bool Enabled);
     private readonly record struct TextState(TextMeshProUGUI Text, bool Enabled);
+    private readonly record struct ImageState(Image Image, bool Enabled);
 
     private EntryState[] entries = Array.Empty<EntryState>();
     private FitterState[] fitters = Array.Empty<FitterState>();
     private TextState[] texts = Array.Empty<TextState>();
+    private ImageState[] images = Array.Empty<ImageState>();
     private SpectatorCount? spectator;
     private bool spectatorEnabled;
     private GameObject? scoreList;
@@ -28,7 +30,7 @@ internal sealed class HiddenLeaderboardOverride
     private bool? lastHidden;
 
     public bool NeedsRestore => entries.Length != 0 || fitters.Length != 0
-        || texts.Length != 0 || spectator != null;
+        || texts.Length != 0 || images.Length != 0 || spectator != null;
 
     public void Apply(bool requested, double realtime, bool online)
     {
@@ -82,6 +84,16 @@ internal sealed class HiddenLeaderboardOverride
             bool desired = state.Enabled && !suspend;
             if (label.enabled != desired) label.enabled = desired;
         }
+        // Alpha-zero CanvasGroups can leave their child Graphics registered
+        // with the canvas. Remove the score-list images from that path until
+        // the same group becomes visible again.
+        foreach (var state in images)
+        {
+            var image = state.Image;
+            if (image == null) continue;
+            bool desired = state.Enabled && !suspend;
+            if (image.enabled != desired) image.enabled = desired;
+        }
         // SpectatorCount.FixedUpdate polls the online count even in solo play.
         // It is independent of the score-list fade, but needed immediately
         // again if the session becomes online.
@@ -108,12 +120,14 @@ internal sealed class HiddenLeaderboardOverride
             if (canvasGroup == null || found.Length == 0) return;
             var foundFitters = list.GetComponentsInChildren<AspectRatioFitter>(true);
             var foundTexts = list.GetComponentsInChildren<TextMeshProUGUI>(true);
+            var foundImages = list.GetComponentsInChildren<Image>(true);
 
             scoreList = list.gameObject;
             group = canvasGroup;
             entries = found.Select(entry => new EntryState(entry, entry != null && entry.enabled)).ToArray();
             fitters = foundFitters.Select(fitter => new FitterState(fitter, fitter != null && fitter.enabled)).ToArray();
             texts = foundTexts.Select(text => new TextState(text, text != null && text.enabled)).ToArray();
+            images = foundImages.Select(image => new ImageState(image, image != null && image.enabled)).ToArray();
             spectator = root.transform.Find("Menu Canvas/Spectator Count")?.GetComponent<SpectatorCount>();
             spectatorEnabled = spectator != null && spectator.enabled;
             lastHidden = null;
@@ -128,6 +142,7 @@ internal sealed class HiddenLeaderboardOverride
             entries = Array.Empty<EntryState>();
             fitters = Array.Empty<FitterState>();
             texts = Array.Empty<TextState>();
+            images = Array.Empty<ImageState>();
             spectator = null;
             spectatorEnabled = false;
             lastHidden = null;
@@ -163,6 +178,15 @@ internal sealed class HiddenLeaderboardOverride
             }
             catch { }
         }
+        foreach (var state in images)
+        {
+            try
+            {
+                if (state.Image != null && state.Image.enabled != state.Enabled)
+                    state.Image.enabled = state.Enabled;
+            }
+            catch { }
+        }
         try
         {
             if (spectator != null && spectator.enabled != spectatorEnabled)
@@ -172,6 +196,7 @@ internal sealed class HiddenLeaderboardOverride
         entries = Array.Empty<EntryState>();
         fitters = Array.Empty<FitterState>();
         texts = Array.Empty<TextState>();
+        images = Array.Empty<ImageState>();
         spectator = null;
         spectatorEnabled = false;
         scoreList = null;
