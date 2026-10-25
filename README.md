@@ -1,11 +1,16 @@
-# SlopHero 0.4.100 alpha
+# SlopHero 0.4.101 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.100
+build, compiled against its loader and generated assemblies. Version 0.4.101
+fixes Sloptifine 3 visual discovery so it tolerates runtime child-component
+changes. The side-glow switch now targets only the left and right branches,
+leaving the separate center glow visible. A one-time warning identifies a
+missing live target. These switches still need a Windows activation test.
+Version 0.4.100
 adds separate default-off switches under **Sloptifine 3** for the personal-best
 popup and Star Power side glows during active offline solo Quickplay songs.
 They restore on pause, online play, or scene exit. The Star Power controller,
@@ -167,7 +172,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.100 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.100-alpha.zip)
+[Download SlopHero v0.4.101 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.101-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

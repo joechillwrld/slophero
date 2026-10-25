@@ -25,6 +25,7 @@ internal sealed class OptionalHudAnimationsOverride
     private IntPtr glowRoot;
     private bool pbSuppressed, glowSuppressed;
     private double nextPbDiscovery, nextGlowDiscovery, nextReconcile;
+    private int pbDiscoveryMisses, glowDiscoveryMisses;
 
     public bool NeedsRestore => pbSuppressed || glowSuppressed;
     public bool PbSuppressed => pbSuppressed;
@@ -64,7 +65,7 @@ internal sealed class OptionalHudAnimationsOverride
                     if (state.Component != null && state.Component.enabled) state.Component.enabled = false;
                 foreach (var state in glowRenderers)
                     if (state.Component != null && state.Component.enabled) state.Component.enabled = false;
-                if (!glowSuppressed) MelonLoader.MelonLogger.Msg("Sloptifine paused Star Power side-glow visuals (2 animators, 8 color scripts, 13 sprites).");
+                if (!glowSuppressed) MelonLoader.MelonLogger.Msg($"Sloptifine paused Star Power side-glow visuals ({glowAnimators.Length} animators, {glowColors.Length} color scripts, {glowRenderers.Length} sprites).");
                 glowSuppressed = true;
             }
         }
@@ -79,6 +80,7 @@ internal sealed class OptionalHudAnimationsOverride
         pbAnimator = null;
         ResetGlowReferences();
         nextPbDiscovery = nextGlowDiscovery = nextReconcile = 0;
+        pbDiscoveryMisses = glowDiscoveryMisses = 0;
     }
 
     private void ResetGlowReferences()
@@ -94,10 +96,21 @@ internal sealed class OptionalHudAnimationsOverride
     {
         nextPbDiscovery = now + 1;
         var root = GameObject.Find("HUDCam")?.transform.Find("HUD/Score/PB Notification");
-        if (root == null || root.GetComponent<HighScoreDisplay>() == null) return;
+        if (root == null || root.GetComponent<HighScoreDisplay>() == null)
+        {
+            ReportMissing(ref pbDiscoveryMisses, "personal-best popup");
+            return;
+        }
         var canvas = root.GetComponent<Canvas>();
         var animator = root.GetComponent<Animator>();
-        if (canvas == null || animator == null || root.GetComponentsInChildren<CanvasRenderer>(true).Length != 4) return;
+        // The popup's generated text/graphics can change its CanvasRenderer
+        // count at runtime. Its exact path and controller are the identity.
+        if (canvas == null || animator == null)
+        {
+            ReportMissing(ref pbDiscoveryMisses, "personal-best popup");
+            return;
+        }
+        pbDiscoveryMisses = 0;
         pbCanvas = canvas;
         pbCanvasEnabled = canvas.enabled;
         pbAnimator = animator;
@@ -107,25 +120,45 @@ internal sealed class OptionalHudAnimationsOverride
     private void DiscoverGlows(GameManager game, double now)
     {
         nextGlowDiscovery = now + 1;
-        if (game.playerObjects == null) return;
+        if (game.playerObjects == null)
+        {
+            ReportMissing(ref glowDiscoveryMisses, "Star Power side glows");
+            return;
+        }
         foreach (var player in game.playerObjects)
         {
             var guitar = player?.TryCast<GuitarPlayer>();
             if (guitar == null) continue;
             var root = guitar.transform.Find("Updated SP Animation");
             if (root == null || root.GetComponent<StarPowerController>() == null) continue;
-            var animators = root.GetComponentsInChildren<Animator>(true).ToArray();
-            var colors = root.GetComponentsInChildren<AnimatorColorBehavior>(true).ToArray();
-            var renderers = root.GetComponentsInChildren<SpriteRenderer>(true).ToArray();
-            if (animators.Length != 2 || colors.Length != 8 || renderers.Length != 13
-                || !animators.Any(a => a != null && a.gameObject.name == "SpSideGlows L")
-                || !animators.Any(a => a != null && a.gameObject.name == "SpSideGlows R")) continue;
+            var left = root.Find("SpSideGlows L");
+            var right = root.Find("SpSideGlows R");
+            if (left == null || right == null) continue;
+            var leftAnimator = left.GetComponent<Animator>();
+            var rightAnimator = right.GetComponent<Animator>();
+            if (leftAnimator == null || rightAnimator == null) continue;
+            // Only these two branches are side glows. The sibling CenterGlow
+            // sprite is a separate visual and must remain untouched.
+            var animators = new[] { leftAnimator, rightAnimator };
+            var colors = left.GetComponentsInChildren<AnimatorColorBehavior>(true).ToArray()
+                .Concat(right.GetComponentsInChildren<AnimatorColorBehavior>(true).ToArray()).ToArray();
+            var renderers = left.GetComponentsInChildren<SpriteRenderer>(true).ToArray()
+                .Concat(right.GetComponentsInChildren<SpriteRenderer>(true).ToArray()).ToArray();
+            if (renderers.Length == 0) continue;
+            glowDiscoveryMisses = 0;
             glowRoot = root.Pointer;
             glowAnimators = animators.Select(a => new AnimatorState(a, a != null && a.enabled)).ToArray();
             glowColors = colors.Select(c => new ColorState(c, c != null && c.enabled)).ToArray();
             glowRenderers = renderers.Select(r => new RendererState(r, r != null && r.enabled)).ToArray();
             return;
         }
+        ReportMissing(ref glowDiscoveryMisses, "Star Power side glows");
+    }
+
+    private static void ReportMissing(ref int misses, string target)
+    {
+        if (++misses == 3)
+            MelonLoader.MelonLogger.Warning($"Sloptifine 3 could not find the live {target} visual target; the game's visuals remain enabled.");
     }
 
     private void RestorePb()

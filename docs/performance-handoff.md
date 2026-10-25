@@ -421,11 +421,13 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.100** on the private
+- Latest packaged build: SlopHero **0.4.101** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.99 (SHA-256
-  `c679d72bc53c5d6acb6dc679d74ab77d0177ab78b735905edd482080f1ab061e`)
-  and is analyzed below. An earlier 0.4.95 log (SHA-256
+  0.4.100 (SHA-256
+  `4516179dc70583a82f5358c028afe03104f8cec06a3cc3b5c0f73aadec32cf75`)
+  and is analyzed below. The earlier 0.4.99 log has SHA-256
+  `c679d72bc53c5d6acb6dc679d74ab77d0177ab78b735905edd482080f1ab061e`.
+  An earlier 0.4.95 log (SHA-256
   `686ab1bc9132560aaed79a8a2880502d63d91dd938bba68ab83ecd29c7ea11a2`)
   records the previous timing windows. The earlier
   0.4.91 log (SHA-256
@@ -1142,3 +1144,28 @@ sampled render time is available to save.
 The 0.4.100 mod builds against the supplied IL2CPP references with zero
 warnings; the Core checks pass (114/114). Runtime behavior and presented-FPS
 impact still require the user's Windows test.
+
+## v0.4.100 log and v0.4.101 correction
+
+The uploaded 0.4.100 log matches the packaged DLL hash
+`ec7242a23a1d82598b7d0ff19cc8f70413c3834a447d2f82d588bb170f123dfb`.
+Two 30-second song windows report 1,545 and 1,548 scheduled render callbacks/s.
+These callback rates are not presented FPS. The largest update gaps were 122.6
+and 55.4 ms; there is no timestamp alignment or stack evidence tying them to
+the new switches. SlopHero shows no exception. The user confirmed that both
+Sloptifine 3 switches were enabled, but neither logged activation. The live
+snapshot still counted three active Animators. The log does not record the new
+preference values, so exact failure stage is not established.
+
+The first implementation required exact serialized component counts (4
+CanvasRenderers for PB; 2 Animators, 8 color scripts and 13 sprites for Star
+Power). That is brittle after runtime object creation. It also counted the
+separate `CenterGlow` sprite as a side glow. Version 0.4.101 instead identifies
+the PB popup by exact hierarchy path plus `HighScoreDisplay`, Canvas, and
+Animator, and finds the named left/right Star Power branches under the
+controller without requiring fixed child counts. Only left/right descendants
+are suppressed; `CenterGlow` stays active. If a requested visual target is
+still absent after three one-second attempts, one warning is logged and
+vanilla visuals remain. The timing-settings snapshot now records both
+preferences and whether each target was suppressed. The fix builds, but its
+activation and FPS effect are not established until a Windows run.
