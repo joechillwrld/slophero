@@ -423,8 +423,8 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 - Latest packaged build: SlopHero **0.4.99** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.98 (SHA-256
-  `596e071ba8f4fbda8de36e22852a60f5dc2f111b4a83bc96ef8ca10cb3a13ce1`)
+  0.4.99 (SHA-256
+  `c679d72bc53c5d6acb6dc679d74ab77d0177ab78b735905edd482080f1ab061e`)
   and is analyzed below. An earlier 0.4.95 log (SHA-256
   `686ab1bc9132560aaed79a8a2880502d63d91dd938bba68ab83ecd29c7ea11a2`)
   records the previous timing windows. The earlier
@@ -1066,3 +1066,47 @@ older 29.9-second raw capture. ZIP SHA-256:
 `27921e125c1ff3a3a28b64084e83b9877273b7cec595c99810fd8d91c5045059`;
 DLL SHA-256:
 `f63bca6dce0a968dc510f5c9842e2a964d5c1f7cfc814001fd30bd1c965c5f1f`.
+
+## v0.4.98 versus v0.4.99 presented-frame comparison
+
+The user supplied one raw 29.9-second Intel PresentMon capture and its small
+`-stats` summary for each mod version. The raw 0.4.98 CSV SHA-256 is
+`462b8d26ee84e1e48c2e84238a25de2882eff0a7523e2da7e6ffa2c43ff3dbfe`;
+the raw 0.4.99 CSV is
+`220cf9e21b73def27450a786024001023af316bf3eeb27860274be4dbbd1b29c`.
+The two ~219-byte files are PresentMon summaries, not second runs. Both raw
+captures contain only Clone Hero, one swapchain, DXGI independent-flip
+application frames, and zero reported PSO compilations. Average CPU frequency
+is effectively equal (~4,402 MHz) in both.
+
+| Raw capture | Presents/s | Present interval p99 | CPU busy mean | GPU busy mean | Frames >3 ms | Longest present interval |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0.4.98 | 1,574.7 | 0.828 ms | 0.605 ms | 0.259 ms | 8 | 8.253 ms |
+| 0.4.99 | 1,570.2 | 0.828 ms | 0.608 ms | 0.260 ms | 2 | 3.951 ms |
+
+Per-second present-rate patterns align best with about a two-second start
+offset (correlation 0.94 across the overlapping 27 one-second bins). If the
+0.4.98 interval `[2,29)` seconds is compared to the 0.4.99 interval `[0,27)`,
+the rates are 1,574.0 versus 1,581.5 presents/s and present p99 values are
+0.8279 versus 0.8274 ms. This shift reverses the tiny average-FPS ordering,
+showing that the full-window 0.3% difference is not a robust mod effect.
+The fewer >3 ms frames in 0.4.99 are a favorable observation, but eight
+versus two rare events across single runs cannot establish a repeatable
+stutter improvement. The 8.253 ms 0.4.98 outlier is CPU-heavy (8.226 ms
+CPU busy, 0.297 ms GPU busy), not a reported shader compile.
+
+The 0.4.99 log confirms the TMP experiment ran zero times in both 30-second
+timing windows, consistent with scene preparation and its no-target latch.
+It shows no SlopHero hook error. Its first `Core.OnUpdate` maximum is 68.820
+ms, but PresentMon's 0.4.99 capture has a 3.951 ms maximum; the log and raw
+CSV do not share an absolute capture timestamp, so these outliers cannot be
+correlated or called the same displayed-frame stall. The log's two Gameplay
+snapshots differ in active SpriteRenderers (181 and 199); they were taken
+around different scene phases, another reason not to infer exact chart-state
+matching from mod callback counts.
+
+This comparison validates the intended no-work TMP gameplay path. It shows
+no sustained presented-FPS improvement or regression attributable to 0.4.99.
+The underlying CPU-heavy render/cull and first-song outlier investigations
+remain open. Do not redesign the native mouse hooks or Unity worker pool
+based on these two rare-spike counts alone.
