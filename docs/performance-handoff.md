@@ -421,11 +421,13 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.101** on the private
+- Latest packaged build: SlopHero **0.4.102** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.100 (SHA-256
-  `4516179dc70583a82f5358c028afe03104f8cec06a3cc3b5c0f73aadec32cf75`)
-  and is analyzed below. The earlier 0.4.99 log has SHA-256
+  0.4.101 (SHA-256
+  `8361a5c0873b28ce1e18f39cf9e952c5debf2a71d3a72b80ae77b82db7590f36`)
+  and is analyzed below. The earlier 0.4.100 log has SHA-256
+  `4516179dc70583a82f5358c028afe03104f8cec06a3cc3b5c0f73aadec32cf75`.
+  The earlier 0.4.99 log has SHA-256
   `c679d72bc53c5d6acb6dc679d74ab77d0177ab78b735905edd482080f1ab061e`.
   An earlier 0.4.95 log (SHA-256
   `686ab1bc9132560aaed79a8a2880502d63d91dd938bba68ab83ecd29c7ea11a2`)
@@ -1169,3 +1171,23 @@ still absent after three one-second attempts, one warning is logged and
 vanilla visuals remain. The timing-settings snapshot now records both
 preferences and whether each target was suppressed. The fix builds, but its
 activation and FPS effect are not established until a Windows run.
+
+## v0.4.101 log and v0.4.102 lookup
+
+The supplied 0.4.101 log records both Sloptifine 3 preferences as `True`,
+both suppression states as `False`, and a one-time missing-target warning for
+each during two songs. It confirms the count-guard relaxation alone did not
+fix either live discovery path. The same windows report 1,554 and 1,539
+scheduled render callbacks/s, which cannot establish presented FPS. Their
+largest update gaps are 31 and 106 ms. Neither visual optimization ran, so
+these windows measure only the existing combined Sloptifine configuration.
+
+Version 0.4.102 resolves the single Gameplay `HighScoreDisplay` component
+using `FindObjectsByType` with inactive objects included, then gets its own
+Canvas and Animator. It resolves the two named side-glow Animators in the
+Gameplay scene under a guitar player, requiring the same parent and touching
+only their descendants. This avoids dependence on two serialized hierarchy
+paths. A failed lookup continues to leave the game components untouched; the
+one-time missing-target warning now includes the observed Gameplay component
+count or Animator names if discovery still fails. The match needs a runtime test;
+the log cannot tell why the earlier paths failed.

@@ -56,7 +56,7 @@ internal sealed class OptionalHudAnimationsOverride
         else
         {
             if (glowRoot == IntPtr.Zero && game != null && now >= nextGlowDiscovery)
-                DiscoverGlows(game, now);
+                DiscoverGlows(now);
             if (glowRoot != IntPtr.Zero && (!glowSuppressed || reconcile))
             {
                 foreach (var state in glowAnimators)
@@ -95,19 +95,30 @@ internal sealed class OptionalHudAnimationsOverride
     private void DiscoverPb(double now)
     {
         nextPbDiscovery = now + 1;
-        var root = GameObject.Find("HUDCam")?.transform.Find("HUD/Score/PB Notification");
-        if (root == null || root.GetComponent<HighScoreDisplay>() == null)
+        // Resolve the live controller rather than assuming the serialized
+        // Gameplay hierarchy path is unchanged after scene initialization.
+        var displays = UnityEngine.Object.FindObjectsByType<HighScoreDisplay>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        HighScoreDisplay? display = null;
+        int gameplayDisplays = 0;
+        foreach (var candidate in displays)
         {
-            ReportMissing(ref pbDiscoveryMisses, "personal-best popup");
-            return;
+            if (candidate == null || candidate.gameObject.scene.name != "Gameplay") continue;
+            gameplayDisplays++;
+            if (display != null)
+            {
+                ReportMissing(ref pbDiscoveryMisses, "personal-best popup",
+                    pbDiscoveryMisses == 2 ? $"Gameplay displays={gameplayDisplays}" : "");
+                return;
+            }
+            display = candidate;
         }
-        var canvas = root.GetComponent<Canvas>();
-        var animator = root.GetComponent<Animator>();
-        // The popup's generated text/graphics can change its CanvasRenderer
-        // count at runtime. Its exact path and controller are the identity.
+        var canvas = display?.GetComponent<Canvas>();
+        var animator = display?.GetComponent<Animator>();
         if (canvas == null || animator == null)
         {
-            ReportMissing(ref pbDiscoveryMisses, "personal-best popup");
+            ReportMissing(ref pbDiscoveryMisses, "personal-best popup",
+                pbDiscoveryMisses == 2 ? $"Gameplay displays={gameplayDisplays}; Canvas={canvas != null}; Animator={animator != null}" : "");
             return;
         }
         pbDiscoveryMisses = 0;
@@ -117,48 +128,57 @@ internal sealed class OptionalHudAnimationsOverride
         pbAnimatorEnabled = animator.enabled;
     }
 
-    private void DiscoverGlows(GameManager game, double now)
+    private void DiscoverGlows(double now)
     {
         nextGlowDiscovery = now + 1;
-        if (game.playerObjects == null)
+        // The live player hierarchy can differ from the prefab path. The
+        // current scene has two named side-glow Animators, both parented under
+        // the guitar player; locate that pair directly.
+        Animator? leftAnimator = null, rightAnimator = null;
+        List<string>? observed = glowDiscoveryMisses == 2 ? new List<string>(4) : null;
+        foreach (var animator in UnityEngine.Object.FindObjectsByType<Animator>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
-            ReportMissing(ref glowDiscoveryMisses, "Star Power side glows");
-            return;
+            if (animator == null || animator.gameObject.scene.name != "Gameplay") continue;
+            bool underGuitar = animator.GetComponentInParent<GuitarPlayer>() != null;
+            if (observed != null && observed.Count < 6)
+                observed.Add($"{animator.gameObject.name}:{(underGuitar ? "guitar" : "other")}");
+            if (!underGuitar) continue;
+            if (animator.gameObject.name == "SpSideGlows L") leftAnimator = animator;
+            else if (animator.gameObject.name == "SpSideGlows R") rightAnimator = animator;
         }
-        foreach (var player in game.playerObjects)
+        if (leftAnimator != null && rightAnimator != null
+            && leftAnimator.transform.parent != null && rightAnimator.transform.parent != null
+            && leftAnimator.transform.parent.Pointer == rightAnimator.transform.parent.Pointer)
         {
-            var guitar = player?.TryCast<GuitarPlayer>();
-            if (guitar == null) continue;
-            var root = guitar.transform.Find("Updated SP Animation");
-            if (root == null || root.GetComponent<StarPowerController>() == null) continue;
-            var left = root.Find("SpSideGlows L");
-            var right = root.Find("SpSideGlows R");
-            if (left == null || right == null) continue;
-            var leftAnimator = left.GetComponent<Animator>();
-            var rightAnimator = right.GetComponent<Animator>();
-            if (leftAnimator == null || rightAnimator == null) continue;
-            // Only these two branches are side glows. The sibling CenterGlow
-            // sprite is a separate visual and must remain untouched.
-            var animators = new[] { leftAnimator, rightAnimator };
-            var colors = left.GetComponentsInChildren<AnimatorColorBehavior>(true).ToArray()
-                .Concat(right.GetComponentsInChildren<AnimatorColorBehavior>(true).ToArray()).ToArray();
-            var renderers = left.GetComponentsInChildren<SpriteRenderer>(true).ToArray()
-                .Concat(right.GetComponentsInChildren<SpriteRenderer>(true).ToArray()).ToArray();
-            if (renderers.Length == 0) continue;
+            // Only these branches are side glows. The sibling CenterGlow
+            // sprite is a separate visual and stays active.
+            var colors = leftAnimator.GetComponentsInChildren<AnimatorColorBehavior>(true).ToArray()
+                .Concat(rightAnimator.GetComponentsInChildren<AnimatorColorBehavior>(true).ToArray()).ToArray();
+            var renderers = leftAnimator.GetComponentsInChildren<SpriteRenderer>(true).ToArray()
+                .Concat(rightAnimator.GetComponentsInChildren<SpriteRenderer>(true).ToArray()).ToArray();
+            if (renderers.Length == 0)
+            {
+                ReportMissing(ref glowDiscoveryMisses, "Star Power side glows",
+                    glowDiscoveryMisses == 2 ? $"animators={string.Join(",", observed ?? new List<string>())}; renderers=0" : "");
+                return;
+            }
             glowDiscoveryMisses = 0;
-            glowRoot = root.Pointer;
-            glowAnimators = animators.Select(a => new AnimatorState(a, a != null && a.enabled)).ToArray();
+            glowRoot = leftAnimator.transform.parent.Pointer;
+            glowAnimators = new[] { new AnimatorState(leftAnimator, leftAnimator.enabled),
+                new AnimatorState(rightAnimator, rightAnimator.enabled) };
             glowColors = colors.Select(c => new ColorState(c, c != null && c.enabled)).ToArray();
             glowRenderers = renderers.Select(r => new RendererState(r, r != null && r.enabled)).ToArray();
             return;
         }
-        ReportMissing(ref glowDiscoveryMisses, "Star Power side glows");
+        ReportMissing(ref glowDiscoveryMisses, "Star Power side glows",
+            glowDiscoveryMisses == 2 ? $"animators={string.Join(",", observed ?? new List<string>())}" : "");
     }
 
-    private static void ReportMissing(ref int misses, string target)
+    private static void ReportMissing(ref int misses, string target, string detail)
     {
         if (++misses == 3)
-            MelonLoader.MelonLogger.Warning($"Sloptifine 3 could not find the live {target} visual target; the game's visuals remain enabled.");
+            MelonLoader.MelonLogger.Warning($"Sloptifine 3 could not find the live {target} visual target ({detail}); the game's visuals remain enabled.");
     }
 
     private void RestorePb()

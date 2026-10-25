@@ -37,7 +37,10 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.101. It relaxes the new Sloptifine 3 target
+The latest packaged build is 0.4.102. It looks up the personal-best display
+and Star Power side glows through live Gameplay components after v0.4.101
+failed to find either target by hierarchy path. Runtime activation still needs
+a Windows test. Version 0.4.101 relaxes the new Sloptifine 3 target
 lookup, excludes the separate CenterGlow from the side-glow switch, and
 reports a missing live target once. A Windows activation test is still needed.
 Version 0.4.100 adds separate default-off Sloptifine 3
