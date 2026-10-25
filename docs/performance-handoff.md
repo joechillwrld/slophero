@@ -423,8 +423,8 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 - Latest packaged build: SlopHero **0.4.95** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.94 (SHA-256
-  `ffe44b7d319bcfd985c42b073cd21d5e50888358b946622963389b118c54cf71`).
+  0.4.95 (SHA-256
+  `686ab1bc9132560aaed79a8a2880502d63d91dd938bba68ab83ecd29c7ea11a2`).
   Its timing windows and camera activation are analyzed below. The earlier
   0.4.91 log (SHA-256
   `9a036617279b5d5c175b1ca060868f4f06a7d9409b65d318238d511708a44d5d`)
@@ -828,6 +828,30 @@ warnings/errors, and all 114 core checks passed. The release ZIP contains
 `406e6f590fb71ea1e83fc28d0077d1a5b760492c4f0a23f6f8ef4dadada41466`;
 DLL SHA-256:
 `a2f79fc4646de6634cad85967f31f039855c705280da3706f74cbc5b25a332b2`.
+
+### v0.4.95 Windows log
+
+The uploaded `Latest.log` SHA-256 is
+`686ab1bc9132560aaed79a8a2880502d63d91dd938bba68ab83ecd29c7ea11a2`.
+It loads 0.4.95 against the matching game build. In both captured solo songs,
+the hidden-leaderboard preference is on and the score list reports active with
+alpha zero and zero eligible entry updates. There is no SlopHero exception or
+hidden-leaderboard failure, but the log does not expose individual `Image`
+enabled states or measure the canvas savings. Most other performance switches
+are also on, so these are not isolated before/after runs.
+
+The two 30-second windows have scheduled-render callback p99 intervals of
+0.99 and 1.00 ms. Their maxima are 126.4 and 59.5 ms, mirrored by simulation
+delta maxima of 118.5 and 58.2 ms and GUI-repaint maxima of 124.8 and 59.5 ms.
+`Core.OnUpdate` wall-clock maxima are 116.1 and 56.9 ms, versus 0.003 ms
+average. The image pause runs in `OnLateUpdate` at a 20 Hz gate, outside the
+`Core.OnUpdate` timing bucket, so the log does not attribute those isolated
+Update maxima to v0.4.95. `RuntimeTimings` uses `Stopwatch`, which includes
+time if the thread is descheduled during a callback. Do not infer that 116 ms
+of mod code executed or that this was a presented-frame hitch. The TMP scale
+experiment still modifies zero labels and incurred a 5.786 ms maximum in the
+first window, plausibly its one-time scene scan. That is a separate small
+startup lead, not an explanation for the 116 ms maximum.
 
 ## v0.4.89 legacy mouse-event test
 
