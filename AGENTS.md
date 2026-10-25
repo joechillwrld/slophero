@@ -37,11 +37,13 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.95. It extends the default-off hidden
+The latest packaged build is 0.4.96. It extends the default-off hidden
 leaderboard option to pause 24 score-list TMP labels only while the list is
 fully invisible offline, and now also pauses 30 score-list Image components.
-It restores their prior states on reveal or online
-play. The exact scene inventory and limits are in the handoff. Version 0.4.93
+It additionally pauses the list's dedicated world-space Canvas, CanvasScaler,
+and GraphicRaycaster under a guarded scene-shape check. It restores prior
+states on reveal or online play. The exact scene inventory and limits are in
+the handoff. Version 0.4.93
 corrects the optional SpriteAttach
 cache so a skipped original update no longer recaptures all inputs and outputs;
 the hook stays pass-through on pause and menu transitions until scene exit or

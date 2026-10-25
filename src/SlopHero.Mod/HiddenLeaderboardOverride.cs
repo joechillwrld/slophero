@@ -23,6 +23,12 @@ internal sealed class HiddenLeaderboardOverride
     private ImageState[] images = Array.Empty<ImageState>();
     private SpectatorCount? spectator;
     private bool spectatorEnabled;
+    private Canvas? leaderboardCanvas;
+    private bool leaderboardCanvasEnabled;
+    private CanvasScaler? leaderboardScaler;
+    private bool leaderboardScalerEnabled;
+    private GraphicRaycaster? leaderboardRaycaster;
+    private bool leaderboardRaycasterEnabled;
     private GameObject? scoreList;
     private CanvasGroup? group;
     private double nextDiscovery;
@@ -30,7 +36,11 @@ internal sealed class HiddenLeaderboardOverride
     private bool? lastHidden;
 
     public bool NeedsRestore => entries.Length != 0 || fitters.Length != 0
-        || texts.Length != 0 || images.Length != 0 || spectator != null;
+        || texts.Length != 0 || images.Length != 0 || spectator != null
+        || leaderboardCanvas != null || leaderboardScaler != null
+        || leaderboardRaycaster != null;
+    public bool CanvasSuspended => leaderboardCanvas != null && leaderboardCanvasEnabled
+        && !leaderboardCanvas.enabled;
 
     public void Apply(bool requested, double realtime, bool online)
     {
@@ -94,6 +104,25 @@ internal sealed class HiddenLeaderboardOverride
             bool desired = state.Enabled && !suspend;
             if (image.enabled != desired) image.enabled = desired;
         }
+        // This dedicated world-space Canvas contains only ScoreList in the
+        // supplied Gameplay scene. Pausing its render registration can avoid
+        // traversing the invisible leaderboard subtree; the hierarchy
+        // and manager remain active so the fade/reveal can still advance.
+        if (leaderboardScaler != null)
+        {
+            bool desired = leaderboardScalerEnabled && !suspend;
+            if (leaderboardScaler.enabled != desired) leaderboardScaler.enabled = desired;
+        }
+        if (leaderboardCanvas != null)
+        {
+            bool desired = leaderboardCanvasEnabled && !suspend;
+            if (leaderboardCanvas.enabled != desired) leaderboardCanvas.enabled = desired;
+        }
+        if (leaderboardRaycaster != null)
+        {
+            bool desired = leaderboardRaycasterEnabled && !suspend;
+            if (leaderboardRaycaster.enabled != desired) leaderboardRaycaster.enabled = desired;
+        }
         // SpectatorCount.FixedUpdate polls the online count even in solo play.
         // It is independent of the score-list fade, but needed immediately
         // again if the session becomes online.
@@ -121,6 +150,14 @@ internal sealed class HiddenLeaderboardOverride
             var foundFitters = list.GetComponentsInChildren<AspectRatioFitter>(true);
             var foundTexts = list.GetComponentsInChildren<TextMeshProUGUI>(true);
             var foundImages = list.GetComponentsInChildren<Image>(true);
+            Canvas? dedicatedCanvas = null;
+            var parent = list.parent;
+            if (parent != null && parent.childCount == 1 && parent.GetChild(0).Pointer == list.Pointer)
+            {
+                var candidate = parent.GetComponent<Canvas>();
+                if (candidate != null && candidate.renderMode == RenderMode.WorldSpace)
+                    dedicatedCanvas = candidate;
+            }
 
             scoreList = list.gameObject;
             group = canvasGroup;
@@ -128,6 +165,12 @@ internal sealed class HiddenLeaderboardOverride
             fitters = foundFitters.Select(fitter => new FitterState(fitter, fitter != null && fitter.enabled)).ToArray();
             texts = foundTexts.Select(text => new TextState(text, text != null && text.enabled)).ToArray();
             images = foundImages.Select(image => new ImageState(image, image != null && image.enabled)).ToArray();
+            leaderboardCanvas = dedicatedCanvas;
+            leaderboardCanvasEnabled = dedicatedCanvas != null && dedicatedCanvas.enabled;
+            leaderboardScaler = dedicatedCanvas != null ? parent!.GetComponent<CanvasScaler>() : null;
+            leaderboardScalerEnabled = leaderboardScaler != null && leaderboardScaler.enabled;
+            leaderboardRaycaster = dedicatedCanvas != null ? parent!.GetComponent<GraphicRaycaster>() : null;
+            leaderboardRaycasterEnabled = leaderboardRaycaster != null && leaderboardRaycaster.enabled;
             spectator = root.transform.Find("Menu Canvas/Spectator Count")?.GetComponent<SpectatorCount>();
             spectatorEnabled = spectator != null && spectator.enabled;
             lastHidden = null;
@@ -143,6 +186,12 @@ internal sealed class HiddenLeaderboardOverride
             fitters = Array.Empty<FitterState>();
             texts = Array.Empty<TextState>();
             images = Array.Empty<ImageState>();
+            leaderboardCanvas = null;
+            leaderboardCanvasEnabled = false;
+            leaderboardScaler = null;
+            leaderboardScalerEnabled = false;
+            leaderboardRaycaster = null;
+            leaderboardRaycasterEnabled = false;
             spectator = null;
             spectatorEnabled = false;
             lastHidden = null;
@@ -189,6 +238,24 @@ internal sealed class HiddenLeaderboardOverride
         }
         try
         {
+            if (leaderboardScaler != null && leaderboardScaler.enabled != leaderboardScalerEnabled)
+                leaderboardScaler.enabled = leaderboardScalerEnabled;
+        }
+        catch { }
+        try
+        {
+            if (leaderboardCanvas != null && leaderboardCanvas.enabled != leaderboardCanvasEnabled)
+                leaderboardCanvas.enabled = leaderboardCanvasEnabled;
+        }
+        catch { }
+        try
+        {
+            if (leaderboardRaycaster != null && leaderboardRaycaster.enabled != leaderboardRaycasterEnabled)
+                leaderboardRaycaster.enabled = leaderboardRaycasterEnabled;
+        }
+        catch { }
+        try
+        {
             if (spectator != null && spectator.enabled != spectatorEnabled)
                 spectator.enabled = spectatorEnabled;
         }
@@ -197,6 +264,12 @@ internal sealed class HiddenLeaderboardOverride
         fitters = Array.Empty<FitterState>();
         texts = Array.Empty<TextState>();
         images = Array.Empty<ImageState>();
+        leaderboardCanvas = null;
+        leaderboardCanvasEnabled = false;
+        leaderboardScaler = null;
+        leaderboardScalerEnabled = false;
+        leaderboardRaycaster = null;
+        leaderboardRaycasterEnabled = false;
         spectator = null;
         spectatorEnabled = false;
         scoreList = null;

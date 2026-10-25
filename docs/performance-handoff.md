@@ -421,7 +421,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.95** on the private
+- Latest packaged build: SlopHero **0.4.96** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.95 (SHA-256
   `686ab1bc9132560aaed79a8a2880502d63d91dd938bba68ab83ecd29c7ea11a2`).
@@ -793,8 +793,8 @@ objects, not proof they stayed enabled at runtime:
 | --- | ---: | --- |
 | `HUDCam` drag-handle roots / `HudDragController.Update` | 3 enabled | Only ~8 ms sampled CPU in 31 s. The old source has a constant HUD-position setter, but current v1.1 native `Update` first calls `Input.get_mousePosition` and compares it with cached coordinates before its longer branch; the old behavior cannot be presumed. |
 | `HUDCam` drag-handle canvases / `GraphicRaycaster` | 3 enabled single-Image canvases | Part of four scene raycasters. The broad EventSystem pause already prevents their ordinary mouse raycasts during eligible songs; disabling raycasters in that same scope cannot yield an additive raycast saving. Their canvas/render cost is not separately measured. |
-| `HUDCam/Leaderboard/Canvas` / `GraphicRaycaster` | 1 enabled | Its score list is alpha zero in the runtime log. v0.4.94 pauses entry, fitter, and TMP components while hidden offline. The remaining 30 enabled `Image` graphics are addressed by v0.4.95; canvas batching for the parent hierarchy remains unmeasured. |
-| `Background Cam/Background Canvas/Background Image` | enabled Canvas, `AspectRatioFitter`, `SongBackground`, and `VideoPlayer`; disabled `Image` | Runtime reports one enabled but non-playing video. The optional black-background mode disables the camera, not the screen-space overlay canvas. Its current residual cost has not been attributed; `AspectRatioFitter.Update` is only ~4 ms in the old 31 s method export, so it is not a large likely saving. |
+| `HUDCam/Leaderboard/Canvas` / `GraphicRaycaster` | 1 enabled | Its score list is alpha zero in the runtime log. v0.4.94 pauses entry, fitter, and TMP components while hidden offline; v0.4.95 pauses child Images; v0.4.96 adds a guarded pause for the dedicated Canvas, scaler, and raycaster. The canvas cost and benefit remain unmeasured. |
+| `Background Cam/Background Canvas/Background Image` | enabled Canvas, `AspectRatioFitter`, `SongBackground`, and `VideoPlayer`; disabled `Image` | Runtime reports one enabled but non-playing video. The Canvas is Screen Space - Camera mode targeting `Background Cam`, so it does not render through the disabled camera. `AspectRatioFitter.Update` is only ~4 ms in the old 31 s method export, so further suppression is not a large likely saving. |
 | `HUDCam/Menu Canvas/Lyrics` / `LyricDisplay.Update` | 1 enabled | About 4 ms in the earlier method view. Lyric visibility and chart support must be preserved. |
 | `HUDCam/Input Viewer/Drums Input Viewer` / `DrumsInputViewer.Update` | 1 enabled in serialized hierarchy | About 1 ms mapped in the earlier method view. Runtime has zero enabled drum-viewer sprites; a broad drums component kill is not supported by this cost. |
 | `HUDCam/HUD/Score/PB Notification` / `Animator` | 1 enabled | No isolated Animator cost in the supplied trace. Do not infer cost from the static scene count. |
@@ -852,6 +852,48 @@ of mod code executed or that this was a presented-frame hitch. The TMP scale
 experiment still modifies zero labels and incurred a 5.786 ms maximum in the
 first window, plausibly its one-time scene scan. That is a separate small
 startup lead, not an explanation for the 116 ms maximum.
+
+### Exact camera and canvas follow-up
+
+The Gameplay `HUDCam` and `Background Cam` are **orthographic** (size 5);
+all three `PlayerCamera` variants in the reassembled exact `resources.assets`
+are **perspective**. `HUDCam` renders layers 5 and 12, while the player camera
+renders layer 9. A single-camera merge would change HUD projection and draw
+ordering, so it is not a safe culling optimization. The background-camera
+experiment is different: it hides only the blank background pass and transfers
+the color clear. Also, `Background Cam/Background Canvas` is
+Screen Space - Camera mode targeting `Background Cam`, **not** a screen-space
+overlay as an earlier note suggested; that Canvas cannot continue rendering
+through its disabled camera. The enabled but non-playing VideoPlayer and its
+AspectRatioFitter have only small mapped method rows, so extra background
+Canvas suppression is not a promising next gain.
+
+The nine serialized Gameplay Canvases include one dedicated world-space
+`HUDCam/Leaderboard/Canvas` with `ScoreList` as its sole direct child. Under
+it are 80 GameObjects, 24 active-ancestor TMP labels, and 14 active-ancestor
+Images (30 Images are enabled in the asset). Its parent Canvas, CanvasScaler,
+and GraphicRaycaster remain enabled under the alpha-zero score list. By
+contrast, `HUDCam/Menu Canvas` serializes 61 enabled TMP labels and 56 Images,
+but only 8 TMP labels and 5 Images have active ancestors; the game already
+deactivates most menus. The live log reports 48 enabled guitar input-viewer
+sprites and zero GHL/drum viewer sprites, so blindly hiding those roots would
+duplicate game behavior or remove visible input feedback.
+
+Version 0.4.96 extends the existing default-off hidden-leaderboard switch to pause
+its dedicated Canvas, CanvasScaler, and GraphicRaycaster alongside the hidden
+children. Discovery requires the exact one-child, world-space Canvas shape;
+otherwise it leaves the parent Canvas untouched. The GameObject, manager,
+fade state, and online requests remain active, and prior component states
+restore on reveal, online play, setting disable, or scene exit. This targets
+the remaining invisible Canvas traversal without inventing an FPS result.
+The optional timing snapshot now reports `canvasSuspended` once per capture,
+so the next log can confirm this guard engaged without per-frame logging.
+The build has zero warnings/errors against the supplied references, all 114
+core checks pass, and the release ZIP contains `Mods/SlopHero.dll`. Windows
+runtime behavior and presented-frame impact remain untested. ZIP SHA-256:
+`0ddd7cd7e17f3d940afc672c90aa5030accb1cf3a604b9d31b84b3e9144fed90`;
+DLL SHA-256:
+`f9ce7e748e55c0e6cbf4755d5bb58bc135db24fad0d7a14bf004e47f93eea383`.
 
 ## v0.4.89 legacy mouse-event test
 
