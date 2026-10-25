@@ -37,7 +37,11 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.93. It corrects the optional SpriteAttach
+The latest packaged build is 0.4.94. It extends the default-off hidden
+leaderboard option to pause 24 score-list TMP labels only while the list is
+fully invisible offline, restoring their prior states on reveal or online
+play. The exact scene inventory and limits are in the handoff. Version 0.4.93
+corrects the optional SpriteAttach
 cache so a skipped original update no longer recaptures all inputs and outputs;
 the hook stays pass-through on pause and menu transitions until scene exit or
 setting disable. Three experimental offline-solo settings now share one game

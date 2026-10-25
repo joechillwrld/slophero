@@ -421,7 +421,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.93** on the private
+- Latest packaged build: SlopHero **0.4.94** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.92 (SHA-256
   `da127fa224b26ada8a126568654dee3c0c094c50fd7828fa78a7ce612893dcd1`).
@@ -692,6 +692,46 @@ level reductions, with no Windows runtime result or measured FPS gain yet.
 The v0.4.93 build has zero warnings/errors and the 114 core checks pass.
 ZIP SHA-256: `3eb6cc993a0f292b672a0aff75991071ba409f631cd83de5cbf9c7b1c90d88f5`;
 DLL SHA-256: `cf8e22fdc216419d41cfdee92e6e659dc6af79cf1c2db30010ba14cf5405ef99`.
+
+## 2026-10-25 game and renderer follow-up
+
+I screened the exact-build ETW method map, the symbolized WPA tree, the
+Gameplay scene, and the reassembled resource prefabs together:
+
+- Rewired's `InputManager_Base.DoUpdate` and the large obfuscated controller
+  manager/device update methods are core polling paths. Their sampled weights
+  overlap. The existing mouse-only option is the narrow input experiment;
+  these methods do not justify reducing the 1000 Hz instrument rate.
+- The WPA tree still places the largest Unity work in camera render/cull and
+  scene extraction (`RenderCameras` 10,344 ms inclusive over 42.3 seconds).
+  `RenderManager::UpdateAllRenderers` is about 780 ms and
+  `SortingGroupManager::Update` about 240 ms in that same tree. The static
+  Gameplay scene has **zero** SortingGroup components. The resource prefabs
+  have 17: note variants, combo indicators, arrows, volume overlays, kick
+  flames, a disabled fret variant, and a Pong paddle. These are serialized
+  prefab counts, not live costs. Removing note/combo sorting groups without
+  proving they are idle could change draw order.
+- The Gameplay scene serializes 86 `TextMeshProUGUI` components. Thirty-three
+  have enabled components and active ancestors in the static hierarchy; 24
+  are children of `HUDCam/Leaderboard/Canvas/ScoreList`. The latest live
+  snapshot reports that list active with CanvasGroup alpha zero. The existing
+  default-off hidden-leaderboard option paused entries and layout fitters but
+  left these text components enabled. It now records each label's original
+  state and pauses the list's TMP labels only while fully hidden offline,
+  restoring them when the list appears or online play starts. The older trace
+  has 320 ms inclusive in `TMP_UpdateManager.DoRebuilds` and 279 ms nested in
+  `TextMeshProUGUI.InternalUpdate`; it cannot assign that work to the 24 labels
+  or predict this option's FPS effect.
+- Current `BaseGuitarNoteRenderer.Update` is already gated to rendered frames;
+  `InputViewer.Update`, `HighwayScroll.Update`, and `GuitarFretAnimator.Update`
+  have small mapped method rows. Those paths do not support another blanket
+  song-time skip.
+
+The v0.4.94 build compiles with zero warnings/errors and the 114 core checks
+pass. The archive contains `Mods/SlopHero.dll`. The new text pause has not been
+verified in a Windows game session. ZIP SHA-256:
+`db19c90b7603f33c4203a2d52458d38ce087bbe0bb6e0b0790b951c6ce22d0f6`;
+DLL SHA-256: `1c6565c9114b28dec2bfeb837c9cbbfb72f8daee2362ba40b0752b7047d3862b`.
 
 ## WPA hot-callback attribution follow-up
 
