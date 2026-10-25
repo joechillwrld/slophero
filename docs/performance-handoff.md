@@ -63,7 +63,7 @@ the Sloptifine pages and preserve their documented scope:
 | Unity job queue setter was resolved through the matching player PDB | `UnityJobWorkerLimit` uses the generated `SetJobQueueMaximumActiveThreadCount` API and restores the prior limit. It is default-off; the latest three-run callback comparison shows no benefit. |
 | Current `HighwayScroll.Update` combines property-block writes with video/fade behavior | `HighwayAnimationOverride` is a default-off whole-update freeze during offline solo songs. It may freeze those visuals and has no demonstrated frame gain. The old source's note `yield`/hit-detection paths remain untouched because they are scoring-sensitive and not confirmed in current code. |
 | TMP's SDF scale queue repeatedly checks text transforms | v0.4.88 packages the default-off offline-solo experiment; its v0.4.89 log changed zero labels. The current worktree includes labels under Animator/Animation parents and checks those at 20 Hz, while ordinary labels stay at 4 Hz. Any detected scale change restores TMP's per-frame scale updates and excludes that label for the scene. The scene-wide discovery uses unsorted `FindObjectsByType`; TMP layout, graphic-rebuild, and culling queues stay active. Scale animation could briefly soften text; the prototype has no measured frame-time result yet. |
-| Rewired's mouse-only sampler and `SpriteAttach.Update` have small WPA self-CPU rows | v0.4.91 adds two separate default-off options, limited to offline solo guitar Quickplay. The Rewired prefix skips only the mouse snapshot (seven buttons, three axes); keyboard/controller and 1000 Hz instrument polling stay active, while mouse-bound actions pause. The SpriteAttach cache verifies camera/screen/sprite/scale inputs and outputs, including the exact-build packed scale input at RVA `0x64C60`; missing bindings fail open to vanilla. Both are prototypes without runtime or matched PresentMon results; the checks themselves may erase the SpriteAttach savings. Test separately before combining. |
+| Rewired's mouse-only sampler and `SpriteAttach.Update` have small WPA self-CPU rows | v0.4.91 adds two separate default-off options, limited to offline solo guitar Quickplay. The Rewired prefix skips only the mouse snapshot (seven buttons, three axes); keyboard/controller and 1000 Hz instrument polling stay active, while mouse-bound actions pause. The SpriteAttach cache verifies camera/screen/sprite/scale inputs and outputs, including the exact-build packed scale input at RVA `0x64C60`; missing bindings fail open to vanilla. The new v0.4.91 log confirms both install without errors. Its two cache-on callback windows are slightly slower than a later cache-off window, but these are not presented frames or a controlled A/B. Keep the cache default-off; its interop checks may exceed the native work it skips. |
 
 ClonZones installs a `GuitarFretAnimator.Update` settle gate in the user's
 setup, which may overlap with another fret hook. Current `HighwayScroll` also
@@ -423,10 +423,12 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 - Latest packaged build: SlopHero **0.4.91** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.89 (SHA-256
-  `6bfd5b29167d86e05e37996606bc6b72df03f96e0c228bba954df27c65b0c596`).
-  It confirms the legacy mouse detour's in-game install/restore path; its
-  performance limits are described below. The earlier 0.4.87 log (SHA-256
+  0.4.91 (SHA-256
+  `9a036617279b5d5c175b1ca060868f4f06a7d9409b65d318238d511708a44d5d`).
+  It confirms the Rewired mouse and SpriteAttach hooks install without errors;
+  the three timing windows are analyzed below. The earlier 0.4.89 log (SHA-256
+  `6bfd5b29167d86e05e37996606bc6b72df03f96e0c228bba954df27c65b0c596`)
+  confirms the legacy mouse detour's install/restore path. The 0.4.87 log (SHA-256
   `f1f2b1b5411260cfcd0e1025a6e114da3a356cecaf147e206d5cd67861517cf0`)
   contains three 30-second captures with 2,636–2,691 simulation updates/s,
   `Core.Update` averaging 0.002 ms, visual overrides 0.015 ms, and Canvas sync
@@ -467,8 +469,8 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
   SHA-256: `eb3fe04566269d1f95a34f0202871043976a50463c227d9797e1c2fe91211c81`.
   Version 0.4.91 adds the separate default-off Rewired mouse-snapshot pause
   and exact-build `SpriteAttach.Update` input/output cache described above.
-  It builds with zero warnings/errors and core checks pass (114). Both remain
-  runtime-unverified experiments without matched frame captures. The mouse
+  It builds with zero warnings/errors and core checks pass (114). Both now
+  install at runtime, but lack matched frame captures. The mouse
   switch leaves keyboard/controller and 1000 Hz instrument polling untouched;
   mouse-bound actions pause during its offline-solo scope. The SpriteAttach
   cache fails open to vanilla and may have negative net performance because
@@ -583,6 +585,55 @@ Keep each proposed change narrow and reversible. Avoid hot-path logging or
 per-frame hierarchy searches. Preserve every existing SlopHero feature,
 online behavior, and 1000 Hz controller polling. Do not infer a performance
 win until a controlled frame capture supports it.
+
+## v0.4.91 prototype result and next rendering lead
+
+The 2026-10-25 log has three 30-second mod timing windows. The first two
+install both the Rewired mouse sampler and SpriteAttach cache; the third
+installs the mouse sampler but does not install SpriteAttach. The native legacy
+mouse hook is present in all three once gameplay starts. Scheduled render
+callback rates are 1,265, 1,252, and 1,312/s, respectively; callback p99s
+are 1.17, 1.17, and 1.06 ms. There are no hook failures. The cache-off run is
+faster on this internal measure, but a song restart, chart position, and normal
+run variation prevent causal attribution. **These callback rates are not FPS.**
+The only available raw PresentMon CSV remains the earlier v0.4.75 capture:
+1,261 presents/s, 1.222 ms p99 frame interval, 0.760 ms mean CPU busy, and
+0.281 ms mean GPU busy. It cannot be matched to the new log's switch states.
+
+The WPA method rows give only about 275 ms self CPU in 31.1 seconds for
+`SpriteAttach.Update` and 317 ms for Rewired's mouse snapshot. At roughly
+1,200 rendered frames/s, perfect elimination would save only about 0.007 and
+0.008 ms per frame before Harmony and interop overhead. This sharply limits
+their likely impact. Keep both opt-in; prioritize larger current-game or Unity
+render paths rather than treating these prototypes as major wins.
+
+The exact `level2` Gameplay scene has two static cameras. `Background Cam`
+(depth -5, solid-color clear, culling mask 8192) sees layer 13, whose scene
+objects are `Background Cam`, `Background Image`, and `Background Canvas`.
+The image has an enabled `VideoPlayer`; the latest gameplay snapshots report
+one enabled but **non-playing** VideoPlayer. `HUDCam` (depth 6, clear flags 4,
+culling mask 4128) handles separate HUD layers; the live scene adds a guitar
+camera. The rebuilt current `resources.assets` contains three `PlayerCamera`
+prefab variants: all use depth 0 and mask 512, two use clear flags 3 and one
+uses clear flags 4. All three have full-screen rects and target display 0.
+The static background camera's clear flags are 2, full-screen, target display
+0, with transparent black background color. Thus the guitar/HUD cameras do
+**not** replace its color clear; merely disabling `Background Cam` could leave
+the previous frame on screen. A viable opt-in black-background experiment
+would save the live camera's clear flags/color, set the single guitar camera
+to the background camera's solid-color clear, then disable `Background Cam`.
+It would restore both states on pause, scene exit, online/multiplayer, or
+option disable. Apply/restore should be transition-driven, not a per-frame
+hierarchy search or setter call. Runtime camera ordering/rects, image/video
+visibility, and visual behavior still need validation before code ships.
+The WPA tree attributes substantial *inclusive* time to
+`Camera::CustomRender` and `Camera::CustomCull` across cameras, without
+per-camera cost. A future **default-off** background-camera suppression when
+backgrounds are unused might reduce a whole render pass, but it must preserve
+the first camera's screen clear and restore video/image display immediately.
+It needs explicit user consultation before implementation because the game
+camera clear/depth behavior and actual background visibility have not been
+verified. Do not simply disable the camera or claim its cost from the WPA sum.
 
 ## v0.4.89 legacy mouse-event test
 
