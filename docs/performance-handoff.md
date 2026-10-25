@@ -421,7 +421,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.99** on the private
+- Latest packaged build: SlopHero **0.4.100** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.99 (SHA-256
   `c679d72bc53c5d6acb6dc679d74ab77d0177ab78b735905edd482080f1ab061e`)
@@ -1110,3 +1110,35 @@ no sustained presented-FPS improvement or regression attributable to 0.4.99.
 The underlying CPU-heavy render/cull and first-song outlier investigations
 remain open. Do not redesign the native mouse hooks or Unity worker pool
 based on these two rare-spike counts alone.
+
+## v0.4.100 exact-scene visual experiments
+
+The supplied Gameplay `level2` and PlayerCamera prefab show that the HUD,
+highway, and background cameras use separate layer masks. The existing
+black-background option already disables the background camera during
+eligible songs, so these assets do not support a second camera-cull patch.
+The apparent Song Details canvas is also already deactivated by the game's
+`CanvasFader` after fading. Neither is a new optimization target.
+
+The exact `Updated SP Animation` guitar prefab contains two `SpSideGlows`
+Animators, eight `AnimatorColorBehavior` scripts, and 13 sprite renderers
+under one `StarPowerController`. The `PB Notification` Gameplay object has a
+Canvas and Animator under `HighScoreDisplay`. Version 0.4.100 adds two
+independent, default-off Sloptifine 3 switches. They pause only these visual
+components during active offline solo Quickplay and restore their captured
+enabled states on pause, online transition, focus loss, or scene exit.
+The Star Power controller and high-score display script remain enabled.
+Discovery requires exact component counts, so a game build with a different
+scene shape fails open and leaves visuals active. A 20 Hz reconciliation
+pass handles scripts that re-enable those components.
+
+The symbolized WPA capture attributes substantial inclusive time to Unity's
+`CustomCull` and camera-render paths, but does not attribute it to either of
+these visual groups. `AnimatorColorBehavior.Update` was only a small sampled
+path in the older method export. There is no matched presented-FPS test for
+0.4.100 yet; gains may be negligible. Continue investigating scene-conditional
+CPU work and the main-thread render/cull path rather than claiming all
+sampled render time is available to save.
+The 0.4.100 mod builds against the supplied IL2CPP references with zero
+warnings; the Core checks pass (114/114). Runtime behavior and presented-FPS
+impact still require the user's Windows test.

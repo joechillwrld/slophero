@@ -1,11 +1,16 @@
-# SlopHero 0.4.99 alpha
+# SlopHero 0.4.100 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.99
+build, compiled against its loader and generated assemblies. Version 0.4.100
+adds separate default-off switches under **Sloptifine 3** for the personal-best
+popup and Star Power side glows during active offline solo Quickplay songs.
+They restore on pause, online play, or scene exit. The Star Power controller,
+scoring, and note path stay active. Their FPS effect is not yet measured.
+Version 0.4.99
 moves the optional TMP label scan out of the first playable frames when the
 setting is already enabled, and confines mouse UI/legacy-event suppression to
 offline solo play. The PresentMon report tool can show one-second presented
@@ -162,7 +167,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.99 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.99-alpha.zip)
+[Download SlopHero v0.4.100 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.100-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -192,7 +197,7 @@ Backspace removes the last digit; Delete clears the entry; Escape cancels the ed
 game's normal left/right controls to change the value by the configured step (5%
 by default). Set that step on the SlopHero **Controls** page.
 
-F8 has ten pages: **General**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, **Sloptifine**, and **Sloptifine 2**. The black-background camera option is under **Sloptifine**. The centered window uses a left category sidebar and a separate options panel. Boolean options use checkboxes throughout. The **Menu accent** color on the Colors page applies to the title bar, selected page, and resize outline; it is included in color themes.
+F8 has eleven pages: **General**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, **Sloptifine**, **Sloptifine 2**, and **Sloptifine 3**. The black-background camera option is under **Sloptifine**; the optional side-glow and personal-best popup switches are under **Sloptifine 3**. The centered window uses a left category sidebar and a separate options panel. Boolean options use checkboxes throughout. The **Menu accent** color on the Colors page applies to the title bar, selected page, and resize outline; it is included in color themes.
 
 - Click a numeric or color value and type a replacement. Enter or **Apply** saves;
   Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.

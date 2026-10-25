@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.99", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.100", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -109,6 +109,8 @@ public sealed partial class Core : MelonMod
         rewiredMousePolling.Clear(HarmonyInstance);
         spriteAttachCache.Clear(HarmonyInstance);
         backgroundCamera.Clear();
+        optionalHudAnimations.Clear();
+        optionalHudAnimationsError = false;
         staticTmpScaleError = false;
         SongSpeedControl.ResetMenuCache();
         gameplayInitialized = false;
@@ -201,6 +203,8 @@ public sealed partial class Core : MelonMod
         rewiredMousePolling.Clear(HarmonyInstance);
         spriteAttachCache.Clear(HarmonyInstance);
         backgroundCamera.Clear();
+        optionalHudAnimations.Clear();
+        optionalHudAnimationsError = false;
         staticTmpScaleError = false;
         SongSpeedControl.ResetMenuCache();
         counterCanvas.Clear();
@@ -1034,6 +1038,7 @@ public sealed partial class Core : MelonMod
         rewiredMousePolling.Clear(HarmonyInstance);
         spriteAttachCache.Clear(HarmonyInstance);
         backgroundCamera.Clear();
+        optionalHudAnimations.Clear();
         gameplayUiEvents.Clear(HarmonyInstance);
         highwayAnimations.Clear(HarmonyInstance);
         rings.Clear(HarmonyInstance);

@@ -9,7 +9,7 @@ namespace SlopHero.Mod;
 
 public sealed partial class Core
 {
-    private static readonly string[] SettingsPages = { "General", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Sizing", "Profiles", "Sloptifine", "Sloptifine 2" };
+    private static readonly string[] SettingsPages = { "General", "Counters", "Song HUD", "Highway", "Colors", "Game HUD", "Sizing", "Profiles", "Sloptifine", "Sloptifine 2", "Sloptifine 3" };
     private MelonPreferences_Entry<bool> showMisses = null!, showHit = null!, showGhosts = null!, showBest = null!;
     private MelonPreferences_Entry<bool> showSong = null!, showTitle = null!, showArtist = null!, showCharter = null!, showSpeed = null!;
     private MelonPreferences_Entry<int> songX = null!, songY = null!, songFont = null!;
@@ -34,6 +34,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> pauseRewiredMousePolling = null!;
     private MelonPreferences_Entry<bool> cacheSpriteAttachTransforms = null!;
     private MelonPreferences_Entry<bool> skipBackgroundCamera = null!;
+    private MelonPreferences_Entry<bool> hidePbPopup = null!, hideStarPowerSideGlows = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
     private readonly VisualOverrides visuals = new();
@@ -55,6 +56,7 @@ public sealed partial class Core
     private readonly RewiredMousePollingOverride rewiredMousePolling = new();
     private readonly SpriteAttachCacheOverride spriteAttachCache = new();
     private readonly BackgroundCameraOverride backgroundCamera = new();
+    private readonly OptionalHudAnimationsOverride optionalHudAnimations = new();
     private readonly RuntimeTimings timings = new();
     private string songText = "", editText = "", editLabel = "", editError = "";
     private Action<string>? editApply;
@@ -152,6 +154,8 @@ public sealed partial class Core
         pauseRewiredMousePolling = preferences.CreateEntry("PerformancePauseRewiredMousePolling", false);
         cacheSpriteAttachTransforms = preferences.CreateEntry("PerformanceCacheSpriteAttachTransforms", false);
         skipBackgroundCamera = preferences.CreateEntry("PerformanceSkipBackgroundCamera", false);
+        hidePbPopup = preferences.CreateEntry("PerformanceHidePbPopup", false);
+        hideStarPowerSideGlows = preferences.CreateEntry("PerformanceHideStarPowerSideGlows", false);
         var legacyFreezeLyricsScroll = preferences.CreateEntry("PerformanceFreezeLyricsBackgroundScroll", false);
         if (legacyFreezeLyricsScroll.Value)
         {
@@ -377,6 +381,13 @@ public sealed partial class Core
                 Toggle(pauseRewiredMousePolling, "Pause Rewired mouse polling in solo songs", x, y + 296);
                 Toggle(cacheSpriteAttachTransforms, "Cache unchanged SpriteAttach transforms (may lower FPS)", x, y + 326);
                 GUI.Label(new Rect(x + 22, y + 356, 610, 112), "Experimental; default off. Pausing UI events also pauses its three transparent HUD drag-handle Canvases and built-in UI navigation during solo songs. Keyboard and controller polling stay enabled. The SpriteAttach cache can cost more than the native update it skips; leave it off unless it helps your game. TMP layout/rebuilds stay enabled. Drum MIDI shutdown requires a restart to restore.");
+                break;
+            case 10:
+                SectionHeader("Optional HUD animations", x, y);
+                Toggle(hideStarPowerSideGlows, "Hide Star Power side glows during solo songs", x, y + 26);
+                Toggle(hidePbPopup, "Hide personal-best popup during solo songs", x, y + 56);
+                GUI.Label(new Rect(x + 22, y + 96, 610, 76),
+                    "Experimental; default off. Pauses only these visuals during active offline solo songs. Star Power, score, and note gameplay stay active. Visuals restore when paused or after the song.");
                 break;
         }
         if (editApply != null) DrawValueEditor();
@@ -837,6 +848,8 @@ public sealed partial class Core
             Bool("PerformancePauseRewiredMousePolling", pauseRewiredMousePolling);
             Bool("PerformanceCacheSpriteAttachTransforms", cacheSpriteAttachTransforms);
             Bool("PerformanceSkipBackgroundCamera", skipBackgroundCamera);
+            Bool("PerformanceHidePbPopup", hidePbPopup);
+            Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
         }
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
@@ -889,6 +902,8 @@ public sealed partial class Core
         Bool("PerformancePauseRewiredMousePolling", pauseRewiredMousePolling);
         Bool("PerformanceCacheSpriteAttachTransforms", cacheSpriteAttachTransforms);
         Bool("PerformanceSkipBackgroundCamera", skipBackgroundCamera);
+        Bool("PerformanceHidePbPopup", hidePbPopup);
+        Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
         if (values.ContainsKey("PerformanceFreezeComboSmokeScroll"))
             Bool("PerformanceFreezeComboSmokeScroll", freezeComboSmokeScroll);
         else
@@ -1087,12 +1102,14 @@ public sealed partial class Core
     private bool hiddenLeaderboardError;
     private bool comboSmokeScrollError;
     private bool staticTmpScaleError;
+    private bool optionalHudAnimationsError;
     public override void OnLateUpdate()
     {
         if (!compatible || !gameplay || !gameplayInitialized || transition)
         {
             if (staticTmpScale.IsActive || staticTmpScale.NeedsRestore)
                 UpdateStaticTmpScaleExperiment(null, clock.Elapsed.TotalSeconds);
+            if (optionalHudAnimations.NeedsRestore) optionalHudAnimations.Clear();
             return;
         }
         // Read preference entries and inspect Unity objects at the same 20 Hz
@@ -1157,15 +1174,18 @@ public sealed partial class Core
         bool comboSmokeRequested = !comboSmokeScrollError && (freezeComboSmokeScroll.Value || comboSmokeScroll.NeedsRestore);
         bool tmpScalePassDue = !staticTmpScaleError && !staticTmpScale.NoTargetsForScene
             && (staticTmpScaleDuringSong.Value || staticTmpScale.IsActive || staticTmpScale.NeedsRestore);
+        bool optionalHudPassDue = !optionalHudAnimationsError
+            && (hidePbPopup.Value || hideStarPowerSideGlows.Value || optionalHudAnimations.NeedsRestore);
         bool visualPending = !visualError && (visualRequested || practiceSpeedRequested || visuals.NeedsUpdate
             || ringUpdateDue);
         if (!nativeHudPending && !visualPending && !comboSmokeRequested && !performanceApplyDue
-            && !starProgressApplyDue && !tmpScalePassDue) return;
+            && !starProgressApplyDue && !tmpScalePassDue && !optionalHudPassDue) return;
 
         // Avoid GameManager/IL2CPP property reads at the unlocked update rate.
         // All HUD and visual changes refresh at 5–20 Hz, so resolving the
         // manager at the same cadence is sufficient.
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
+        if (optionalHudPassDue) UpdateOptionalHudAnimations(game, now);
         if (tmpScalePassDue) UpdateStaticTmpScaleExperiment(game, now);
         if (starProgressApplyDue)
         {
@@ -1278,6 +1298,28 @@ public sealed partial class Core
             visualError = true;
             LoggerInstance.Error($"Visual overrides paused after an error; counters and controls remain available: {ex}");
             Notice("Visual overrides stopped after an error. Send Latest.log.");
+        }
+    }
+
+    private void UpdateOptionalHudAnimations(Il2Cpp.GameManager? game, double now)
+    {
+        try
+        {
+            bool eligible = game != null && game.songLoaded && game.playersInit
+                && game.globalVariables != null && game.isSongPlaying && !game.isPaused
+                && !game.isSongOver && game.coroutinesRunning == 0
+                && game.actualPlayerCount == 1 && (int)game.globalVariables.gameMode == 0
+                && !game.globalVariables.isPlayingSetlist && !transition && !settingsOpen
+                && !moveHud && resizeTarget < 0 && nativeMoveTarget == 0
+                && editApply == null && capture == null && Application.isFocused && !IsOnline(now);
+            optionalHudAnimations.Apply(game, eligible && hidePbPopup.Value,
+                eligible && hideStarPowerSideGlows.Value, now);
+        }
+        catch (Exception ex)
+        {
+            optionalHudAnimations.Clear();
+            optionalHudAnimationsError = true;
+            LoggerInstance.Warning($"Optional HUD animation optimization stopped; visuals were restored: {ex.Message}");
         }
     }
 

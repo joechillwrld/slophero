@@ -37,7 +37,10 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.99. It moves the optional TMP candidate scan
+The latest packaged build is 0.4.100. It adds separate default-off Sloptifine 3
+switches for the personal-best popup and Star Power side-glow visuals during
+offline solo Quickplay. Their presented-FPS impact is unmeasured. Version
+0.4.99 moves the optional TMP candidate scan
 to Gameplay scene initialization when already enabled, and keeps the native
 legacy-mouse and mouse-UI skips offline solo. The PresentMon report tool now
 supports one-second presented-FPS windows from raw captures. Runtime impact
