@@ -421,7 +421,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.91** on the private
+- Latest packaged build: SlopHero **0.4.92** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.91 (SHA-256
   `9a036617279b5d5c175b1ca060868f4f06a7d9409b65d318238d511708a44d5d`).
@@ -477,6 +477,14 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
   it checks Unity inputs every call. ZIP SHA-256:
   `cb8f15d86b0dc01250134780e79029820595fb0d90c580a96bcc8795a09c4951`; DLL
   SHA-256: `b51773181fe2f9a48953b62a51d011c678117f84d5be4378effb1cb4accbc5be`.
+  Version 0.4.92 adds the default-off black-background camera option for
+  active offline solo guitar Quickplay. It transfers the background color
+  clear to the guitar camera, disables the background camera, and restores
+  both on pause, settings, focus loss, scene exit, or option disable. The build
+  has zero warnings/errors and the 114 core checks pass. The camera behavior
+  has not been runtime-tested and no FPS gain is claimed. ZIP SHA-256:
+  `ef7507568f3f7bc0b4561048e196527d1ad5fede0eed90ab059add81a5eeb52b`; DLL
+  SHA-256: `6718841690e1ff4fc5026d07b7bb06a42ce71519ed58d297aff868ec2e3de4b5`.
   The 0.4.88 package SHA-256 is
   `527b5367bceb523a64375ad958360356eb0a72a28353636e57c1078f976c054d`, and
   its DLL SHA-256 is
@@ -619,21 +627,22 @@ uses clear flags 4. All three have full-screen rects and target display 0.
 The static background camera's clear flags are 2, full-screen, target display
 0, with transparent black background color. Thus the guitar/HUD cameras do
 **not** replace its color clear; merely disabling `Background Cam` could leave
-the previous frame on screen. A new, **unreleased** default-off prototype in
+the previous frame on screen. The default-off option in
 `BackgroundCameraOverride.cs` handles this only during active offline solo
 guitar Quickplay. It validates camera masks, clear flags, order, rect, display,
 and render-texture targets; transfers the background clear to the guitar
 camera; and disables `Background Cam`. It restores both cameras on pause,
 settings, scene exit, focus loss, or option disable. These changes occur on
 state transitions, with no per-frame hierarchy search or camera setter call.
-The option is on Sloptifine page 1 and participates in settings profiles and
+The option is on Sloptifine and participates in settings profiles and
 timing-setting snapshots. Runtime visuals and frame benefit remain untested.
 The WPA tree attributes substantial *inclusive* time to
 `Camera::CustomRender` and `Camera::CustomCull` across cameras, without
 per-camera cost. The user authorized the default-off black-background option;
 do not claim its cost or benefit from the WPA sum. Compile verification passed
-with zero warnings/errors against the supplied generated assemblies. No
-packaged build or Windows runtime test exists yet; Luna owns the release.
+with zero warnings/errors against the supplied generated assemblies. The
+v0.4.92 package exists, but no Windows runtime test or measured frame benefit
+exists.
 
 ## v0.4.89 legacy mouse-event test
 

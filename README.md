@@ -1,19 +1,24 @@
-# SlopHero 0.4.91 alpha
+# SlopHero 0.4.92 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.91
-adds two default-off offline-solo experiments: pause Rewired's mouse-only
-snapshot while preserving keyboard, controller, and 1000 Hz instrument input;
-and cache `SpriteAttach.Update` only while its camera, viewport, sprite,
-scaling inputs, and output transforms stay unchanged. The cache is limited to
-the supplied exact game build and fails open to vanilla updates. Both options
-These prototypes may have little or negative performance impact until tested
-in-game; test one at a time before combining them. Version 0.4.90 keeps the TMP
-scale-update experiment default-off and broadens it to
+build, compiled against its loader and generated assemblies. Version 0.4.92
+adds a default-off black-background experiment that skips the full-screen
+background camera during offline solo songs, transferring its screen clear to
+the guitar camera and restoring the original camera settings on pause, menus,
+focus loss, scene changes, or when disabled. Chart images and videos stay hidden
+while the option is active. The camera behavior has not been runtime-tested and
+no FPS gain is measured yet. Version 0.4.91 adds two default-off offline-solo
+experiments: pause Rewired's mouse-only snapshot while preserving keyboard,
+controller, and 1000 Hz instrument input; and cache `SpriteAttach.Update` only
+while its camera, viewport, sprite, scaling inputs, and output transforms stay
+unchanged. The cache is limited to the supplied exact game build and fails open
+to vanilla updates. These prototypes may have little or negative performance
+impact until tested in-game; test one at a time before combining them. Version
+0.4.90 keeps the TMP scale-update experiment default-off and broadens it to
 labels under Animator/Animation parents. Ordinary labels are checked at 4 Hz
 and animated-parent labels at 20 Hz; a detected scale change restores TMP's
 per-frame scale checks for that label. TMP layout, graphics, and culling
@@ -119,7 +124,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.91 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.91-alpha.zip)
+[Download SlopHero v0.4.92 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.92-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -149,7 +154,7 @@ Backspace removes the last digit; Delete clears the entry; Escape cancels the ed
 game's normal left/right controls to change the value by the configured step (5%
 by default). Set that step on the SlopHero **Controls** page.
 
-F8 has ten pages: **General**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, **Sloptifine**, and **Sloptifine 2**. The centered window uses a left category sidebar and a separate options panel. Boolean options use checkboxes throughout. The **Menu accent** color on the Colors page applies to the title bar, selected page, and resize outline; it is included in color themes.
+F8 has ten pages: **General**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, **Sloptifine**, and **Sloptifine 2**. The black-background camera option is under **Sloptifine**. The centered window uses a left category sidebar and a separate options panel. Boolean options use checkboxes throughout. The **Menu accent** color on the Colors page applies to the title bar, selected page, and resize outline; it is included in color themes.
 
 - Click a numeric or color value and type a replacement. Enter or **Apply** saves;
   Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.
