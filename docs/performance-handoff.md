@@ -421,7 +421,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.102** on the private
+- Latest packaged build: SlopHero **0.4.103** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.102 (SHA-256
   `dd91a809156a86dab321d7563aef1d07b6f8c9e8f498812394ad0e039cf9e0c6`)
@@ -1194,7 +1194,7 @@ one-time missing-target warning now includes the observed Gameplay component
 count or Animator names if discovery still fails. The match needs a runtime test;
 the log cannot tell why the earlier paths failed.
 
-## v0.4.102 log, unreleased lookup fix, and separate score-path screen
+## v0.4.102 log, v0.4.103 lookup fix, and separate score-path screen
 
 The 0.4.102 log confirms both optional visual preferences were on. On the
 first eligible pass, `OptionalHudAnimationsOverride` failed with `Method
@@ -1202,7 +1202,7 @@ unstripping failed`, restored its component states, and latched itself off for
 the scene. Neither option ran. The first of two 30-second timing windows has
 1,559 scheduled render callbacks/s and a 59.8 ms maximum simulation gap.
 There is no presented-FPS capture or causal tie to the optional feature.
-The unreleased worktree removes the new `FindObjectsByType<T>(FindObjectsInactive,
+Version 0.4.103 removes the new `FindObjectsByType<T>(FindObjectsInactive,
 FindObjectsSortMode)` call and generic `GetComponentInParent<GuitarPlayer>`
 lookup. A further exact-scene/reference check found a more fundamental bug:
 the optional-visual code aliased `Animator` to Clone Hero's custom
@@ -1215,20 +1215,20 @@ prefabs, the controller's two serialized references resolve to native Animator
 components on `SpSideGlows L` and `SpSideGlows R`. That type mismatch would prevent
 discovery even after replacing the unsupported search overload.
 
-The current local fix finds the active `HighScoreDisplay` once per discovery
+The release finds the active `HighScoreDisplay` once per discovery
 attempt, verifies it belongs to Gameplay, and gets its Canvas and
 `UnityEngine.Animator`. For the glows it starts from the local guitar player,
 gets its `StarPowerController`, and reads the two serialized Animator fields.
 It still validates the expected side-glow names and shared parent before
 touching their children. Neither feature needs a full Animator scene scan;
-both fail open. The unreleased mod compiles with zero warnings and the Core
-checks pass (114/114). Runtime activation and FPS effect remain unverified.
+both fail open. Version 0.4.103 builds with zero warnings and the Core checks
+pass (114/114). Runtime activation and FPS effect remain unverified.
 
 The same type audit found an independent safety issue in the default-off TMP
 scale experiment. Its ancestor check recognized Clone Hero's custom
 `Il2Cpp.Animator` and Unity's legacy `Animation`, but missed
 `UnityEngine.Animator`; the current PB notification uses that native type.
-The local fix recognizes both Animator types and checks text beneath either
+The release recognizes both Animator types and checks text beneath either
 at the experiment's 20 Hz animated-label cadence. This does not turn the
 experiment on or alter text during normal use.
 
@@ -1290,14 +1290,14 @@ the current version. The old `HighwayScroll.Update` writes through
 method accounts for only ~22 ms in the 31-second export; a blanket material
 cache rewrite would target obsolete code.
 
-## Unshipped Star Power branch prototype and broader screen
+## v0.4.103 Star Power branch optimization and broader screen
 
-The user approved branch deactivation behind the existing default-off
-side-glow switch. In the exact current Guitar Player prefab, the two
+Version 0.4.103 deactivates the two side-glow branches behind the existing
+default-off switch. In the exact current Guitar Player prefab, the two
 `SpSideGlows L/R` branches contain two native Unity Animators, eight
 `AnimatorColorBehavior` scripts, and cosmetic SpriteRenderers. The
 `StarPowerController` is on the active `Updated SP Animation` parent, beside
-`CenterGlow`. The local prototype reads the controller's serialized Animator
+`CenterGlow`. The override reads the controller's serialized Animator
 references, validates the names and shared parent, saves each branch's
 `activeSelf`, and calls `SetActive(false)` only during eligible offline solo
 play. It restores the saved states on pause, menu opening, scope exit, and
@@ -1326,8 +1326,8 @@ cost more than the native method. The guitar prefab also contains ten
 not justify another blanket skip. It does, however, justify one narrower
 change: SlopHero's existing Hide fret strings setting already disables all
 renderers beneath those five string objects, while their five `SpriteAttach`
-scripts continue camera/viewport alignment work. The unshipped worktree now
-pauses only those five scripts as part of the hide setting, remembering each
+scripts continue camera/viewport alignment work. Version 0.4.103 now pauses
+only those five scripts as part of the hide setting, remembering each
 enabled state and restoring it when strings are shown or overrides end. It
 does not touch the separate `SpriteAttach` scripts on the SP bar and rock
 meter. The ~275 ms mapped `SpriteAttach.Update` row covers all instances, so
@@ -1363,3 +1363,14 @@ They are not targets for lowering the user's 1000 Hz controller rate. The
 older online `Client_GameplayScene.Update` contains `GameObject.Find`, but
 only while waiting for the `GameManager` before the network song starts; it
 is not a per-frame lookup throughout active gameplay.
+
+## v0.4.103 package
+
+The release build succeeds against the supplied generated assemblies with
+zero warnings/errors, and all 114 Core checks pass. The ZIP contains only
+`Mods/SlopHero.dll`. The default-off Sloptifine 3 visuals and the conditional
+hidden-string alignment pause have no matched PresentMon comparison, so no
+FPS gain is claimed.
+
+- ZIP SHA-256: `c931083b30561ea7a532a36b2d4185357850a64fe439f212667e972382031f6f`
+- DLL SHA-256: `b65b1e756d8f00abc3080a425c559dfbe0fbb4a16dc971b40977e990179f6c4b`
