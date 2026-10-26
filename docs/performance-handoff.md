@@ -421,7 +421,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.104** on the private
+- Latest packaged build: SlopHero **0.4.105** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.104 (SHA-256
   `d2efc6c8fe437a8da516491a7ca2ece1fa6fa89844d9c88c363de0f012f7c345`)
@@ -1422,6 +1422,50 @@ Those settings do not offer a new guitar optimization. The next rendering
 experiment needs to preserve the live HUD and note visuals and isolate a
 specific native operation; a blanket culling-mask or HUD-camera skip is not
 supported by this capture.
+
+### First-song setup prototype after the 0.4.104 capture
+
+The 0.4.104 timing capture's maximum `Core.OnUpdate` is 59.999 ms. On that
+first song, the log records the legacy native mouse detour activation at
+20:25:43.458 and the Rewired mouse Harmony installation at 20:25:43.476,
+after UI/cheat state changes around 20:25:43.418–.420. That roughly 58 ms
+cluster is consistent with the worst Update, though log timestamps do not
+prove either install's isolated cost. The later PresentMon file is from a
+second song, after those hooks were installed, and its worst present is only
+3.784 ms; this remains a nonmatched comparison.
+
+Version 0.4.105 prepares the exact-build native detour during
+Gameplay scene initialization, immediately undoes it, and reapplies it only
+when the existing solo-song gate opens. It also installs the opt-in Rewired
+mouse prefix at scene initialization and leaves it pass-through outside an
+eligible solo song, removing the first-song Harmony patch from `Core.OnUpdate`.
+Turning either preference off and leaving Gameplay still cleans up its hook.
+The native detour logs one preparation and one activation duration; no
+per-frame diagnostic work was added. It compiles against the supplied game
+references with zero warnings. Windows runtime behavior and the size of any
+first-song hitch reduction are unverified. The pass-through Rewired prefix
+adds small mouse-path overhead while paused/online in Gameplay when that
+experimental preference is on, so this tradeoff needs review before release.
+
+The symbolized WPA grid still shows `Camera::CustomCull` as one collapsed
+4,654 ms inclusive node shared across cameras. The new Unity callbacks cannot
+resolve its internal callees or camera identity. The confirmed camera-side
+gain is the existing blank-background pass removal; both remaining cameras
+draw necessary highway or HUD content. Avoid a whole-camera or native-cull
+skip without a narrower target and a restore path.
+
+## v0.4.105 package
+
+The release build succeeds against the supplied generated assemblies with
+zero warnings/errors, and all 114 Core checks pass. The ZIP contains
+`Mods/SlopHero.dll`. It moves two optional first-song mouse-hook installs to
+Gameplay scene initialization. The native detour remains undone until eligible
+solo play, and the Rewired mouse prefix passes through outside that scope.
+This has not been validated in a Windows run or matched PresentMon capture;
+do not claim a hitch reduction yet.
+
+- ZIP SHA-256: `706479ef82c39a1b84192356b6785ffc3b48ac268ec7f5757546984598e15b23`
+- DLL SHA-256: `4e300b584e7bd795313a8aed88799e3fa541ce06da7c48c51ff17440bceca847`
 
 ## v0.4.104 package
 

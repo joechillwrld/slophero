@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.104", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.105", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -184,6 +184,8 @@ public sealed partial class Core : MelonMod
         if (string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase))
         {
             gameplayInitialized = true;
+            if (compatible) legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
+            if (compatible) rewiredMousePolling.Prepare(HarmonyInstance, pauseRewiredMousePolling.Value);
             if (compatible && staticTmpScaleDuringSong.Value)
             {
                 try { staticTmpScale.Prepare(); }

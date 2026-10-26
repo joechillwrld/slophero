@@ -32,6 +32,29 @@ internal sealed class LegacyMouseEventsDetour
     internal bool IsInstalled => detour != null;
     internal bool IsSuppressed => detour?.IsApplied == true;
 
+    // Construct and validate the exact-build detour while Gameplay is still
+    // initializing, then leave Unity's original mouse path active. The first
+    // eligible song update only needs to apply the already-created detour.
+    internal void Prepare(bool requested)
+    {
+        if (!requested || detour != null || failed) return;
+        try
+        {
+            long started = Stopwatch.GetTimestamp();
+            Install(logActive: false);
+            Disable();
+            if (failed || detour?.IsApplied == true)
+                throw new InvalidOperationException("The prepared mouse detour could not restore Unity's original path.");
+            MelonLogger.Msg($"Sloptifine native legacy-mouse detour prepared before song play in {(Stopwatch.GetTimestamp() - started) * 1000d / Stopwatch.Frequency:0.00} ms.");
+        }
+        catch (Exception ex)
+        {
+            Restore();
+            failed = true;
+            MelonLogger.Warning($"Sloptifine native legacy-mouse preparation stopped safely: {ex.Message}");
+        }
+    }
+
     internal void Update(bool requested, bool gameplayActive)
     {
         if (!requested)
@@ -50,9 +73,13 @@ internal sealed class LegacyMouseEventsDetour
         try
         {
             if (detour == null)
-                Install();
+                Install(logActive: true);
             else if (!detour.IsApplied)
+            {
+                long started = Stopwatch.GetTimestamp();
                 detour.Apply();
+                MelonLogger.Msg($"Sloptifine native legacy-mouse detour active in {(Stopwatch.GetTimestamp() - started) * 1000d / Stopwatch.Frequency:0.00} ms.");
+            }
         }
         catch (Exception ex)
         {
@@ -79,7 +106,7 @@ internal sealed class LegacyMouseEventsDetour
         if (detour == null) failed = false;
     }
 
-    private void Install()
+    private void Install(bool logActive)
     {
         if (IntPtr.Size != 8 || !OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("The exact-build native hook requires Windows x64.");
@@ -104,7 +131,8 @@ internal sealed class LegacyMouseEventsDetour
         if (!detour.IsApplied)
             throw new InvalidOperationException("MonoMod created the detour but did not apply it.");
 
-        MelonLogger.Msg("Sloptifine native legacy-mouse detour active for the exact supplied game build.");
+        if (logActive)
+            MelonLogger.Msg("Sloptifine native legacy-mouse detour active for the exact supplied game build.");
     }
 
     private void Restore()

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using HarmonyLib;
 using Il2CppRewired;
@@ -21,6 +22,14 @@ internal sealed class RewiredMousePollingOverride
     internal bool IsInstalled => installed;
     internal bool IsSuppressed => installed && suppressMouse;
 
+    // Patch while Gameplay initializes, before the first song frame. The
+    // prefix passes through until the strict offline-solo gate opens.
+    internal void Prepare(HarmonyLib.Harmony harmony, bool requested)
+    {
+        if (requested && !installed && !failed) Install(harmony);
+        suppressMouse = false;
+    }
+
     internal void Update(HarmonyLib.Harmony harmony, bool requested, bool eligibleSoloSong)
     {
         if (!requested)
@@ -30,12 +39,11 @@ internal sealed class RewiredMousePollingOverride
             return;
         }
 
-        // Keep the Harmony prefix out of the mouse loop outside the exact
-        // offline solo scope where polling is being paused.
+        // Keep the already-prepared prefix installed for this Gameplay scene;
+        // it passes through when play is paused, online, or otherwise ineligible.
         if (!eligibleSoloSong)
         {
             suppressMouse = false;
-            Restore(harmony);
             return;
         }
 
@@ -60,6 +68,7 @@ internal sealed class RewiredMousePollingOverride
     {
         try
         {
+            long started = Stopwatch.GetTimestamp();
             updateMethod = typeof(ThreadSafeUnityInput.Mouse).GetMethod("Update",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
                 binder: null, types: Type.EmptyTypes, modifiers: null);
@@ -72,7 +81,7 @@ internal sealed class RewiredMousePollingOverride
                 BindingFlags.Static | BindingFlags.NonPublic)!;
             harmony.Patch(updateMethod, prefix: new HarmonyMethod(prefix));
             installed = true;
-            MelonLogger.Msg("Sloptifine mouse-sampler experiment installed; only Rewired mouse snapshots pause during eligible offline solo songs.");
+            MelonLogger.Msg($"Sloptifine mouse-sampler experiment installed in {(Stopwatch.GetTimestamp() - started) * 1000d / Stopwatch.Frequency:0.00} ms; only Rewired mouse snapshots pause during eligible offline solo songs.");
         }
         catch (Exception ex)
         {

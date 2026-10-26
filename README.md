@@ -1,11 +1,18 @@
-# SlopHero 0.4.104 alpha
+# SlopHero 0.4.105 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.104
+build, compiled against its loader and generated assemblies. Version 0.4.105
+prepares the optional native legacy-mouse detour and Rewired mouse prefix
+during Gameplay initialization. The detour remains inactive until eligible
+solo play; the Rewired prefix passes mouse input through while paused or
+online. This moves their first installation out of the active song update.
+The first-song hitch improvement is unmeasured, and the Rewired prefix adds a
+small pass-through check outside solo play when that option is enabled.
+Version 0.4.104
 adds camera phase attribution to the optional timing capture: per camera it
 reports CPU time from pre-cull to pre-render and from pre-render to post-render.
 These callback intervals help identify which camera is busy; they do not measure
@@ -187,7 +194,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.104 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.104-alpha.zip)
+[Download SlopHero v0.4.105 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.105-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

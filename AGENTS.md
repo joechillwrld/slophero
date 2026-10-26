@@ -37,7 +37,12 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.103. It fixes Sloptifine 3 discovery after
+The latest packaged build is 0.4.105. It prepares the optional legacy-mouse
+native detour and Rewired mouse prefix during Gameplay initialization so
+their first installation does not occur in the first active song update.
+Both remain gated to eligible solo play; the Rewired prefix passes through
+while paused or online. The first-song hitch benefit is unmeasured and the
+new lifecycle needs a Windows log. Version 0.4.103 fixes Sloptifine 3 discovery after
 0.4.102 hit an unsupported Unity lookup and used the wrong Animator type.
 The PB popup and side glows use `UnityEngine.Animator`; Clone Hero also has an
 unrelated custom `Il2Cpp.Animator`. Discovery now uses the live
