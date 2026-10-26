@@ -422,7 +422,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.111** on the private
+- Latest packaged build: SlopHero **0.4.112** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.108 (SHA-256
   `cd30bd2c138e790abc48da678e72bc4e896318ac4c47331d8dfe3ed86d943a2a`)
@@ -1825,12 +1825,10 @@ A separate default-off `PerformanceDisableGuitarCameraBenchmark` switch now
 disables only the active guitar `PlayerCamera` during offline solo play. Notes,
 highway, and 3D effects disappear; the game continues scoring and the HUD stays
 visible. The switch requires the known guitar camera mask (512), full-screen
-rect, display 0, no render texture, the validated HUD overlay, and the active
-solid-color `Background Cam`. It declines activation while the HUD-camera
-benchmark or black-background camera override is active. It restores on pause,
-focus loss, scene transitions, or option-off. This isolates another render pass
-for a matched PresentMon test; the WPA render/cull attribution is shared across
-cameras, so it does not predict a gain for the guitar camera specifically.
+rect, display 0, no render texture, the validated HUD overlay, and a validated
+clear path. It restores on pause, focus loss, scene transitions, or option-off.
+The WPA render/cull attribution is shared across cameras, so it does not predict
+a gain for the guitar camera specifically.
 
 The mod compiles against the supplied generated assemblies with .NET SDK
 6.0.428 (zero warnings/errors), and the core checks pass (127 checks). The
@@ -1838,3 +1836,23 @@ Windows runtime test should verify that each visual set returns on pause and
 that the guitar-camera test leaves scoring/HUD active. Matched PresentMon A/B
 captures are still needed before treating either camera benchmark as evidence
 of improved FPS or frame times.
+
+## 2026-10-26: 0.4.111 camera-benchmark runtime check and 0.4.112 fix
+
+The uploaded 0.4.111 `Latest.log` shows the HUD-camera benchmark activating
+and restoring as expected. It also records `guitarCameraBenchmark=True` while
+it remained inactive. The other active setting was black-background mode: it
+had disabled `Background Cam` and transferred that camera's solid-color clear
+to `PlayerCamera`. The initial integration gate rejected the guitar test
+whenever that override was active, without a useful warning. Version 0.4.112
+removes that gate and temporarily transfers the same clear to HUDCam while
+PlayerCamera is disabled. It restores HUDCam's original clear flags/color when
+the camera test ends. The guitar test no longer requires the PlayerCamera far
+plane to equal 120, since far-clip settings do not matter while that camera is
+disabled. A matched in-game activation/restoration check is still needed; the
+user has not run PresentMon yet.
+
+The same patch moves the larger boymoder artwork to the settings window's
+bottom-right edge and reduces the selected-page accent stripe from 3 to 2 UI
+units. The mod builds against the supplied game references with zero warnings
+or errors, and all 127 core checks pass.

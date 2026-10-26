@@ -37,10 +37,14 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.111. It adds default-off, offline-solo HUD
-and guitar-camera render benchmarks, plus pausing a chart video when its
-background camera is hidden. Both camera tests remove different visuals and
-need a matched PresentMon A/B; no FPS gain is claimed. Version 0.4.110 adds a
+The latest packaged build is 0.4.112. It fixes the guitar-camera render
+benchmark when black-background mode is on by moving the black screen clear to
+HUDCam for the test, then restoring its prior state. It also enlarges and
+bottom-anchors the menu illustration and thins the selected-page stripe.
+Version 0.4.111 added default-off, offline-solo HUD and guitar-camera render
+benchmarks, plus pausing a chart video when its background camera is hidden.
+Both camera tests remove different visuals and need a matched PresentMon A/B;
+no FPS gain is claimed. Version 0.4.110 adds a
 default-off guitar-camera far-clip experiment (120 to 80 units) during eligible
 offline solo songs. The setting checks the known camera configuration,
 restores on scope exit, and can hide distant notes/effects. Its visual behavior

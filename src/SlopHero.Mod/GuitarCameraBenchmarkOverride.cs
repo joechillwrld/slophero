@@ -11,9 +11,12 @@ namespace SlopHero.Mod;
 /// </summary>
 internal sealed class GuitarCameraBenchmarkOverride
 {
-    private const float ExpectedVanillaFarClip = 120f;
     private Camera? camera;
+    private Camera? clearCamera;
     private bool originalEnabled, active, failed;
+    private CameraClearFlags originalClearFlags;
+    private Color originalClearColor;
+    private bool clearStateChanged;
     private string? failure;
 
     internal bool IsActive => active;
@@ -54,8 +57,9 @@ internal sealed class GuitarCameraBenchmarkOverride
             || hud.cullingMask != 4128 || hud.rect != new Rect(0, 0, 1, 1)
             || hud.targetDisplay != 0)
             throw new InvalidOperationException("HUDCam did not match the expected active overlay setup.");
-        if (background == null || !background.enabled || background.targetTexture != null
-            || background.clearFlags != CameraClearFlags.SolidColor || background.cullingMask != 8192
+        if (background == null || background.targetTexture != null
+            || background.clearFlags != CameraClearFlags.SolidColor
+            || background.cullingMask != 8192
             || background.rect != hud.rect || background.targetDisplay != hud.targetDisplay)
             throw new InvalidOperationException("Background Cam was not clearing the solo gameplay image.");
 
@@ -74,24 +78,48 @@ internal sealed class GuitarCameraBenchmarkOverride
             }
         }
         if (guitarCamera == null || guitarCamera.targetTexture != null || guitarCamera.cullingMask != 512
-            || guitarCamera.rect != hud.rect || guitarCamera.targetDisplay != hud.targetDisplay
-            || !Mathf.Approximately(guitarCamera.farClipPlane, ExpectedVanillaFarClip))
+            || guitarCamera.rect != hud.rect || guitarCamera.targetDisplay != hud.targetDisplay)
             throw new InvalidOperationException("The guitar camera did not match the known solo render setup.");
+
+        if (!background.enabled && guitarCamera.clearFlags != CameraClearFlags.SolidColor)
+            throw new InvalidOperationException("Black-background mode did not transfer the color clear to the guitar camera.");
 
         camera = guitarCamera;
         originalEnabled = guitarCamera.enabled;
+        // Black-background mode normally transfers the screen clear onto the
+        // guitar camera. When benchmarking that camera, move the same clear to
+        // HUDCam so the frame remains black without rendering the background.
+        if (!background.enabled)
+        {
+            clearCamera = hud;
+            originalClearFlags = hud.clearFlags;
+            originalClearColor = hud.backgroundColor;
+            clearStateChanged = true;
+            hud.backgroundColor = background.backgroundColor;
+            hud.clearFlags = CameraClearFlags.SolidColor;
+        }
         guitarCamera.enabled = false;
         active = true;
-        MelonLogger.Msg("Sloptifine guitar-camera benchmark active; note, highway, and 3D effect visuals are hidden during offline solo play.");
+        MelonLogger.Msg($"Sloptifine guitar-camera benchmark active; note, highway, and 3D effect visuals are hidden during offline solo play; HUD clear transferred={clearStateChanged}.");
     }
 
     internal void Restore()
     {
-        if (camera == null) { active = false; return; }
         bool wasActive = active;
-        try { camera.enabled = originalEnabled; }
+        try { if (camera != null) camera.enabled = originalEnabled; }
         catch { /* The Gameplay scene may already be unloading. */ }
+        try
+        {
+            if (clearStateChanged && clearCamera != null)
+            {
+                clearCamera.clearFlags = originalClearFlags;
+                clearCamera.backgroundColor = originalClearColor;
+            }
+        }
+        catch { /* The HUD camera may already be unloading. */ }
         camera = null;
+        clearCamera = null;
+        clearStateChanged = false;
         active = false;
         if (wasActive) MelonLogger.Msg("Sloptifine guitar camera restored.");
     }

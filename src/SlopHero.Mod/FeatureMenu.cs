@@ -239,7 +239,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.111", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.112", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
             if (GUI.Button(new Rect(frameX + menuWidth - 48, frameY + 13, 32, 32), "×", menuClickStyle))
@@ -275,7 +275,7 @@ public sealed partial class Core
                 if (selected)
                 {
                     GUI.backgroundColor = accent;
-                    GUI.Box(new Rect(rect.x, rect.y + 4, 3, rect.height - 8), "", menuFlatStyle);
+                    GUI.Box(new Rect(rect.x, rect.y + 4, 2, rect.height - 8), "", menuFlatStyle);
                 }
             }
 
@@ -285,7 +285,9 @@ public sealed partial class Core
             GUI.Box(new Rect(frameX + sidebarWidth + 12, frameY + 70, menuWidth - sidebarWidth - 24, menuHeight - 82), "", menuFlatStyle);
             // Use the character as a faint watermark beneath the page controls,
             // rather than a separate sticker in an empty side column.
-            DrawMenuArtwork(new Rect(frameX + sidebarWidth + 12 + 458, frameY + 158, 250, 408));
+            const float artworkWidth = 332, artworkHeight = 542, artworkRightMargin = 22, artworkBottomMargin = 10;
+            DrawMenuArtwork(new Rect(frameX + menuWidth - artworkWidth - artworkRightMargin,
+                frameY + menuHeight - artworkHeight - artworkBottomMargin, artworkWidth, artworkHeight));
             GUI.backgroundColor = Color.white;
             GUI.Label(new Rect(frameX + sidebarWidth + 30, frameY + 76, 632, 30), SettingsPages[settingsPage], menuPageTitleStyle);
             menuSubtitleStyle.normal.textColor = new Color(.57f, .60f, .68f, 1);
@@ -556,7 +558,7 @@ public sealed partial class Core
         GUI.Label(new Rect(x + 4, renderingY + 184, 610, 62), "Aggressive; default off. Hides score, combo, lyrics, and input HUD to measure this camera's upper-bound cost. The HUD camera restores automatically on pause, focus loss, or leaving solo play.");
 
         Toggle(disableGuitarCameraBenchmark, "Disable guitar camera for solo FPS benchmark", x, renderingY + 252);
-        GUI.Label(new Rect(x + 4, renderingY + 296, 610, 64), "Very aggressive; default off. Hides the notes, highway, and 3D effects while scoring and HUD remain active. Test this OR the HUD-camera benchmark, not both; turn off the black-background camera option first. Restores on pause, focus loss, or leaving solo play.");
+        GUI.Label(new Rect(x + 4, renderingY + 296, 610, 64), "Very aggressive; default off. Hides the notes, highway, and 3D effects while scoring and HUD remain active. Test this OR the HUD-camera benchmark, not both. If black-background mode is on, the HUD camera temporarily performs its screen clear. Restores on pause, focus loss, or leaving solo play.");
 
         float networkY = renderingY + 376;
         SectionHeader("Online networking experiment", x, networkY);
