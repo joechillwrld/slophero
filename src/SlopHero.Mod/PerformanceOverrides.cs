@@ -37,7 +37,7 @@ internal sealed class PerformanceOverrides
     private readonly Dictionary<IntPtr, NeckEffects> neckEffects = new();
     private readonly Dictionary<IntPtr, Renderer[]> animatorRenderers = new();
     private bool hitParticles, sustainParticles, fretEffects;
-    private double nextScan, nextDiscovery;
+    private double nextScan;
 
     public bool NeedsUpdate => hitParticles || sustainParticles || fretEffects
         || particles.Count != 0 || animators.Count != 0 || fretFades.Count != 0 || renderers.Count != 0;
@@ -68,7 +68,7 @@ internal sealed class PerformanceOverrides
     {
         Restore();
         hitParticles = sustainParticles = fretEffects = false;
-        nextScan = nextDiscovery = 0;
+        nextScan = 0;
     }
 
     public void Apply(GameManager game, bool disableHitParticles, bool disableSustainParticles,
@@ -86,21 +86,18 @@ internal sealed class PerformanceOverrides
             Restore();
             return;
         }
-        // Apply to cached player-neck effects at most once per second. New
-        // necks are discovered on cache miss; rebuild known hierarchies only
-        // every 30 seconds to catch a rare late-added child without repeatedly
-        // allocating component arrays from stable effect pools.
+        // Apply to cached player-neck effects at most once per second. The
+        // fret effect pools are children of the fixed player prefab. Discover
+        // each neck once, including a new player object after a scene reload,
+        // instead of allocating fresh component arrays every 30 seconds.
         if (!changed && realtime < nextScan) return;
         nextScan = realtime + 1.0;
         if (game.playerObjects == null) return;
-        bool discover = neckEffects.Count == 0 || realtime >= nextDiscovery;
-        if (discover) nextDiscovery = realtime + 30.0;
-
         foreach (var player in game.playerObjects)
         {
             if (player == null || !player.enabled || player.neckController == null) continue;
             var neck = player.neckController;
-            if (discover || !neckEffects.TryGetValue(neck.Pointer, out var effects))
+            if (!neckEffects.TryGetValue(neck.Pointer, out var effects))
                 neckEffects[neck.Pointer] = effects = Discover(player, neck);
 
             foreach (var effect in effects.Particles)
@@ -272,7 +269,7 @@ internal sealed class PerformanceOverrides
             try { state.Component.enabled = state.Enabled; } catch { }
         particles.Clear(); animators.Clear(); fretFades.Clear(); renderers.Clear();
         neckEffects.Clear(); animatorRenderers.Clear();
-        nextScan = nextDiscovery = 0;
+        nextScan = 0;
     }
 }
 

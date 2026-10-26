@@ -15,18 +15,30 @@ internal sealed class UnityJobWorkerLimit
     private int originalCount;
     private int limitedCount;
     private double eligibleSince = double.NaN;
+    private double ineligibleSince = double.NaN;
 
     public bool IsApplied => applied;
 
-    public void Update(bool requested, double now)
+    public void Update(bool requested, double now, bool briefSoloPause = false)
     {
         if (!requested)
         {
             eligibleSince = double.NaN;
+            // A short pause should not tear down and rebuild Unity's native
+            // worker pool. Hard boundaries (option off, online, scene exit)
+            // pass false here and restore immediately.
+            if (briefSoloPause && applied && double.IsFinite(now))
+            {
+                if (!double.IsFinite(ineligibleSince) || now < ineligibleSince)
+                    ineligibleSince = now;
+                if (now - ineligibleSince < 1.0) return;
+            }
+            ineligibleSince = double.NaN;
             if (lastRequested != false) Restore();
             lastRequested = false;
             return;
         }
+        ineligibleSince = double.NaN;
         if (failed || lastRequested == true || !double.IsFinite(now)) return;
         if (!double.IsFinite(eligibleSince) || now < eligibleSince)
         {
@@ -46,6 +58,7 @@ internal sealed class UnityJobWorkerLimit
         Update(false, 0);
         lastRequested = null;
         eligibleSince = double.NaN;
+        ineligibleSince = double.NaN;
     }
 
     private void Apply()

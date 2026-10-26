@@ -421,7 +421,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.105** on the private
+- Latest packaged build: SlopHero **0.4.106** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.104 (SHA-256
   `d2efc6c8fe437a8da516491a7ca2ece1fa6fa89844d9c88c363de0f012f7c345`)
@@ -1466,6 +1466,87 @@ do not claim a hitch reduction yet.
 
 - ZIP SHA-256: `706479ef82c39a1b84192356b6785ffc3b48ac268ec7f5757546984598e15b23`
 - DLL SHA-256: `4e300b584e7bd795313a8aed88799e3fa541ce06da7c48c51ff17440bceca847`
+
+## v0.4.106 package
+
+The release build succeeds against the supplied generated assemblies with
+zero warnings/errors, and all 114 Core checks pass. The ZIP contains only
+`Mods/SlopHero.dll`. It reduces repeated scene hierarchy discovery in the
+optional fret-effect and combo-smoke settings and holds the experimental
+Unity worker limit through a brief offline solo pause. These changes are
+unmeasured; no FPS gain is claimed. The package includes the v0.4.105
+first-song hook preparation described above.
+
+- ZIP SHA-256: `4904372c40c91292cb5741bf25f38ca993157ca0d419991e5d0254009b4635d4`
+- DLL SHA-256: `d1c3d93ce647df1a85fa2eff0022a553ed8150b4e0e2fa1bf6333768d5a87238`
+
+### Further screen after 0.4.105 publication
+
+The exact Gameplay `level2` asset has 35 active-ancestor score sprites under
+`HUDCam/HUD`, all on one material reference. Its input-viewer variants have
+322 active-ancestor serialized sprites using two material references, but
+the runtime snapshot has only 48 enabled guitar sprites and zero GHL/drum
+viewer sprites. This is weak evidence for a custom material-batching rewrite;
+the visible viewer and score graphics cannot simply be culled. The older WPA
+`Camera::CustomCull` node remains collapsed and shared across cameras.
+
+The 0.4.104 log's first-song hook-install cluster aligns closely with its
+59.999 ms `Core.OnUpdate` maximum, but historical logs also contain larger
+Update maxima after optional hooks were already installed. The 0.4.105
+preparation change targets one plausible source of the first-song hitch,
+not every rare spike. Runtime timing of the two installations is needed to
+validate that specific mechanism; no further bulk camera skip is justified.
+
+The v0.4.106 change removes `PerformanceOverrides`' periodic
+30-second rediscovery of the fixed fret-effect pools. It still discovers a new
+neck on first use and clears the cache on scene transition. The 0.4.104
+capture reports up to 0.755 ms for a performance-effects pass, but it does
+not identify whether that maximum was the old rescan. The change removes
+repeated component-array allocations from stable necks and has no expected
+effect on hit particles, scoring, or input; a future Windows capture should
+check that effects remain suppressed after long songs.
+
+The older 0.4.98 session at `18:01:54–18:02:27` repeatedly applied and
+restored the experimental Unity worker limit (15 ↔ 14) during brief eligible
+intervals. The cheat-scanner and UI-event switches changed state at the same
+timestamps, which points to the shared solo-gameplay eligibility gate rather
+than an isolated worker failure. The newer 0.4.104 log holds 14 workers
+through a complete 30-second song, so this is a transition issue, not evidence
+of steady-state worker churn. A v0.4.106 change holds an already
+applied worker limit through at most one second of an offline solo pause, but
+restores immediately on option-off, scene/solo exit, or online play. This
+reduces native pool reconfiguration in brief pauses without changing the
+ordinary song path; no presented-frame gain is claimed.
+
+I reran the exact-build method mapper over the supplied 31-second ETW method
+CSV. Its largest named game-side rows after the already handled UI mouse
+chain are `BasePlayer.Update` (456 ms), `BaseGuitarNoteRenderer.Update`
+(261 ms), `GameManager.Update` (138 ms), and `InputViewer.Update` (16 ms).
+The guitar note renderer already guards its 500-entry pool traversal with
+`OnDemandRendering.willCurrentFrameRender`; the score and chart paths under
+the player/manager updates are timing-sensitive. The input viewer row is too
+small to justify another per-frame interop hook. `SpriteAttach.Update` is
+275 ms in the same old trace, but the current exact-input cache has shown
+lower FPS in user runs; the five hidden fret-string components are already
+disabled through the hide-strings option. The method weights are inclusive
+and from an older capture, so none identifies a new removable native loop.
+
+The same runtime snapshots show two local combo-smoke `UVScroll` components
+already paused. The existing modifier rediscovered them through
+`GetComponentsInChildren` every two seconds even while the same player prefab
+remained live. A v0.4.106 change remembers a player after finding
+both fixed smoke components. New practice/player objects are still discovered,
+and destroyed visual children clear that discovery latch. The native UV work
+was already paused; this only removes repeat mod-side hierarchy scans and does
+not imply an FPS gain.
+
+A further exact-resource check of the guitar's hidden `sidebar_l/r` objects
+mapped their extra MonoBehaviour to `TrackSidebarColoring` (MonoScript path
+1541 in the supplied `globalgamemanagers.assets`). The current generated
+class declares no `Update`, so hiding the sidebar renderers does not leave a
+per-frame sidebar script to suspend. The separate fret-string objects do have
+`SpriteAttach` (resource script type 75) and are already handled by the
+hide-strings option. This rules out a redundant sidebar hook.
 
 ## v0.4.104 package
 

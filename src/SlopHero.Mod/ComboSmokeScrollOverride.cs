@@ -12,6 +12,7 @@ internal sealed class ComboSmokeScrollOverride
 {
     private readonly record struct ScrollState(UVScroll Component, bool Enabled);
     private readonly Dictionary<IntPtr, ScrollState> states = new();
+    private readonly HashSet<IntPtr> discoveredPlayers = new();
     private double nextDiscovery;
 
     public bool NeedsRestore => states.Count != 0;
@@ -61,7 +62,12 @@ internal sealed class ComboSmokeScrollOverride
             catch { }
         }
         if (stale != null)
+        {
             foreach (var pointer in stale) states.Remove(pointer);
+            // A skin/mod may replace only the visual children under the same
+            // player object. Let the next pass discover their replacements.
+            discoveredPlayers.Clear();
+        }
     }
 
     public void Clear()
@@ -85,9 +91,13 @@ internal sealed class ComboSmokeScrollOverride
                 if (player == null || !player.enabled || player.isRemotePlayerPlaying) continue;
                 var guitar = player.TryCast<GuitarPlayer>();
                 if (guitar == null) continue;
+                // Smoke is a fixed pair in the player prefab. A recreated
+                // practice player has a new pointer and still gets scanned.
+                if (discoveredPlayers.Contains(guitar.Pointer)) continue;
                 var multiplier = guitar.transform.Find("Combo/multiplier");
                 if (multiplier == null) continue;
 
+                int found = 0;
                 foreach (var component in multiplier.GetComponentsInChildren<UVScroll>(true))
                 {
                     if (component == null) continue;
@@ -95,9 +105,11 @@ internal sealed class ComboSmokeScrollOverride
                     if (parent == null || parent.Pointer != multiplier.Pointer) continue;
                     string objectName = component.gameObject.name;
                     if (objectName != "smoke_combo_fast" && objectName != "smoke_combo_slow") continue;
+                    found++;
                     if (states.ContainsKey(component.Pointer)) continue;
                     states.Add(component.Pointer, new ScrollState(component, component.enabled));
                 }
+                if (found >= 2) discoveredPlayers.Add(guitar.Pointer);
             }
         }
         catch
@@ -119,5 +131,6 @@ internal sealed class ComboSmokeScrollOverride
             catch { }
         }
         states.Clear();
+        discoveredPlayers.Clear();
     }
 }

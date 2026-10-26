@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.105", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.106", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -451,7 +451,15 @@ public sealed partial class Core : MelonMod
             // Unlike UI/input hooks, the worker-count limit is independent of
             // foreground input. Keep it stable while the user alt-tabs during
             // a solo song instead of restoring and reapplying the native pool.
-            unityJobWorkerLimit.Update(workerLimitCandidate && isOfflineSolo, now);
+            // Keep the pool stable through a momentary offline solo pause.
+            // Leaving solo, going online, or switching the setting off must
+            // restore the game's worker count without a grace period.
+            bool briefWorkerPause = workerLimitRequested && unityJobWorkerLimit.IsApplied
+                && ready && game != null && game.actualPlayerCount == 1
+                && !game.isSongOver && !transition && !settingsOpen
+                && !moveHud && resizeTarget < 0 && !IsOnline(now);
+            unityJobWorkerLimit.Update(workerLimitCandidate && isOfflineSolo, now,
+                briefSoloPause: briefWorkerPause);
             highwayAnimations.SetSuppressed(pauseHighwayRequested && activeSoloContext && isOfflineSolo);
             if (cheatScanner.IsInstalled)
             {
