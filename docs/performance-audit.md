@@ -2378,3 +2378,27 @@ as the HUD merge failure. Version 0.4.117 replaces those calls with existing
 SpriteRenderer enumeration and Camera.WorldToScreenPoint-based bounds culling.
 It compiled with zero warnings/errors and all 127 Core checks passed; in-game
 activation still needs confirmation. No FPS impact is claimed.
+
+### v0.4.117 runtime result and v0.4.118 follow-up
+
+The next Windows log confirms separate activations of the sustain write cache
+(250 pooled regular renderers), batching flag (one shared material), and plain
+held tails (300 pooled glow renderers). The HUD merge reaches command-buffer
+recording, then fails with `Method unstripping failed`. The exact IL2CPP dump
+has no managed draw/matrix/clear command methods, although UnityPlayer still
+registers native internal calls for all three. Version 0.4.118 prototypes a
+default-off native bridge for those calls; it is compiled but needs Windows
+validation and could crash on a native signature mismatch.
+
+The game's held-sustain helper can re-enable glow every rendered frame, which
+could undo the previous one-time hide. Version 0.4.118 intercepts re-enable
+writes for the mapped glow pool while the plain-tail option is active. The
+cache's five Harmony hooks are now prepared at Gameplay initialization and
+reused through pause/restart so they do not first install during song play.
+The first write-cache timing capture contained a 110.6 ms update maximum,
+which is consistent with an installation hitch but does not attribute it
+conclusively. Combo-smoke discovery now uses a live scene-wide UVScroll lookup
+already proven by the snapshot, with a local hierarchy filter. Earlier
+near-entry snapshots showed zero tracked with two UVScroll scripts present;
+those snapshots do not establish that the scripts stayed untracked for the
+whole song. Activation counts and mod callback intervals are not FPS gains.

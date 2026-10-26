@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.117", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.118", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -120,7 +120,7 @@ public sealed partial class Core : MelonMod
         playerCameraFarClip.Clear();
         sustainWriteCache.Clear(HarmonyInstance);
         sustainBatching.Clear();
-        plainHeldSustains.Clear();
+        plainHeldSustains.Clear(HarmonyInstance);
         hudCameraMerge.Clear();
         optionalHudAnimations.Clear();
         optionalHudGame = null;
@@ -206,6 +206,7 @@ public sealed partial class Core : MelonMod
             if (compatible) legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
             if (compatible) rewiredMousePolling.Prepare(HarmonyInstance, pauseRewiredMousePolling.Value);
             if (compatible) rewiredKeyboardPolling.Prepare(HarmonyInstance, pauseRewiredKeyboardPolling.Value);
+            if (compatible) sustainWriteCache.Prepare(HarmonyInstance, cacheStaticSustainWrites.Value);
             if (compatible && staticTmpScaleDuringSong.Value)
             {
                 try { staticTmpScale.Prepare(); }
@@ -230,7 +231,7 @@ public sealed partial class Core : MelonMod
         playerCameraFarClip.Clear();
         sustainWriteCache.Clear(HarmonyInstance);
         sustainBatching.Clear();
-        plainHeldSustains.Clear();
+        plainHeldSustains.Clear(HarmonyInstance);
         hudCameraMerge.Clear();
         optionalHudAnimations.Clear();
         optionalHudGame = null;
@@ -325,7 +326,7 @@ public sealed partial class Core : MelonMod
                     hudCameraMerge.Restore();
                     sustainWriteCache.Clear(HarmonyInstance);
                     sustainBatching.Clear();
-                    plainHeldSustains.Clear();
+                    plainHeldSustains.Clear(HarmonyInstance);
                     cheatScanner.Disable();
                     gameplayUiEvents.Disable();
                     highwayAnimations.SetSuppressed(false);
@@ -381,7 +382,7 @@ public sealed partial class Core : MelonMod
             if (!Application.isFocused) hudCameraMerge.Restore();
             if (!Application.isFocused) sustainWriteCache.Clear(HarmonyInstance);
             if (!Application.isFocused) sustainBatching.Clear();
-            if (!Application.isFocused) plainHeldSustains.Clear();
+            if (!Application.isFocused) plainHeldSustains.Clear(HarmonyInstance);
             if (!Application.isFocused) playerCameraFarClip.Restore();
             if (!Application.isFocused) highwayAnimations.SetSuppressed(false);
             if (capture != null)
@@ -628,7 +629,7 @@ public sealed partial class Core : MelonMod
                 && !hudCameraBenchmark.IsActive && !guitarCameraBenchmark.IsActive;
             sustainWriteCache.Update(HarmonyInstance, sustainWriteCacheRequested, eligibleRenderPrototype, game);
             sustainBatching.Update(sustainBatchingRequested, eligibleRenderPrototype, game);
-            plainHeldSustains.Update(plainHeldSustainRequested, eligibleRenderPrototype, game);
+            plainHeldSustains.Update(HarmonyInstance, plainHeldSustainRequested, eligibleRenderPrototype, game);
             hudCameraMerge.Update(hudCameraMergeRequested, eligibleRenderPrototype, game);
             if (hudCameraMerge.ConsumeFailure() is string hudMergeFailure)
                 LoggerInstance.Warning($"Sloptifine HUD-camera merge prototype stayed off; HUDCam remains active: {hudMergeFailure}");
@@ -740,7 +741,7 @@ public sealed partial class Core : MelonMod
             playerCameraFarClip.Clear();
             sustainWriteCache.Clear(HarmonyInstance);
             sustainBatching.Clear();
-            plainHeldSustains.Clear();
+            plainHeldSustains.Clear(HarmonyInstance);
             hudCameraMerge.Clear();
             whammyTextureThrottle.Clear(HarmonyInstance);
             unityJobWorkerLimit.Clear();
@@ -768,7 +769,7 @@ public sealed partial class Core : MelonMod
         playerCameraFarClip.Restore();
         sustainWriteCache.Clear(HarmonyInstance);
         sustainBatching.Clear();
-        plainHeldSustains.Clear();
+        plainHeldSustains.Clear(HarmonyInstance);
         hudCameraMerge.Restore();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
@@ -798,7 +799,7 @@ public sealed partial class Core : MelonMod
         playerCameraFarClip.Restore();
         sustainWriteCache.Clear(HarmonyInstance);
         sustainBatching.Clear();
-        plainHeldSustains.Clear();
+        plainHeldSustains.Clear(HarmonyInstance);
         hudCameraMerge.Restore();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
@@ -1174,7 +1175,7 @@ public sealed partial class Core : MelonMod
         playerCameraFarClip.Clear();
         sustainWriteCache.Clear(HarmonyInstance);
         sustainBatching.Clear();
-        plainHeldSustains.Clear();
+        plainHeldSustains.Clear(HarmonyInstance);
         hudCameraMerge.Clear();
         networkTickRemainder.Clear(HarmonyInstance);
         optionalHudAnimations.Clear();

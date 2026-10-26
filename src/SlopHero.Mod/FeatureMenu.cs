@@ -183,7 +183,10 @@ public sealed partial class Core
         cacheStaticSustainWrites = preferences.CreateEntry("PerformanceCacheStaticSustainWrites", false);
         batchSustainBodies = preferences.CreateEntry("PerformanceBatchSustainBodies", false);
         hideHeldSustainGlow = preferences.CreateEntry("PerformanceHideHeldSustainGlow", false);
-        mergeHudCamera = preferences.CreateEntry("PerformanceMergeHudCamera", false);
+        // The previous managed command-buffer prototype may be saved as on.
+        // Native internal calls have a different crash risk, so require a new
+        // explicit opt-in instead of inheriting that old preference/profile.
+        mergeHudCamera = preferences.CreateEntry("PerformanceMergeHudCameraNative", false);
         hidePbPopup = preferences.CreateEntry("PerformanceHidePbPopup", false);
         hideStarPowerSideGlows = preferences.CreateEntry("PerformanceHideStarPowerSideGlows", false);
         preserveNetworkTickRemainder = preferences.CreateEntry("PerformancePreserveNetworkTickRemainder", false);
@@ -251,7 +254,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.117", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.118", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
             if (GUI.Button(new Rect(frameX + menuWidth - 48, frameY + 13, 32, 32), "×", menuClickStyle))
@@ -584,8 +587,8 @@ public sealed partial class Core
         Toggle(cacheStaticSustainWrites, "Skip repeated sustain sprite, color, and length writes", x, sustainY + 30);
         Toggle(batchSustainBodies, "Allow Unity batching for sustain bodies", x, sustainY + 70);
         Toggle(hideHeldSustainGlow, "Hide held-sustain glow (plain tails)", x, sustainY + 110);
-        Toggle(mergeHudCamera, "Merge HUDCam renderers into the guitar camera", x, sustainY + 150);
-        GUI.Label(new Rect(x + 4, sustainY + 194, 610, 126), "All default off and limited to offline solo songs. The write cache skips exact duplicate values only; positions and changing tail data stay live. Batching can distort tail geometry. Plain tails remove only glow. HUD merge keeps HUDCam's orthographic projection; camera-space Canvas content stays on a narrowed HUDCam while other renderers move to the guitar camera. Sorting can differ.");
+        Toggle(mergeHudCamera, "Merge HUD camera (native prototype)", x, sustainY + 150);
+        GUI.Label(new Rect(x + 4, sustainY + 194, 610, 126), "All default off and limited to offline solo songs. The write cache skips exact duplicate values only; positions and changing tail data stay live. Batching can distort tail geometry. Plain tails keep pooled glow renderers hidden even when the game tries to enable them. HUD merge uses native Unity draw commands; it can crash the game if the exact-build native signature differs, and sorting can differ.");
     }
 
     private void Toggle(MelonPreferences_Entry<bool> entry, string label, float x, float y)
@@ -1091,7 +1094,7 @@ public sealed partial class Core
             Bool("PerformanceCacheStaticSustainWrites", cacheStaticSustainWrites);
             Bool("PerformanceBatchSustainBodies", batchSustainBodies);
             Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
-            Bool("PerformanceMergeHudCamera", mergeHudCamera);
+            Bool("PerformanceMergeHudCameraNative", mergeHudCamera);
             Bool("PerformanceHidePbPopup", hidePbPopup);
             Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
             Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1155,7 +1158,7 @@ public sealed partial class Core
         Bool("PerformanceCacheStaticSustainWrites", cacheStaticSustainWrites);
         Bool("PerformanceBatchSustainBodies", batchSustainBodies);
         Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
-        Bool("PerformanceMergeHudCamera", mergeHudCamera);
+        Bool("PerformanceMergeHudCameraNative", mergeHudCamera);
         Bool("PerformanceHidePbPopup", hidePbPopup);
         Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
         Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);

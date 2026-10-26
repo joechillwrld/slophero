@@ -1,4 +1,5 @@
 using Il2Cpp;
+using MelonLoader;
 using UnityEngine;
 
 namespace SlopHero.Mod;
@@ -14,6 +15,7 @@ internal sealed class ComboSmokeScrollOverride
     private readonly Dictionary<IntPtr, ScrollState> states = new();
     private readonly HashSet<IntPtr> discoveredPlayers = new();
     private double nextDiscovery;
+    private bool warnedDiscovery;
 
     public bool NeedsRestore => states.Count != 0;
     public int TrackedCount => states.Count;
@@ -74,6 +76,7 @@ internal sealed class ComboSmokeScrollOverride
     {
         Restore();
         nextDiscovery = 0;
+        warnedDiscovery = false;
     }
 
     private void Discover(GameManager? game, double realtime)
@@ -94,15 +97,20 @@ internal sealed class ComboSmokeScrollOverride
                 // Smoke is a fixed pair in the player prefab. A recreated
                 // practice player has a new pointer and still gets scanned.
                 if (discoveredPlayers.Contains(guitar.Pointer)) continue;
-                var multiplier = guitar.transform.Find("Combo/multiplier");
-                if (multiplier == null) continue;
+                var guitarRoot = guitar.transform;
 
                 int found = 0;
-                foreach (var component in multiplier.GetComponentsInChildren<UVScroll>(true))
+                // The current player strips some closed GetComponentsInChildren<T>
+                // wrappers. The live Gameplay snapshot already uses this
+                // scene-wide UVScroll lookup successfully and finds the pair.
+                foreach (var component in UnityEngine.Object.FindObjectsOfType<UVScroll>())
                 {
                     if (component == null) continue;
                     var parent = component.transform.parent;
-                    if (parent == null || parent.Pointer != multiplier.Pointer) continue;
+                    var combo = parent == null ? null : parent.parent;
+                    if (parent == null || parent.name != "multiplier"
+                        || combo == null || combo.name != "Combo"
+                        || combo.parent == null || combo.parent.Pointer != guitarRoot.Pointer) continue;
                     string objectName = component.gameObject.name;
                     if (objectName != "smoke_combo_fast" && objectName != "smoke_combo_slow") continue;
                     found++;
@@ -112,10 +120,15 @@ internal sealed class ComboSmokeScrollOverride
                 if (found >= 2) discoveredPlayers.Add(guitar.Pointer);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Missing wrappers leave the original animations running. Retry
-            // discovery on a later 20 Hz feature pass.
+            if (!warnedDiscovery)
+            {
+                warnedDiscovery = true;
+                MelonLogger.Warning($"Combo-smoke discovery failed; its animations remain active: {ex}");
+            }
+            // A missing wrapper leaves the native animation intact. Retry
+            // after the normal two-second discovery interval.
         }
     }
 

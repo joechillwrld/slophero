@@ -12,13 +12,13 @@ Use the existing binaries, symbols, source archive, and captures to pursue
 several independent leads before building. A diagnostic log or another
 capture request alone is not the performance work the user asked for.
 The newest aggressive candidates and exact callsite/shader evidence are in
-`docs/aggressive-render-targets-2026-10-26.md` and its linked JSON. The first
-0.4.115 Windows runtime log showed all four rendering prototypes failing with
-`Method unstripping failed`. The 0.4.116 log pinpointed the stripped
-`GetComponentInChildren<GuitarNoteRenderer>` and `GeometryUtility` calls. The
-0.4.117 candidate replaces those with APIs already used by the mod; confirm
-runtime activation before describing them as usable. See the performance audit
-and handoff. Do not report gains as measured.
+`docs/aggressive-render-targets-2026-10-26.md` and its linked JSON. The
+0.4.117 Windows log confirms three sustain prototypes activate, but HUD merge
+reaches another stripped group in `CommandBuffer`. Version 0.4.118 prototypes
+native Unity draw bindings for HUD merge, keeps glow suppressed against game
+re-enables, prepares cache hooks before song play, and changes combo-smoke
+discovery. These fixes compile but need runtime and frame validation. See the
+performance audit and handoff. Do not report gains as measured.
 The handoff indexes current mod code, older source, exact-game binaries,
 Unity symbols, logs, captures, and local raw uploads. `references/` and
 `/workspace/attachments` are not committed to Git; in a fresh environment,
@@ -45,11 +45,9 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.117, a repair/test candidate for the failed
-0.4.115 rendering prototypes. It replaces the unsupported child lookup and
-frustum utility identified by the 0.4.116 stack traces, while retaining the
-supported renderer enabled property and active-object HUD scan. It still needs
-an in-game activation check. The 0.4.114 camera cap
+The latest packaged build is 0.4.118, a native HUD and sustain follow-up. It
+needs an in-game activation check, especially for the native HUD experiment.
+The 0.4.114 camera cap
 and previous camera-test findings remain below. PresentMon captures are
 directional, not a matched A/B, and do not establish a FPS gain. Version
 0.4.113 removes the remaining activation gate that blocked

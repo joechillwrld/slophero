@@ -85,8 +85,13 @@ renderer submission. The 0.4.115 runtime log showed all four stopping on
 pinpointed the stripped `GetComponentInChildren<GuitarNoteRenderer>` and
 `GeometryUtility.CalculateFrustumPlanes(Camera)` calls. Version 0.4.117
 replaces these with SpriteRenderer child enumeration and camera screen-point
-projection, APIs already used elsewhere in the mod. It needs a fresh runtime
-activation check before visual or PresentMon testing.
+projection, APIs already used elsewhere in the mod. The 0.4.117 runtime log
+confirms all three sustain prototypes activate, but HUD merge then fails in
+command recording. The exact IL2CPP dump contains no managed HUD draw/matrix
+command methods; UnityPlayer still registers their native internal calls.
+Version 0.4.118 adds a default-off native bridge for that HUD experiment and
+fixes the glow re-enable behavior. Windows activation, visual parity, and
+presented-frame impact remain unverified.
 The cache still uses managed setter hooks, the batching toggle does not build
 new geometry, and the HUD path keeps HUDCam for camera-space Canvas layers. Do
 not replace note-head state caching (already present), lower input polling, or
@@ -1976,8 +1981,57 @@ failed at `GeometryUtility.CalculateFrustumPlanes(Camera)`. Version 0.4.117
 enumerates the active guitar player's SpriteRenderer children (the closed
 SpriteRenderer generic is already used by existing visuals) and performs HUD
 bounds culling through `Camera.WorldToScreenPoint`, already used in the HUD
-layout. The build still needs an in-game activation check; no FPS result is
-available. Release compilation completed with zero warnings/errors and all 127
+layout. The 0.4.117 log confirms the three sustain controls activate, but HUD
+merge fails at command recording. There is no FPS result. Release compilation completed with zero warnings/errors and all 127
 Core checks passed. `downloads/SlopHero-0.4.117-alpha.zip` contains only
 `Mods/SlopHero.dll`; its SHA-256 is
 `df018f19e5165a47acc29cb128d37a6e1a03f8945a9f59bde4fd4b7e4c6d2fa8`.
+
+### 0.4.118: native HUD commands and effective visual suppression
+
+The uploaded 0.4.117 `Latest.log` has separate tests of the write cache
+(250 pooled body renderers), material batching (one shared material), plain
+tails (300 pooled glow renderers), and a combined run. Those are activation
+counts, not draw counts or FPS gains. The HUD merge failed with
+`Method unstripping failed` in `RecordCommands`; the exact game's IL2CPP
+`CommandBuffer` dump contains `Clear` and `Blit` but no managed
+`SetViewProjectionMatrices`, `ClearRenderTarget`, or `DrawRenderer` methods.
+The matching UnityPlayer has native internal-call registrations for
+`SetViewProjectionMatrices_Injected`, `ClearRenderTarget_Injected`, and
+`Internal_DrawRenderer`. Version 0.4.118 resolves those native calls before
+altering HUDCam. Its exact-build delegate signatures follow the Unity
+2022.3 bindings and the existing GameAssembly internal-call ABI. A missing
+entry leaves HUDCam intact; a mismatched signature can still crash the game.
+This bridge has not run on Windows yet.
+It uses the new default-off `PerformanceMergeHudCameraNative` preference key;
+the earlier managed prototype's saved preference and profiles do not
+automatically enable the native bridge.
+
+The current held-tail helper can re-enable its glow renderers every rendered
+frame, so the old one-time `Renderer.enabled=false` may not persist. The
+plain-tail experiment now intercepts those re-enable writes while active,
+then removes the hook and restores prior states on exit. It reports the count
+of blocked writes once per song. This targets actual glow rendering, though
+the game still computes held-tail visual parameters and the hook itself costs
+CPU. The sustain write-cache hooks are now prepared at Gameplay initialization
+and reused across pause/restart; only renderer membership and output state
+reset per song. This moves a possible first-song hook-install hitch outside
+active play without proving an FPS gain. Combo-smoke discovery now uses the
+scene-wide `UVScroll` lookup already verified by the snapshot and filters to
+the local guitar's two smoke components; prior timing snapshots showed 0
+tracked while both scripts were live, but they were captured near song entry
+and cannot prove persistent failure. This change needs a runtime check.
+
+The existing PresentMon camera-isolation pair is directional: disabling the
+guitar camera while leaving HUDCam drew 1,936.77 presents/s, and disabling
+HUDCam while leaving the guitar camera drew 1,860 presents/s, with different
+far-clip settings and different moments in the session. It suggests larger
+guitar-render work than HUD work on this machine, but neither number is a
+controlled estimate for the new toggles. A true sustain geometry batch could
+reduce renderer submission more than material flags alone; that remains the
+next high-impact rendering investigation after these prototypes are validated.
+
+The 0.4.118 Release build completed with zero warnings/errors and 127 Core
+checks passed. `downloads/SlopHero-0.4.118-alpha.zip` contains only
+`Mods/SlopHero.dll`; SHA-256:
+`6300161b6becd32ed57cb78505dca6c590909164a66ac4bface5ec1b1a82776b`.

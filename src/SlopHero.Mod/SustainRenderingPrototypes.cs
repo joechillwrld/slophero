@@ -37,29 +37,66 @@ internal sealed class SustainStaticWriteCachePrototype
     internal bool IsInstalled => installed;
     internal bool IsActive => installed && enabled;
 
+    // Install the five global setter hooks when Gameplay initializes, before
+    // the first active song update. Renderer membership is still discovered
+    // only when an eligible local guitar player exists.
+    internal void Prepare(HarmonyLib.Harmony harmony, bool requested)
+    {
+        if (!requested || installed || failed) return;
+        try { InstallHooks(harmony); }
+        catch (Exception ex)
+        {
+            Restore(harmony);
+            failed = true;
+            MelonLogger.Warning($"Sloptifine sustain write-cache setup stopped at '{installStage}': {ex}");
+        }
+    }
+
     internal void Update(HarmonyLib.Harmony harmony, bool requested, bool eligible, GameManager? game)
     {
-        if (!requested || !eligible || game == null)
+        if (!requested)
         {
             enabled = false;
             Restore(harmony);
-            if (!requested) failed = false;
+            failed = false;
+            return;
+        }
+        if (!eligible || game == null)
+        {
+            if (enabled)
+            {
+                enabled = false;
+                ClearSongState();
+            }
             return;
         }
 
         if (failed) return;
         if (!installed)
         {
-            try { Install(harmony, game); }
+            Prepare(harmony, requested: true);
+            if (!installed) return;
+        }
+        if (!enabled)
+        {
+            try
+            {
+                installStage = "scan regular sustain renderers";
+                foreach (var renderer in FindRegularSustainRenderers(game))
+                    if (renderer != null) sustainRenderers.Add(renderer.Pointer);
+                if (sustainRenderers.Count == 0)
+                    throw new InvalidOperationException("No regular sustain renderers with the mapped CloneHero/Sustains shader were found.");
+                enabled = true;
+                MelonLogger.Msg($"Sloptifine sustain write-cache prototype active for {sustainRenderers.Count} regular sustain renderers; positions and per-frame changing output remain vanilla.");
+            }
             catch (Exception ex)
             {
-                Restore(harmony);
+                enabled = false;
+                ClearSongState();
                 failed = true;
                 MelonLogger.Warning($"Sloptifine sustain write-cache prototype stopped safely at '{installStage}': {ex}");
-                return;
             }
         }
-        enabled = installed;
     }
 
     internal void Clear(HarmonyLib.Harmony harmony)
@@ -69,14 +106,8 @@ internal sealed class SustainStaticWriteCachePrototype
         failed = false;
     }
 
-    private void Install(HarmonyLib.Harmony harmony, GameManager game)
+    private void InstallHooks(HarmonyLib.Harmony harmony)
     {
-        installStage = "scan regular sustain renderers";
-        foreach (var renderer in FindRegularSustainRenderers(game))
-            if (renderer != null) sustainRenderers.Add(renderer.Pointer);
-        if (sustainRenderers.Count == 0)
-            throw new InvalidOperationException("No regular sustain renderers with the mapped CloneHero/Sustains shader were found.");
-
         const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         installStage = "resolve SpriteRenderer.sprite setter";
         spriteSetter = typeof(SpriteRenderer).GetProperty("sprite", flags)?.GetSetMethod(true)
@@ -110,7 +141,7 @@ internal sealed class SustainStaticWriteCachePrototype
         installStage = "patch Unity MaterialPropertyBlock.Clear";
         Patch(harmony, blockClear, null, nameof(AfterClearBlock));
         installed = true;
-        MelonLogger.Msg($"Sloptifine sustain write-cache prototype active for {sustainRenderers.Count} regular sustain renderers; positions and per-frame changing output remain vanilla.");
+        MelonLogger.Msg("Sloptifine sustain write-cache setter hooks prepared at Gameplay initialization.");
     }
 
     internal static IEnumerable<SpriteRenderer> FindRegularSustainRenderers(GameManager game)
@@ -255,6 +286,7 @@ internal sealed class SustainStaticWriteCachePrototype
 
     private void Restore(HarmonyLib.Harmony harmony)
     {
+        enabled = false;
         if (ReferenceEquals(active, this)) active = null;
         foreach (var target in patchedMethods)
         {
@@ -262,13 +294,18 @@ internal sealed class SustainStaticWriteCachePrototype
             catch (Exception ex) { MelonLogger.Warning($"Sustain write-cache hook cleanup failed; its inactive prefix now passes through: {ex.Message}"); }
         }
         patchedMethods.Clear();
+        ClearSongState();
+        spriteSetter = colorSetter = setPropertyBlock = blockSetFloat = blockClear = null;
+        installed = false;
+    }
+
+    private void ClearSongState()
+    {
         sustainRenderers.Clear();
         linkedBlocks.Clear();
         rendererBlocks.Clear();
         outputs.Clear();
         lengths.Clear();
-        spriteSetter = colorSetter = setPropertyBlock = blockSetFloat = blockClear = null;
-        installed = false;
     }
 }
 
@@ -353,17 +390,21 @@ internal sealed class SustainBatchingPrototype
 /// <summary>Suppresses only sustain glow renderers; base sustain bodies remain intact.</summary>
 internal sealed class PlainHeldSustainPrototype
 {
+    private static PlainHeldSustainPrototype? active;
     private readonly Dictionary<IntPtr, (SpriteRenderer Renderer, bool WasEnabled)> renderers = new();
+    private MethodInfo? enabledSetter;
+    private bool hookInstalled;
+    private long blockedReenables;
     private bool failed;
     private string updateStage = "initialize";
 
     internal bool IsActive => renderers.Count != 0;
 
-    internal void Update(bool requested, bool eligible, GameManager? game)
+    internal void Update(HarmonyLib.Harmony harmony, bool requested, bool eligible, GameManager? game)
     {
         if (!requested || !eligible || game == null)
         {
-            Restore();
+            Restore(harmony);
             if (!requested) failed = false;
             return;
         }
@@ -385,20 +426,35 @@ internal sealed class PlainHeldSustainPrototype
             }
             if (renderers.Count == 0)
                 throw new InvalidOperationException("No sustain glow renderers were found under the active guitar renderer.");
-            MelonLogger.Msg($"Sloptifine plain-held-sustain prototype hid {renderers.Count} glow renderer(s); base sustain bodies remain visible.");
+            updateStage = "patch Renderer.enabled setter";
+            enabledSetter = typeof(Renderer).GetProperty("enabled", BindingFlags.Public | BindingFlags.Instance)?.GetSetMethod()
+                ?? throw new MissingMethodException("UnityEngine.Renderer.enabled setter");
+            harmony.Patch(enabledSetter, prefix: new HarmonyMethod(typeof(PlainHeldSustainPrototype)
+                .GetMethod(nameof(BeforeSetEnabled), BindingFlags.Static | BindingFlags.NonPublic)!));
+            hookInstalled = true;
+            active = this;
+            MelonLogger.Msg($"Sloptifine plain-held-sustain prototype hid {renderers.Count} pooled glow renderer(s) and blocks game re-enables while active; base sustain bodies remain visible.");
         }
         catch (Exception ex)
         {
-            Restore();
+            Restore(harmony);
             failed = true;
             MelonLogger.Warning($"Sloptifine plain-held-sustain prototype stopped safely at '{updateStage}': {ex}");
         }
     }
 
-    internal void Clear()
+    internal void Clear(HarmonyLib.Harmony harmony)
     {
-        Restore();
+        Restore(harmony);
         failed = false;
+    }
+
+    private static bool BeforeSetEnabled(Renderer __instance, bool value)
+    {
+        var owner = active;
+        if (owner == null || !value || !owner.renderers.ContainsKey(__instance.Pointer)) return true;
+        owner.blockedReenables++;
+        return false;
     }
 
     private static bool IsGlow(Material? material)
@@ -410,8 +466,19 @@ internal sealed class PlainHeldSustainPrototype
             || material.name.Contains("OpenSustainGlow", StringComparison.OrdinalIgnoreCase);
     }
 
-    private void Restore()
+    private void Restore(HarmonyLib.Harmony harmony)
     {
+        if (ReferenceEquals(active, this)) active = null;
+        if (hookInstalled && enabledSetter != null)
+        {
+            try { harmony.Unpatch(enabledSetter, HarmonyPatchType.All, harmony.Id); }
+            catch (Exception ex) { MelonLogger.Warning($"Held-sustain glow hook cleanup failed; its inactive prefix now passes through: {ex.Message}"); }
+        }
+        hookInstalled = false;
+        enabledSetter = null;
+        if (renderers.Count != 0 && blockedReenables != 0)
+            MelonLogger.Msg($"Sloptifine plain-held-sustain prototype blocked {blockedReenables} glow re-enable write(s) during this song.");
+        blockedReenables = 0;
         foreach (var (renderer, wasEnabled) in renderers.Values)
         {
             try

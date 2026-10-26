@@ -4,9 +4,16 @@ Research against the supplied v1.1.0.6142 binary and assets. Four independent
 default-off implementations first shipped in v0.4.115; the first runtime test
 showed all four aborting before activation. Version 0.4.116 traces identified
 two stripped Unity calls. Version 0.4.117 replaces those calls with APIs
-already used elsewhere in the mod. In-game behavior and performance remain
-unmeasured. This supplements the existing camera benchmarks; it does not prove
+already used elsewhere in the mod. Its runtime log confirms all three sustain
+controls activate, while HUD merge fails at stripped command-buffer methods.
+Version 0.4.118 adds a default-off native-command bridge, fixes the game's
+glow re-enable behavior, and prepares cache hooks before song play. In-game
+visual behavior and performance remain unmeasured. This supplements the
+existing camera benchmarks; it does not prove
 that sustains dominate guitar-camera cost.
+
+The table below records the initial implementations. The current fixes and
+remaining risks are documented in [the handoff](performance-handoff.md#04118-native-hud-commands-and-effective-visual-suppression).
 
 ## v0.4.115 implementation status
 

@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Il2Cpp;
 using MelonLoader;
 using UnityEngine;
@@ -213,21 +214,22 @@ internal sealed class HudCameraMergePrototype
     private static void RecordCommands(CommandBuffer buffer, Camera hud, Camera guitar, List<DrawItem> items,
         bool clearDepth)
     {
+        NativeHudCommands.Resolve();
         buffer.Clear();
-        buffer.SetViewProjectionMatrices(hud.worldToCameraMatrix, hud.projectionMatrix);
+        NativeHudCommands.SetMatrices(buffer, hud.worldToCameraMatrix, hud.projectionMatrix);
         // HUDCam uses ClearFlags.Nothing. Clear depth after the guitar pass so
         // its perspective depth values cannot incorrectly occlude orthographic
         // HUD sprites. This runs after the last other camera and clears no color.
-        if (clearDepth) buffer.ClearRenderTarget(true, false, Color.clear);
+        if (clearDepth) NativeHudCommands.ClearDepth(buffer);
         foreach (var item in items)
         {
             for (int submesh = 0; submesh < item.Materials.Length; submesh++)
             {
                 Material? material = item.Materials[submesh];
-                if (material != null) buffer.DrawRenderer(item.Renderer, material, submesh, -1);
+                if (material != null) NativeHudCommands.Draw(buffer, item.Renderer, material, submesh);
             }
         }
-        buffer.SetViewProjectionMatrices(guitar.worldToCameraMatrix, guitar.projectionMatrix);
+        NativeHudCommands.SetMatrices(buffer, guitar.worldToCameraMatrix, guitar.projectionMatrix);
     }
 
     private static List<DrawItem> BuildDrawItems(List<Renderer> candidates, Camera hud)
@@ -292,4 +294,65 @@ internal sealed class HudCameraMergePrototype
         return maxX >= -marginX && minX <= Screen.width + marginX
             && maxY >= -marginY && minY <= Screen.height + marginY;
     }
+}
+
+/// <summary>
+/// The current IL2CPP build strips CommandBuffer's managed draw/matrix/clear
+/// wrappers, even though UnityPlayer registers their native internal calls.
+/// Resolve only these exact Unity 2022.3.62f2 bindings; a missing binding
+/// aborts the optional HUD merge before HUDCam's state is changed.
+/// </summary>
+internal static class NativeHudCommands
+{
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void SetMatricesCall(IntPtr buffer, ref Matrix4x4 view, ref Matrix4x4 projection);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void ClearCall(IntPtr buffer, int clearFlags, ref Color background, float depth, uint stencil);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void DrawCall(IntPtr buffer, IntPtr renderer, IntPtr material, int submesh, int pass);
+
+    [DllImport("GameAssembly.dll", EntryPoint = "il2cpp_resolve_icall", CallingConvention = CallingConvention.Cdecl,
+        CharSet = CharSet.Ansi)]
+    private static extern IntPtr ResolveInternalCall(string name);
+
+    private static SetMatricesCall? setMatrices;
+    private static ClearCall? clear;
+    private static DrawCall? draw;
+
+    internal static void Resolve()
+    {
+        if (!OperatingSystem.IsWindows() || !Environment.Is64BitProcess)
+            throw new PlatformNotSupportedException("The native HUD bridge requires the validated Windows x64 game build.");
+        if (setMatrices != null && clear != null && draw != null) return;
+        setMatrices = Resolve<SetMatricesCall>(
+            "UnityEngine.Rendering.CommandBuffer::SetViewProjectionMatrices_Injected");
+        clear = Resolve<ClearCall>(
+            "UnityEngine.Rendering.CommandBuffer::ClearRenderTarget_Injected");
+        draw = Resolve<DrawCall>(
+            "UnityEngine.Rendering.CommandBuffer::Internal_DrawRenderer");
+    }
+
+    private static T Resolve<T>(string name) where T : Delegate
+    {
+        IntPtr address = ResolveInternalCall(name);
+        if (address == IntPtr.Zero)
+            throw new NotSupportedException($"Unity native command '{name}' is unavailable.");
+        return Marshal.GetDelegateForFunctionPointer<T>(address);
+    }
+
+    internal static void SetMatrices(CommandBuffer buffer, Matrix4x4 view, Matrix4x4 projection)
+        => setMatrices!(buffer.Pointer, ref view, ref projection);
+
+    internal static void ClearDepth(CommandBuffer buffer)
+    {
+        Color clearColor = Color.clear;
+        // Unity's legacy ClearRenderTarget(true, false, ...) uses
+        // RTClearFlags.DepthStencil (Depth=2 | Stencil=4), depth=1, stencil=0.
+        clear!(buffer.Pointer, 6, ref clearColor, 1f, 0);
+    }
+
+    internal static void Draw(CommandBuffer buffer, Renderer renderer, Material material, int submesh)
+        => draw!(buffer.Pointer, renderer.Pointer, material.Pointer, submesh, -1);
 }
