@@ -37,11 +37,14 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.110. It adds a default-off guitar-camera
-far-clip experiment (120 to 80 units) during eligible offline solo songs.
-The setting checks the known camera configuration, restores on scope exit, and
-can hide distant notes/effects. Its visual behavior and FPS impact need an
-in-game A/B. Version 0.4.105 moved setup of the optional legacy-mouse detour
+The latest packaged build is 0.4.111. It adds default-off, offline-solo HUD
+and guitar-camera render benchmarks, plus pausing a chart video when its
+background camera is hidden. Both camera tests remove different visuals and
+need a matched PresentMon A/B; no FPS gain is claimed. Version 0.4.110 adds a
+default-off guitar-camera far-clip experiment (120 to 80 units) during eligible
+offline solo songs. The setting checks the known camera configuration,
+restores on scope exit, and can hide distant notes/effects. Its visual behavior
+and FPS impact need an in-game A/B. Version 0.4.105 moved setup of the optional legacy-mouse detour
 and Rewired mouse prefix out of the first active song update. The first-song
 hitch benefit remains unmeasured. Version 0.4.103 fixes Sloptifine 3 discovery after
 0.4.102 hit an unsupported Unity lookup and used the wrong Animator type.

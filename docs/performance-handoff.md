@@ -422,7 +422,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.110** on the private
+- Latest packaged build: SlopHero **0.4.111** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.108 (SHA-256
   `cd30bd2c138e790abc48da678e72bc4e896318ac4c47331d8dfe3ed86d943a2a`)
@@ -1690,3 +1690,151 @@ FPS gain is claimed.
 
 - ZIP SHA-256: `c931083b30561ea7a532a36b2d4185357850a64fe439f212667e972382031f6f`
 - DLL SHA-256: `b65b1e756d8f00abc3080a425c559dfbe0fbb4a16dc971b40977e990179f6c4b`
+
+## 2026-10-26: v0.4.110 log and callback recheck
+
+The latest log (`Latest.log`, SHA-256
+`6f43531698eaf5394c598f78fa4b306d2eb9f61e35ac8ace4f0c6f275da48aad`)
+matches Clone Hero v1.1.0.6142 and SlopHero v0.4.110. It contains two
+30-second offline solo timing windows with most visual/performance switches
+enabled. The first enables the far-clip experiment: the log confirms the live
+guitar camera changed from 120 to 80 units and restored on song exit. The
+second leaves that option off. Both windows also overlap many other enabled
+experiments, so they are not an isolated A/B.
+
+Scheduled-render callback rates were 1,644.6/s and 1,674.7/s; their p99
+intervals were 0.82 ms and 0.80 ms. These are mod callback intervals, not
+presented FPS. PlayerCamera pre-cull-to-pre-render averages remained 0.026 ms,
+and pre-render-to-post-render 0.056/0.055 ms. Neither timing bucket captures
+exclusive native culling or GPU presentation. The log contains no PresentMon
+frame data and no SlopHero gameplay exception; the one loader warning is the
+existing Il2CppInterop signature fallback. This run validates the far-clip
+scope and restoration, not an FPS change.
+
+The current-build `CHNetManager.Update` at GameAssembly RVA `0x146DC0` has a
+very small disconnected fast path: it checks the connection-state field and
+returns. When connected, it accumulates `Time.deltaTime`, waits for the
+configured tick interval, then dispatches the server/client network update(s)
+and resets the accumulator. This is consistent with the older source's
+network-tick design, but the current methods behind the virtual dispatch are
+obfuscated. Changing the gate, tick rate, packet poll, or gameplay update risks
+online chart/input synchronization. Existing WPA evidence is from offline solo
+play; it does not attribute a costly online callback. Therefore no network
+callback suppression is justified by the current capture. A future online
+trace would need named callback stacks and PresentMon frames during a matched
+two-player song before proposing code.
+
+The unshipped HUD draft in `FeatureMenu.cs` enlarges the window to 1200x740,
+uses a larger transparent character illustration as a faint watermark beneath
+the right edge of page controls, removes long toggle-divider bars, spaces rows
+and controls for larger click targets, and restyles numeric/color editors to
+match the dark accented panel. It has not yet been visually verified in Clone
+Hero and does not alter gameplay performance.
+
+## 2026-10-26: online network-tick remainder prototype
+
+The user approved a default-off experiment for the current `CHNetManager.Update`
+30 Hz accumulator. The prototype patches that method only while the preference
+is enabled. For established connections, a prefix records the current
+accumulator, `Time.deltaTime`, and tick interval. After the native update runs,
+the postfix writes a fractional remainder only if the native method reached
+its threshold and reset the accumulator to zero. It uses `elapsed % interval`,
+so it keeps phase while discarding whole missed intervals; it does not create
+catch-up bursts or dispatch more than the native one update per Unity frame.
+The feature does not alter the configured network tick rate, offline behavior,
+or 1000 Hz controller/instrument polling. Its exact-build field offsets are
+`elapsedTime=0x30`, `timePerTick=0x34`, and `ConnectionState=0x38`, from the
+current `CHNetManager` dump (TypeDef 672). The default-off toggle is on the
+Performance page and is included in profiles.
+
+This remains an untested online prototype. The offset check, connected-state
+gate, and native-reset verification fail open if observed state differs, but a
+write can still change packet timing or worsen desync. It has not been tested
+in a live lobby and has no frame-time claim. Build succeeds with zero warnings
+and errors; the core suite now passes 127 checks, including fractional-phase,
+exact-boundary, long-stall, and invalid-value cases. The whammy upload hook
+stays installed but passes through to vanilla when the song is paused, online,
+or outside eligible offline solo play. Particle, hidden-beatline, and
+combo-smoke suppressions are also scoped to active offline solo play and
+restore when that scope ends. The shared state gate is polled at up to 50 ms
+intervals, so these transitions are automatic but not instantaneous.
+
+The same log is a useful screen for new offline-only switches: it records
+three live cameras, one enabled but idle VideoPlayer, no playing particles,
+and camera callback averages around 0.02–0.06 ms. It does not show a video
+decoder cost in that run. A later targeted change folds `VideoPlayer.Pause()`
+into the existing black-background camera experiment: it only pauses the exact
+camera-targeted chart video while its render camera is hidden, including if
+playback starts after the camera option activates. The video resumes on
+restore. This is a conditional
+offline opportunity, not a gain in the idle-video capture. Broad camera
+suppression or a particle-system kill switch still has no support from that
+snapshot. The existing offline gate rejects online, multiplayer, pause,
+transition, menu, and lost-focus states.
+
+## 2026-10-26 PresentMon recheck
+
+The paired `pmcap-Clone Hero.exe-261025-202631.csv` contains 48,804 application
+presents over 29.95 s; its stats file reports 1,629.52 average FPS, 1,120.32
+1st-percentile FPS, 1,334.07 5th-percentile FPS, and a 264.31 FPS minimum. Raw
+`MsBetweenPresents` intervals are 0.597 ms at p50, 0.750 ms at p95, 0.893 ms at
+p99, and 3.784 ms maximum; 14 frames exceed 2 ms and none exceed 5 ms. Present
+API p99 is 0.062 ms, while render-present latency p99 is 0.366 ms. This capture
+has genuinely high presented FPS and few long display gaps, though it is not
+an A/B against any single Sloptifine switch. The separate October 23 capture
+reports 1,261 average FPS and 818.65 1st-percentile FPS, but its settings and
+render multiplier are not controlled against October 25; do not interpret the
+difference as an optimization gain.
+
+## 2026-10-26: pause hidden chart-video decoding with black-background mode
+
+The existing default-off background-camera option now tracks the known
+`Background Image` VideoPlayer when it activates. If it targets the validated
+`Background Cam`, Sloptifine pauses it whenever it is playing while the camera
+is hidden, including if playback starts later in the song. Restore calls
+`Play()` on that same player, retaining its playback position across the hidden
+interval. No other VideoPlayer is touched. This is a real offline CPU/GPU decode-work
+reduction for songs whose chart background video is playing while the user has
+chosen the black-background option; it does nothing in the supplied latest log,
+where the player was idle. There is no measured FPS or frame-time result yet.
+
+The video-player hook targets APIs present in the supplied Unity VideoModule
+assembly (`targetCamera`, `isPlaying`, `Pause`, and `Play`). Runtime behavior
+still needs a video-background test; the supplied capture had no active video.
+
+## 2026-10-26: HUD camera upper-bound benchmark
+
+The current runtime log records `HUDCam` and `PlayerCamera` rendering on all
+49,351 scheduled render frames. HUDCam's pre-cull-to-pre-render interval is
+0.022 ms and pre-render-to-post-render is 0.039 ms per camera frame. These
+callback windows are not exclusive GPU timings, but they make HUDCam a larger
+and more persistent solo target than the idle background video. A new
+default-off `PerformanceDisableHudCameraBenchmark` option disables only the
+validated HUDCam during active offline solo Quickplay. It restores on pause,
+focus loss, scene exit, option-off, restart, or practice transition. It hides
+camera-rendered score/combo/lyrics/input feedback and is an upper-bound
+measurement experiment, not a visual-preserving camera merge. It fails open
+unless HUDCam matches the current 4128 culling mask, full-screen rect, depth 6,
+no render target, and non-clearing overlay configuration, and another known
+camera still clears the color buffer. Build and matched PresentMon A/B remain
+pending.
+
+## 2026-10-26: isolate the guitar-camera render pass
+
+A separate default-off `PerformanceDisableGuitarCameraBenchmark` switch now
+disables only the active guitar `PlayerCamera` during offline solo play. Notes,
+highway, and 3D effects disappear; the game continues scoring and the HUD stays
+visible. The switch requires the known guitar camera mask (512), full-screen
+rect, display 0, no render texture, the validated HUD overlay, and the active
+solid-color `Background Cam`. It declines activation while the HUD-camera
+benchmark or black-background camera override is active. It restores on pause,
+focus loss, scene transitions, or option-off. This isolates another render pass
+for a matched PresentMon test; the WPA render/cull attribution is shared across
+cameras, so it does not predict a gain for the guitar camera specifically.
+
+The mod compiles against the supplied generated assemblies with .NET SDK
+6.0.428 (zero warnings/errors), and the core checks pass (127 checks). The
+Windows runtime test should verify that each visual set returns on pause and
+that the guitar-camera test leaves scoring/HUD active. Matched PresentMon A/B
+captures are still needed before treating either camera benchmark as evidence
+of improved FPS or frame times.

@@ -22,8 +22,14 @@ internal sealed class WhammyTextureThrottle
     private long uploadedVersion;
     private bool installed;
     private bool failed;
+    private volatile bool passThrough;
 
     internal bool IsInstalled => installed;
+    internal bool IsSuppressed => installed && passThrough;
+
+    // Keep the prepared hook installed, but return to the native upload path
+    // immediately outside eligible offline solo play.
+    internal void SetSuppressed(bool value) => passThrough = installed && value;
 
     internal void Update(HarmonyLib.Harmony harmony, bool enabled, bool isGameplay)
     {
@@ -90,6 +96,7 @@ internal sealed class WhammyTextureThrottle
     private void Restore(HarmonyLib.Harmony harmony)
     {
         // Leave any prefix that fails to unpatch in pass-through mode.
+        passThrough = false;
         if (ReferenceEquals(active, this)) active = null;
         if (uploadMethod != null)
         {
@@ -111,14 +118,14 @@ internal sealed class WhammyTextureThrottle
     private static void AfterWhammyDataWrite()
     {
         WhammyTextureThrottle? instance = active;
-        if (instance != null) Interlocked.Increment(ref instance.dataVersion);
+        if (instance != null && !instance.passThrough) Interlocked.Increment(ref instance.dataVersion);
     }
 
     private static bool BeforeWhammyUpload(out long __state)
     {
         __state = 0;
         WhammyTextureThrottle? instance = active;
-        if (instance == null) return true;
+        if (instance == null || instance.passThrough) return true;
 
         long currentVersion = Volatile.Read(ref instance.dataVersion);
         if (currentVersion == Volatile.Read(ref instance.uploadedVersion)) return false;

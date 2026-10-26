@@ -1,6 +1,7 @@
 using Il2Cpp;
 using MelonLoader;
 using UnityEngine;
+using UnityEngine.Video;
 
 namespace SlopHero.Mod;
 
@@ -13,9 +14,11 @@ internal sealed class BackgroundCameraOverride
 {
     private Camera? background;
     private Camera? player;
+    private VideoPlayer? backgroundVideo;
     private CameraClearFlags originalPlayerClear;
     private Color originalPlayerColor;
     private bool originalBackgroundEnabled;
+    private bool videoPausedByMod;
     private bool active, failed;
     private string? failure;
 
@@ -36,7 +39,12 @@ internal sealed class BackgroundCameraOverride
             if (!requested) { failed = false; failure = null; }
             return;
         }
-        if (active || failed) return;
+        if (active)
+        {
+            PauseHiddenVideoIfPlaying();
+            return;
+        }
+        if (failed) return;
         try { Activate(game); }
         catch (Exception ex)
         {
@@ -75,8 +83,16 @@ internal sealed class BackgroundCameraOverride
                 && guitarCamera.clearFlags != CameraClearFlags.Nothing))
             throw new InvalidOperationException("Guitar camera did not match the known solo render setup.");
 
+        // The scene's chart-background video is rendered by Background Cam.
+        // Disabling that camera removes its render pass, but Unity can keep
+        // decoding a VideoPlayer whose output is now invisible. Track only
+        // that exact player; Update catches a delayed Play() while hidden.
+        var video = GameObject.Find("Background Image")?.GetComponent<VideoPlayer>();
+        bool targetsBackgroundCamera = video != null && video.targetCamera == bg;
+
         background = bg;
         player = guitarCamera;
+        backgroundVideo = targetsBackgroundCamera ? video : null;
         originalBackgroundEnabled = bg.enabled;
         originalPlayerClear = guitarCamera.clearFlags;
         originalPlayerColor = guitarCamera.backgroundColor;
@@ -86,17 +102,43 @@ internal sealed class BackgroundCameraOverride
         guitarCamera.clearFlags = CameraClearFlags.SolidColor;
         bg.enabled = false;
         active = true;
-        MelonLogger.Msg("Sloptifine black-background camera mode active for offline solo play.");
+        PauseHiddenVideoIfPlaying();
+        MelonLogger.Msg($"Sloptifine black-background mode active for offline solo play; chart video tracked={backgroundVideo != null}, paused={videoPausedByMod}.");
+    }
+
+    private void PauseHiddenVideoIfPlaying()
+    {
+        try
+        {
+            if (backgroundVideo != null && backgroundVideo.enabled && backgroundVideo.isPlaying
+                && background != null && backgroundVideo.targetCamera == background)
+            {
+                backgroundVideo.Pause();
+                videoPausedByMod = true;
+            }
+        }
+        catch { /* A destroyed/replaced player must not affect camera restoration. */ }
     }
 
     internal void Restore()
     {
-        if (background == null && player == null) { active = false; return; }
+        if (background == null && player == null && backgroundVideo == null)
+        {
+            active = false;
+            videoPausedByMod = false;
+            return;
+        }
         bool wasActive = active;
         // Restore the old color clear before returning the player camera to
         // its depth/nothing clear mode.
         try { if (background != null) background.enabled = originalBackgroundEnabled; }
         catch { /* The scene may already be unloading. */ }
+        try
+        {
+            if (backgroundVideo != null && videoPausedByMod && backgroundVideo.enabled)
+                backgroundVideo.Play();
+        }
+        catch { /* The video player or scene may already be unloading. */ }
         try
         {
             if (player != null)
@@ -108,6 +150,8 @@ internal sealed class BackgroundCameraOverride
         catch { /* The player object may already be unloading. */ }
         background = null;
         player = null;
+        backgroundVideo = null;
+        videoPausedByMod = false;
         active = false;
         if (wasActive) MelonLogger.Msg("Sloptifine background camera restored.");
     }

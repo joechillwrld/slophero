@@ -43,6 +43,16 @@ Check(!ChartNote.IsResolved(0) && !ChartNote.IsMissed(0), "Future note omitted")
 Check(ChartNote.IsResolved(1) && !ChartNote.IsMissed(1), "Hit head resolved");
 Check(ChartNote.IsResolved(2) && ChartNote.IsMissed(2), "Missed head resolved");
 Check(!ChartNote.IsResolved(4 | 8 | 16), "Dynamics and sustain flags are not head outcomes");
+const float networkTickInterval = 1f / 30f;
+Check(Math.Abs(NetworkTickRemainder.PreserveFraction(.035f, networkTickInterval) - (.035f % networkTickInterval)) < .000001f,
+    "Network tick experiment keeps the fractional remainder after a normal overrun");
+Check(NetworkTickRemainder.PreserveFraction(networkTickInterval, networkTickInterval) == 0f,
+    "Exact network tick boundaries leave no remainder");
+Check(NetworkTickRemainder.PreserveFraction(.105f, networkTickInterval) < networkTickInterval,
+    "Long network stalls discard whole missed periods instead of accumulating catch-up bursts");
+Check(NetworkTickRemainder.PreserveFraction(float.NaN, networkTickInterval) == 0f
+    && NetworkTickRemainder.PreserveFraction(.01f, 0f) == 0f,
+    "Invalid network tick timing fails open to a zero remainder");
 Check(!PracticeReadiness.CanSelect(false, true, true, true, true, 0),
     "Regression: practice cannot select before scene initialization even when game flags are ready");
 Check(!PracticeReadiness.CanSelect(true, false, true, true, true, 0),
