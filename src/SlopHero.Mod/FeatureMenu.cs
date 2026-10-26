@@ -32,7 +32,8 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> reduceUnityJobWorkers = null!;
     private MelonPreferences_Entry<bool> staticTmpScaleDuringSong = null!;
     private MelonPreferences_Entry<bool> pauseRewiredMousePolling = null!;
-    private MelonPreferences_Entry<bool> cacheSpriteAttachTransforms = null!;
+    private MelonPreferences_Entry<bool> pauseRewiredKeyboardPolling = null!;
+    private MelonPreferences_Entry<bool> limitSlopHeroShortcutPolling = null!;
     private MelonPreferences_Entry<bool> skipBackgroundCamera = null!;
     private MelonPreferences_Entry<bool> hidePbPopup = null!, hideStarPowerSideGlows = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
@@ -54,7 +55,7 @@ public sealed partial class Core
     private readonly UnityJobWorkerLimit unityJobWorkerLimit = new();
     private readonly StaticTmpScaleOverride staticTmpScale = new();
     private readonly RewiredMousePollingOverride rewiredMousePolling = new();
-    private readonly SpriteAttachCacheOverride spriteAttachCache = new();
+    private readonly RewiredKeyboardPollingOverride rewiredKeyboardPolling = new();
     private readonly BackgroundCameraOverride backgroundCamera = new();
     private readonly OptionalHudAnimationsOverride optionalHudAnimations = new();
     private readonly RuntimeTimings timings = new();
@@ -63,7 +64,8 @@ public sealed partial class Core
     private bool replaceEdit, moveSong, editColor;
     private Color editPreview = Color.white;
     private GUIStyle? colorPreviewStyle;
-    private GUIStyle? menuNavStyle, menuHeaderStyle, menuPageTitleStyle;
+    private GUIStyle? menuNavStyle, menuHeaderStyle, menuPageTitleStyle, menuSubtitleStyle;
+    private GUIStyle? menuFlatStyle, menuClickStyle, menuToggleLabelStyle, sectionHeaderStyle;
     private int settingsPage;
     private bool profileDropdownOpen;
     private int profileListStart;
@@ -152,7 +154,8 @@ public sealed partial class Core
         reduceUnityJobWorkers = preferences.CreateEntry("PerformanceReduceUnityJobWorkers", false);
         staticTmpScaleDuringSong = preferences.CreateEntry("PerformanceStaticTmpScaleDuringSong", false);
         pauseRewiredMousePolling = preferences.CreateEntry("PerformancePauseRewiredMousePolling", false);
-        cacheSpriteAttachTransforms = preferences.CreateEntry("PerformanceCacheSpriteAttachTransforms", false);
+        pauseRewiredKeyboardPolling = preferences.CreateEntry("PerformancePauseRewiredKeyboardPolling", false);
+        limitSlopHeroShortcutPolling = preferences.CreateEntry("PerformanceLimitSlopHeroShortcutPolling", false);
         skipBackgroundCamera = preferences.CreateEntry("PerformanceSkipBackgroundCamera", false);
         hidePbPopup = preferences.CreateEntry("PerformanceHidePbPopup", false);
         hideStarPowerSideGlows = preferences.CreateEntry("PerformanceHideStarPowerSideGlows", false);
@@ -192,60 +195,102 @@ public sealed partial class Core
 
     private void DrawScaledSettingsPage(float scale)
     {
-        // Keep the centered window, with a left category rail and a separate
-        // options surface modeled on the user's mockup.
-        const float menuWidth = 900, menuHeight = 660, sidebarWidth = 220;
+        // Keep the centered window and reshape it around the user's dark,
+        // compact sidebar-and-panel mockup.
+        const float menuWidth = 900, menuHeight = 660, sidebarWidth = 194;
         float frameX = (Screen.width - menuWidth) / 2f, frameY = (Screen.height - menuHeight) / 2f;
-        float x = frameX + sidebarWidth + 24, y = frameY + 102;
+        float x = frameX + sidebarWidth + 24, y = frameY + 136;
         Color previousColor = GUI.color, previousBackground = GUI.backgroundColor;
         try
         {
+            if (menuFlatStyle == null)
+            {
+                menuFlatStyle = new GUIStyle(GUI.skin.box);
+                menuFlatStyle.normal.background = menuFlatStyle.hover.background =
+                    menuFlatStyle.active.background = menuFlatStyle.focused.background = Texture2D.whiteTexture;
+                var flatBorder = menuFlatStyle.border;
+                flatBorder.left = flatBorder.right = flatBorder.top = flatBorder.bottom = 0;
+                menuFlatStyle.border = flatBorder;
+                var flatMargin = menuFlatStyle.margin;
+                flatMargin.left = flatMargin.right = flatMargin.top = flatMargin.bottom = 0;
+                menuFlatStyle.margin = flatMargin;
+            }
             GUI.color = Color.white;
-            GUI.backgroundColor = new Color(.12f, .12f, .12f, 1);
-            GUI.Box(new Rect(frameX, frameY, menuWidth, menuHeight), "");
-            GUI.backgroundColor = new Color(.09f, .09f, .09f, 1);
-            GUI.Box(new Rect(frameX, frameY, sidebarWidth, menuHeight), "");
-            GUI.backgroundColor = new Color(.34f, .34f, .34f, 1);
-            GUI.Box(new Rect(frameX + sidebarWidth, frameY, menuWidth - sidebarWidth, menuHeight), "");
+            GUI.backgroundColor = new Color(.035f, .04f, .055f, 1);
+            GUI.Box(new Rect(frameX, frameY, menuWidth, menuHeight), "", menuFlatStyle);
+            GUI.backgroundColor = new Color(.025f, .03f, .043f, 1);
+            GUI.Box(new Rect(frameX, frameY, sidebarWidth, menuHeight), "", menuFlatStyle);
+            GUI.backgroundColor = new Color(.075f, .08f, .10f, 1);
+            GUI.Box(new Rect(frameX + sidebarWidth, frameY, menuWidth - sidebarWidth, menuHeight), "", menuFlatStyle);
+            GUI.backgroundColor = new Color(.045f, .05f, .065f, 1);
+            GUI.Box(new Rect(frameX, frameY, menuWidth, 58), "", menuFlatStyle);
 
-            menuHeaderStyle ??= new GUIStyle(GUI.skin.box) { fontSize = 21, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            menuHeaderStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
             menuHeaderStyle.normal.textColor = Color.white;
-            GUI.backgroundColor = MenuAccentColor();
-            GUI.Box(new Rect(frameX, frameY, sidebarWidth, 54), "Mod Settings", menuHeaderStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
+            menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
+            menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.108", menuSubtitleStyle);
+            menuSubtitleStyle.normal.textColor = new Color(.36f, .88f, .61f, 1);
+            GUI.Label(new Rect(frameX + menuWidth - 150, frameY + 15, 86, 28), "● READY", menuSubtitleStyle);
+            menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
+            menuClickStyle.normal.textColor = Color.white;
+            if (GUI.Button(new Rect(frameX + menuWidth - 48, frameY + 13, 32, 32), "×", menuClickStyle))
+            {
+                settingsOpen = false;
+                SavePreferences();
+                UpdateCursor();
+            }
 
-            menuNavStyle ??= new GUIStyle(GUI.skin.button) { fontSize = 18, alignment = TextAnchor.MiddleLeft };
+            menuNavStyle ??= new GUIStyle(GUI.skin.button) { fontSize = 15, alignment = TextAnchor.MiddleLeft };
             var navPadding = menuNavStyle.padding;
-            navPadding.left = 14;
+            navPadding.left = 18;
             menuNavStyle.padding = navPadding;
             menuNavStyle.normal.textColor = Color.white;
             menuNavStyle.hover.textColor = Color.white;
-            menuPageTitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+            menuNavStyle.normal.background = menuNavStyle.hover.background =
+                menuNavStyle.active.background = menuNavStyle.focused.background = Texture2D.whiteTexture;
+            menuPageTitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
             menuPageTitleStyle.normal.textColor = Color.white;
 
-            const float navTop = 66, navRowHeight = 44;
+            const float navTop = 76, navRowHeight = 40;
             for (int i = 0; i < SettingsPages.Length; i++)
             {
-                var rect = new Rect(frameX + 8, frameY + navTop + i * navRowHeight, sidebarWidth - 16, navRowHeight - 2);
+                var rect = new Rect(frameX + 10, frameY + navTop + i * navRowHeight, sidebarWidth - 20, navRowHeight - 4);
                 bool selected = settingsPage == i;
                 bool hovered = rect.Contains(Event.current.mousePosition);
-                GUI.backgroundColor = selected ? MenuAccentColor()
-                    : hovered ? Color.Lerp(new Color(.14f, .14f, .14f, 1), MenuAccentColor(), .22f)
-                    : (i % 2 == 0 ? new Color(.14f, .14f, .14f, 1) : new Color(.22f, .22f, .22f, 1));
+                Color accent = MenuAccentColor();
+                GUI.backgroundColor = selected
+                    ? new Color(accent.r * .34f, accent.g * .34f, accent.b * .34f, 1)
+                    : hovered ? new Color(.11f, .12f, .16f, 1) : new Color(.045f, .05f, .065f, 1);
                 if (GUI.Button(rect, SettingsPages[i], menuNavStyle)) settingsPage = i;
+                if (selected)
+                {
+                    GUI.backgroundColor = accent;
+                    GUI.Box(new Rect(rect.x, rect.y + 4, 3, rect.height - 8), "", menuFlatStyle);
+                }
             }
 
             GUI.backgroundColor = MenuAccentColor();
-            GUI.Box(new Rect(frameX + sidebarWidth, frameY, menuWidth - sidebarWidth, 5), "");
-            GUI.backgroundColor = new Color(.34f, .34f, .34f, 1);
-            GUI.Label(new Rect(frameX + sidebarWidth + 24, frameY + 16, 632, 32), SettingsPages[settingsPage], menuPageTitleStyle);
-            GUI.Label(new Rect(frameX + sidebarWidth + 24, frameY + 52, 632, 22), "Pause to edit. Values save automatically; Escape closes.");
+            GUI.Box(new Rect(frameX, frameY, menuWidth, 3), "", menuFlatStyle);
+            GUI.backgroundColor = new Color(.075f, .08f, .10f, 1);
+            GUI.Box(new Rect(frameX + sidebarWidth + 12, frameY + 70, menuWidth - sidebarWidth - 24, menuHeight - 82), "", menuFlatStyle);
+            GUI.backgroundColor = Color.white;
+            GUI.Label(new Rect(frameX + sidebarWidth + 30, frameY + 76, 632, 30), SettingsPages[settingsPage], menuPageTitleStyle);
+            menuSubtitleStyle.normal.textColor = new Color(.57f, .60f, .68f, 1);
+            GUI.Label(new Rect(frameX + sidebarWidth + 30, frameY + 106, 632, 20), "Pause to edit · Changes save automatically · Esc closes");
         }
         finally
         {
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        switch (settingsPage)
+        Color controlBackground = GUI.backgroundColor, controlColor = GUI.contentColor;
+        try
+        {
+            GUI.backgroundColor = new Color(.14f, .15f, .19f, 1);
+            GUI.contentColor = new Color(.92f, .93f, .97f, 1);
+            switch (settingsPage)
         {
             case 0:
                 if (GUI.Button(new Rect(x, y, 632, 34), $"Restart: {restartButton.Value} — bind")) capture = "restart";
@@ -263,7 +308,7 @@ public sealed partial class Core
                             || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
                             || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                         SongSpeedControl.TryRead(out int speedSetting);
-                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret/starProgress)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}/{disableStarProgressParticles.Value}[starSuppressed={starProgressParticles.IsSuppressed}], pausedFretFadeScripts={performance.PausedFretFadeCount}, blackBackground={skipBackgroundCamera.Value}[active={backgroundCamera.IsActive}], hiddenLeaderboard={suspendHiddenLeaderboard.Value}[canvasSuspended={hiddenLeaderboard.CanvasSuspended}], freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI(discovery/session)={stopMidiInput.Value}/{disableMidiForSession.Value}, Discord={disableDiscordPresence.Value}, cheatScanner={pauseGameplayCheatScanner.Value}[state={cheatScanner.Status}], gameplayUiEvents={pauseGameplayUiProcessing.Value}[suspended={gameplayUiEvents.IsSuspended}], highwayPause={pauseHighwayAnimations.Value}[hook={highwayAnimations.IsInstalled},suppressed={highwayAnimations.IsSuppressed}], mouseUiSkip={skipGameplayMouseUi.Value}[hook={mouseUiGameplay.IsInstalled},suppressed={mouseUiGameplay.IsSuppressed}], legacyMouseEvents={skipLegacyMouseEvents.Value}[hook={legacyMouseEvents.IsInstalled},suppressed={legacyMouseEvents.IsSuppressed}], whammyDirtyGate={throttleWhammyTexture.Value}[hooks={whammyTextureThrottle.IsInstalled}], nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                        LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret/starProgress)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}/{disableStarProgressParticles.Value}[starSuppressed={starProgressParticles.IsSuppressed}], pausedFretFadeScripts={performance.PausedFretFadeCount}, blackBackground={skipBackgroundCamera.Value}[active={backgroundCamera.IsActive}], hiddenLeaderboard={suspendHiddenLeaderboard.Value}[canvasSuspended={hiddenLeaderboard.CanvasSuspended}], freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI(discovery/session)={stopMidiInput.Value}/{disableMidiForSession.Value}, Discord={disableDiscordPresence.Value}, cheatScanner={pauseGameplayCheatScanner.Value}[state={cheatScanner.Status}], gameplayUiEvents={pauseGameplayUiProcessing.Value}[suspended={gameplayUiEvents.IsSuspended}], highwayPause={pauseHighwayAnimations.Value}[hook={highwayAnimations.IsInstalled},suppressed={highwayAnimations.IsSuppressed}], mouseUiSkip={skipGameplayMouseUi.Value}[hook={mouseUiGameplay.IsInstalled},suppressed={mouseUiGameplay.IsSuppressed}], legacyMouseEvents={skipLegacyMouseEvents.Value}[hook={legacyMouseEvents.IsInstalled},suppressed={legacyMouseEvents.IsSuppressed}], rewiredMouseSampler={pauseRewiredMousePolling.Value}[hook={rewiredMousePolling.IsInstalled},suppressed={rewiredMousePolling.IsSuppressed}], rewiredKeyboardSampler={pauseRewiredKeyboardPolling.Value}[hook={rewiredKeyboardPolling.IsInstalled},suppressed={rewiredKeyboardPolling.IsSuppressed}], hotkeyPoll120={limitSlopHeroShortcutPolling.Value}, whammyDirtyGate={throttleWhammyTexture.Value}[hooks={whammyTextureThrottle.IsInstalled}], nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                         LoggerInstance.Msg($"Sloptifine 3 visuals: PB={hidePbPopup.Value}[active={optionalHudAnimations.PbSuppressed}], side glows={hideStarPowerSideGlows.Value}[active={optionalHudAnimations.GlowSuppressed}].");
                         LogGameplaySnapshot();
                         timings.Start();
@@ -298,7 +343,7 @@ public sealed partial class Core
                 Hex(starColor, "Stars", x, y + 176); Hex(progressColor, "Star progress bar", x, y + 218);
                 Hex(scoreColor, "Score / accuracy text", x, y + 260);
                 Hex(songProgressColor, "Song progress bar", x, y + 302);
-                Hex(menuAccentHex, "Menu accent", x, y + 344);
+                Hex(menuAccentHex, "Menu accent (active controls)", x, y + 344);
                 break;
             case 5:
                 GUI.Label(new Rect(x, y, 540, 28), "Native game HUD. Offsets use the UI canvas's units.");
@@ -380,8 +425,9 @@ public sealed partial class Core
                 Toggle(disableMidiForSession, "Disable drum MIDI input (restart to restore)", x, y + 236);
                 Toggle(staticTmpScaleDuringSong, "Skip TMP scale checks in offline solo play", x, y + 266);
                 Toggle(pauseRewiredMousePolling, "Pause Rewired mouse polling in solo songs", x, y + 296);
-                Toggle(cacheSpriteAttachTransforms, "Cache unchanged SpriteAttach transforms (may lower FPS)", x, y + 326);
-                GUI.Label(new Rect(x + 22, y + 356, 610, 112), "Experimental; default off. Pausing UI events also pauses its three transparent HUD drag-handle Canvases and built-in UI navigation during solo songs. Keyboard and controller polling stay enabled. The SpriteAttach cache can cost more than the native update it skips; leave it off unless it helps your game. TMP layout/rebuilds stay enabled. Drum MIDI shutdown requires a restart to restore.");
+                Toggle(pauseRewiredKeyboardPolling, "Pause Rewired keyboard polling in solo songs", x, y + 326);
+                Toggle(limitSlopHeroShortcutPolling, "Limit SlopHero hotkey checks to 120 Hz", x, y + 356);
+                GUI.Label(new Rect(x + 22, y + 386, 610, 82), "Experimental; default off. Keyboard-bound game controls pause while its sampler option is on; controller/instrument polling is untouched. Hotkey sampling may add up to 8 ms to SlopHero restart/practice shortcuts. UI-event pause also suspends transparent HUD handles and built-in navigation. TMP layout/rebuilds stay enabled. Drum MIDI shutdown requires a restart to restore.");
                 break;
             case 10:
                 SectionHeader("Optional HUD animations", x, y);
@@ -390,31 +436,70 @@ public sealed partial class Core
                 GUI.Label(new Rect(x + 22, y + 96, 610, 76),
                     "Experimental; default off. Side-glow branches deactivate during active offline solo songs and restore on pause or song exit; their animation may restart. The Star Power controller, score, and notes stay active.");
                 break;
+            }
         }
+        finally { GUI.backgroundColor = controlBackground; GUI.contentColor = controlColor; }
         if (editApply != null) DrawValueEditor();
     }
 
     private void Toggle(MelonPreferences_Entry<bool> entry, string label, float x, float y)
     {
-        bool value = GUI.Toggle(new Rect(x, y, 632, 30), entry.Value, label);
-        if (value != entry.Value)
+        Rect row = new(x, y, 632, 28);
+        Color previousBackground = GUI.backgroundColor;
+        bool hovered = row.Contains(Event.current.mousePosition);
+        try
         {
-            entry.Value = value;
-            preferencesDirty = true;
-            nextStats = 0;
-            if (ReferenceEquals(entry, showHud) && !value)
+            GUI.backgroundColor = hovered ? new Color(.115f, .125f, .16f, 1) : new Color(.09f, .10f, .13f, 1);
+            GUI.Box(row, "", menuFlatStyle);
+            menuToggleLabelStyle ??= new GUIStyle(GUI.skin.label)
             {
-                counterCanvas.Hide();
-                statsText = "";
+                fontSize = 14,
+                alignment = TextAnchor.MiddleLeft
+            };
+            var togglePadding = menuToggleLabelStyle.padding;
+            togglePadding.left = 12;
+            togglePadding.right = 4;
+            togglePadding.top = togglePadding.bottom = 0;
+            menuToggleLabelStyle.padding = togglePadding;
+            menuToggleLabelStyle.normal.textColor = new Color(.91f, .92f, .96f, 1);
+            GUI.Label(row, label, menuToggleLabelStyle);
+
+            const float switchWidth = 40, switchHeight = 20;
+            Rect track = new(x + row.width - switchWidth - 14, y + (row.height - switchHeight) * .5f, switchWidth, switchHeight);
+            GUI.backgroundColor = entry.Value ? MenuAccentColor() : new Color(.24f, .25f, .30f, 1);
+            GUI.Box(track, "", menuFlatStyle);
+            float knobX = entry.Value ? track.xMax - switchHeight + 1 : track.x + 1;
+            GUI.backgroundColor = new Color(.96f, .97f, .99f, 1);
+            GUI.Box(new Rect(knobX, track.y + 1, switchHeight - 2, switchHeight - 2), "", menuFlatStyle);
+
+            if (GUI.Button(row, "", menuClickStyle))
+            {
+                bool value = !entry.Value;
+                entry.Value = value;
+                preferencesDirty = true;
+                nextStats = 0;
+                if (ReferenceEquals(entry, showHud) && !value)
+                {
+                    counterCanvas.Hide();
+                    statsText = "";
+                }
             }
         }
+        finally { GUI.backgroundColor = previousBackground; }
     }
 
-    private GUIStyle? sectionHeaderStyle;
     private void SectionHeader(string text, float x, float y)
     {
-        sectionHeaderStyle ??= new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold };
-        GUI.Label(new Rect(x, y, 632, 24), text, sectionHeaderStyle);
+        sectionHeaderStyle ??= new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, fontSize = 13, alignment = TextAnchor.MiddleLeft };
+        sectionHeaderStyle.normal.textColor = MenuAccentColor();
+        Color previous = GUI.backgroundColor;
+        try
+        {
+            GUI.backgroundColor = MenuAccentColor();
+            GUI.Box(new Rect(x, y + 5, 3, 14), "", menuFlatStyle);
+            GUI.Label(new Rect(x + 10, y, 622, 24), text, sectionHeaderStyle);
+        }
+        finally { GUI.backgroundColor = previous; }
     }
 
     private void BeginNativeHudMove(int target)
@@ -847,7 +932,8 @@ public sealed partial class Core
             Bool("PerformanceReduceUnityJobWorkers", reduceUnityJobWorkers);
             Bool("PerformanceStaticTmpScaleDuringSong", staticTmpScaleDuringSong);
             Bool("PerformancePauseRewiredMousePolling", pauseRewiredMousePolling);
-            Bool("PerformanceCacheSpriteAttachTransforms", cacheSpriteAttachTransforms);
+            Bool("PerformancePauseRewiredKeyboardPolling", pauseRewiredKeyboardPolling);
+            Bool("PerformanceLimitSlopHeroShortcutPolling", limitSlopHeroShortcutPolling);
             Bool("PerformanceSkipBackgroundCamera", skipBackgroundCamera);
             Bool("PerformanceHidePbPopup", hidePbPopup);
             Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
@@ -901,7 +987,8 @@ public sealed partial class Core
         Bool("PerformanceReduceUnityJobWorkers", reduceUnityJobWorkers);
         Bool("PerformanceStaticTmpScaleDuringSong", staticTmpScaleDuringSong);
         Bool("PerformancePauseRewiredMousePolling", pauseRewiredMousePolling);
-        Bool("PerformanceCacheSpriteAttachTransforms", cacheSpriteAttachTransforms);
+        Bool("PerformancePauseRewiredKeyboardPolling", pauseRewiredKeyboardPolling);
+        Bool("PerformanceLimitSlopHeroShortcutPolling", limitSlopHeroShortcutPolling);
         Bool("PerformanceSkipBackgroundCamera", skipBackgroundCamera);
         Bool("PerformanceHidePbPopup", hidePbPopup);
         Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
@@ -1308,7 +1395,7 @@ public sealed partial class Core
         }
     }
 
-    private void UpdateOptionalHudAnimations(Il2Cpp.GameManager? game, double now)
+    private void UpdateOptionalHudAnimations(Il2Cpp.GameManager? game, double now, bool forceReapply = false)
     {
         try
         {
@@ -1326,7 +1413,7 @@ public sealed partial class Core
             bool eligible = eligibleExceptPauseOrFocus && !paused && focused;
             optionalHudWaitingForResume = requested && eligibleExceptPauseOrFocus && (paused || !focused);
             optionalHudAnimations.Apply(game, eligible && hidePbPopup.Value,
-                eligible && hideStarPowerSideGlows.Value, now);
+                eligible && hideStarPowerSideGlows.Value, now, forceReapply);
         }
         catch (Exception ex)
         {
@@ -1354,7 +1441,7 @@ public sealed partial class Core
             if (game.isPaused) return;
             optionalHudAnimations.ClearFocusResumePending();
             optionalHudWaitingForResume = false;
-            UpdateOptionalHudAnimations(game, now);
+            UpdateOptionalHudAnimations(game, now, forceReapply: true);
         }
         catch (Exception ex)
         {

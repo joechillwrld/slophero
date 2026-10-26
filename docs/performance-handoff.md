@@ -63,7 +63,8 @@ the Sloptifine pages and preserve their documented scope:
 | Unity job queue setter was resolved through the matching player PDB | `UnityJobWorkerLimit` uses the generated `SetJobQueueMaximumActiveThreadCount` API and restores the prior limit. It is default-off; the latest three-run callback comparison shows no benefit. |
 | Current `HighwayScroll.Update` combines property-block writes with video/fade behavior | `HighwayAnimationOverride` is a default-off whole-update freeze during offline solo songs. It may freeze those visuals and has no demonstrated frame gain. The old source's note `yield`/hit-detection paths remain untouched because they are scoring-sensitive and not confirmed in current code. |
 | TMP's SDF scale queue repeatedly checks text transforms | v0.4.88 packages the default-off offline-solo experiment; its v0.4.89 log changed zero labels. The current worktree includes labels under Animator/Animation parents and checks those at 20 Hz, while ordinary labels stay at 4 Hz. Any detected scale change restores TMP's per-frame scale updates and excludes that label for the scene. The scene-wide discovery uses unsorted `FindObjectsByType`; TMP layout, graphic-rebuild, and culling queues stay active. Scale animation could briefly soften text; the prototype has no measured frame-time result yet. |
-| Rewired's mouse-only sampler and `SpriteAttach.Update` have small WPA self-CPU rows | v0.4.91 adds two separate default-off options, limited to offline solo guitar Quickplay. The Rewired prefix skips only the mouse snapshot (seven buttons, three axes); keyboard/controller and 1000 Hz instrument polling stay active, while mouse-bound actions pause. The SpriteAttach cache verifies camera/screen/sprite/scale inputs and outputs, including the exact-build packed scale input at RVA `0x64C60`; missing bindings fail open to vanilla. The latest v0.4.96 log also shows slower callback spacing with the cache installed, on different charts. Leave it off: interop checks plausibly cost more than the tiny native update. |
+| Rewired's mouse and keyboard snapshots have separate small WPA self-CPU rows | v0.4.91's default-off mouse-sampler option skips only Rewired's mouse snapshot in an eligible offline solo song. v0.4.108 adds a separate default-off keyboard snapshot experiment; keyboard-bound gameplay input pauses while active, but joystick/controller and instrument polling are not patched. Both restore on pause, menu, focus loss, online play, or leaving the song. The SpriteAttach cache was removed in v0.4.108 because its managed input/output comparisons could exceed the native update it skipped and captures did not show a reliable benefit. |
+| SlopHero's restart/practice hotkey state was checked on every simulation update | v0.4.108 adds a separate default-off 120 Hz gate for these two mod shortcuts only. Binding changes and entering gameplay force an immediate sample; disabling the gate returns to per-update sampling. It does not change Unity or Rewired instrument polling and adds at most about 8 ms shortcut response latency while enabled. |
 
 ClonZones installs a `GuitarFretAnimator.Update` settle gate in the user's
 setup, which may overlap with another fret hook. Current `HighwayScroll` also
@@ -421,7 +422,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.107** on the private
+- Latest packaged build: SlopHero **0.4.108** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.106 (SHA-256
   `4ac81cbd9bd988c148ed9da5fbe4524811cb3455e48f8bc287bb98f1081af183`)
@@ -1570,6 +1571,39 @@ Windows log should confirm the native setup now happens before Gameplay.
 
 - ZIP SHA-256: `7ff6599a71e2f4a805888e73ce567f44e9f4d507bfb838559bf47ed7c20ac476`
 - DLL SHA-256: `33560bfb5f7e2b13932f171cf163501e40b291a636cfd454bdd22207f687a547`
+
+## v0.4.108 package
+
+Version 0.4.107 still allowed a short visual flash on resume: the immediate
+resume pass could see the suppression flags already set and skip checking
+whether the game had reactivated the targets. Version 0.4.108 forces those
+target-state checks on the resume path, including focus return. The final
+in-game result still needs confirmation.
+
+The separate default-off Rewired keyboard experiment targets the generated
+`ThreadSafeUnityInput.Keyboard.Update()` method verified in the supplied
+exact-build assemblies. It pauses only that keyboard snapshot for offline solo
+Quickplay. Keyboard-bound controls stop updating during the song; the mouse,
+joystick/controller and instrument polling methods remain independent. It
+installs during Gameplay initialization when enabled, or while a user enables
+it from the settings page; until the strict eligibility gate opens the prefix
+passes through unchanged. The default-off hotkey gate samples only SlopHero's
+restart/practice bindings at 120 Hz. It does not patch the game's polling loop.
+
+The SpriteAttach cache and its menu preference were removed. The latest
+PresentMon sample reports about 1,629.5 presented FPS, 0.614 ms mean / 0.893 ms
+p99 present intervals, 0.583 ms CPU busy mean and 0.242 ms GPU busy mean.
+That capture is a CPU-limited baseline, not proof for any new setting.
+
+The settings window now uses a dark panel/sidebar layout inspired by the
+user's mockup. The existing Menu Accent color now controls selected navigation,
+section markers and active switches. These controls draw only while the F8
+settings page is open. Build validation: zero compiler warnings/errors and 123
+Core checks. The visual style has not yet been runtime inspected in Clone Hero;
+performance and runtime behavior of the three experiments remain unmeasured.
+
+- ZIP SHA-256: `39acec5e41ce9b1ae382e19dea4d92f7d2c62fe606a9c3849dd2fea8704798ae`
+- DLL SHA-256: `5c50a83ec38627689a0d25d7f930988f4b5cbf426af70b94bb4fd7e4718fd2d1`
 
 ## v0.4.104 package
 

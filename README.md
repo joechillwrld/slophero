@@ -1,16 +1,24 @@
-# SlopHero 0.4.107 alpha
+# SlopHero 0.4.108 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.107
-immediately reapplies the optional Star Power side-glow and personal-best visual
-suppression on song resume and application focus regain, rather than waiting for
-the regular 20 Hz visual pass. It also moves setup for the optional legacy-mouse
-detour out of Gameplay scene initialization and into mod startup. Neither change
-has a measured FPS result. Version 0.4.106
+build, compiled against its loader and generated assemblies. Version 0.4.108
+fixes the remaining optional Star Power side-glow/personal-best flash by
+forcing target-state checks on song resume and focus return. It adds separate
+default-off experiments to pause Rewired keyboard snapshots in offline solo
+songs and sample SlopHero restart/practice hotkeys at 120 Hz. The keyboard
+switch also pauses keyboard-bound game controls; the hotkey switch can add up
+to 8 ms to those shortcuts. Neither touches joystick/controller or instrument
+polling. The slower SpriteAttach cache was removed. It also restyles the F8
+menu after the supplied dark-purple mockup; the existing customizable Menu
+Accent now colors selected pages, section marks, and active switches. That
+visual work runs only while the settings menu is open. These changes have no
+measured FPS result. Version 0.4.107 moved the visual resume attempt into the
+next LateUpdate and moved setup for the optional legacy-mouse detour out of
+Gameplay scene initialization and into mod startup. Version 0.4.106
 reduces repeat discovery work in the fret-effect and combo-smoke overrides.
 It also keeps the optional Unity worker limit steady across brief offline solo
 pauses, restoring it immediately when the option is off or online play begins.
@@ -203,7 +211,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.107 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.107-alpha.zip)
+[Download SlopHero v0.4.108 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.108-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

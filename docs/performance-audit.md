@@ -2242,3 +2242,36 @@ has zero compiler warnings/errors and the core checks pass (114). Neither
 prototype has been runtime-tested or has a matched PresentMon A/B result, so
 neither is a demonstrated FPS or frame-time improvement. Test the switches
 separately before combining them.
+
+### v0.4.108 resume, input-sampler, and shortcut experiments
+
+The v0.4.107 resume fix forced an immediate update call but did not force the
+already-suppressed branches to re-check their live `activeSelf`/enabled states
+inside the 200 ms reconcile interval. Version 0.4.108 now forces those target
+checks on the focus/pause resume path, covering a game-side reactivation even
+when the suppression bookkeeping still says the visuals are hidden. This is a
+bounded fix for the reported Star Power visual flash, not an FPS optimization.
+
+The supplied generated Rewired assembly contains the exact nested
+`ThreadSafeUnityInput.Keyboard.Update()` method, parallel to the previously
+used mouse snapshot method. Version 0.4.108 adds a separate default-off prefix
+that skips only this keyboard snapshot during strict offline solo Quickplay.
+It restores on pause, menu, focus loss, multiplayer/online, and scene exit.
+Keyboard-bound gameplay controls stop responding while active; mouse and
+joystick/controller polling are not patched, and instrument polling remains on
+its existing path. This is an experiment with no PresentMon A/B result.
+
+A second default-off toggle gates SlopHero's own restart/practice binding checks
+to 120 Hz. It immediately samples on entry, binding edits, and whenever the
+option is disabled, limiting shortcut latency to about 8.3 ms while enabled.
+It does not alter game/Rewired polling. `ShortcutPollingGate` has checks for
+these transitions; the mod build has zero warnings/errors and all 123 Core
+checks pass.
+
+The SpriteAttach cache experiment is removed from runtime code, settings,
+profiles, and the build. The supplied captures showed no reliable benefit, and
+the cache performed a large managed comparison set on each native update.
+The settings window was restyled around the supplied dark-purple mockup; the
+existing Menu Accent setting now controls selected navigation, section bars,
+and active toggle tracks. The menu is drawn only when open. No gameplay FPS
+effect is claimed for the visual update.

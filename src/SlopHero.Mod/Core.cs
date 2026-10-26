@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.107", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.108", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -16,6 +16,8 @@ public sealed partial class Core : MelonMod
 {
     private readonly HoldTrigger restartHold = new();
     private readonly HoldTrigger practiceHold = new();
+    private readonly ShortcutPollingGate shortcutPolling = new();
+    private bool lastRestartShortcutPressed, lastPracticeShortcutPressed;
     private readonly ChartStats statsReader = new();
     private readonly NativeHudLayout nativeHud = new();
     private readonly CounterCanvasHud counterCanvas = new();
@@ -111,7 +113,7 @@ public sealed partial class Core : MelonMod
         unityJobWorkerLimit.Clear();
         staticTmpScale.Clear();
         rewiredMousePolling.Clear(HarmonyInstance);
-        spriteAttachCache.Clear(HarmonyInstance);
+        rewiredKeyboardPolling.Clear(HarmonyInstance);
         backgroundCamera.Clear();
         optionalHudAnimations.Clear();
         optionalHudGame = null;
@@ -194,6 +196,7 @@ public sealed partial class Core : MelonMod
             gameplayInitialized = true;
             if (compatible) legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
             if (compatible) rewiredMousePolling.Prepare(HarmonyInstance, pauseRewiredMousePolling.Value);
+            if (compatible) rewiredKeyboardPolling.Prepare(HarmonyInstance, pauseRewiredKeyboardPolling.Value);
             if (compatible && staticTmpScaleDuringSong.Value)
             {
                 try { staticTmpScale.Prepare(); }
@@ -211,7 +214,7 @@ public sealed partial class Core : MelonMod
     {
         staticTmpScale.Clear();
         rewiredMousePolling.Clear(HarmonyInstance);
-        spriteAttachCache.Clear(HarmonyInstance);
+        rewiredKeyboardPolling.Clear(HarmonyInstance);
         backgroundCamera.Clear();
         optionalHudAnimations.Clear();
         optionalHudGame = null;
@@ -299,7 +302,7 @@ public sealed partial class Core : MelonMod
                     mouseUiGameplay.Disable();
                     legacyMouseEvents.Disable();
                     rewiredMousePolling.Disable();
-                    spriteAttachCache.Disable();
+                    rewiredKeyboardPolling.Disable();
                     backgroundCamera.Restore();
                     cheatScanner.Disable();
                     gameplayUiEvents.Disable();
@@ -349,7 +352,7 @@ public sealed partial class Core : MelonMod
             if (!Application.isFocused && mouseUiGameplay.IsInstalled) mouseUiGameplay.Disable();
             if (!Application.isFocused && legacyMouseEvents.IsInstalled) legacyMouseEvents.Disable();
             if (!Application.isFocused && rewiredMousePolling.IsInstalled) rewiredMousePolling.Disable();
-            if (!Application.isFocused) spriteAttachCache.Disable();
+            if (!Application.isFocused) rewiredKeyboardPolling.Disable();
             if (!Application.isFocused) backgroundCamera.Restore();
             if (!Application.isFocused) highwayAnimations.SetSuppressed(false);
             if (capture != null)
@@ -410,8 +413,18 @@ public sealed partial class Core : MelonMod
             // transition readiness refresh at 20 Hz.
             bool shortcutContext = gameplay && gameplayInitialized && !transition
                 && !settingsOpen && !moveHud && resizeTarget < 0 && Application.isFocused;
-            bool restartPressed = shortcutContext && InputBinding.Pressed(restartButton.Value, ref restartBinding, now);
-            bool practicePressed = shortcutContext && InputBinding.Pressed(practiceButton.Value, ref practiceBinding, now);
+            if (shortcutPolling.ShouldPoll(limitSlopHeroShortcutPolling.Value, shortcutContext, now,
+                    restartButton.Value, practiceButton.Value))
+            {
+                lastRestartShortcutPressed = InputBinding.Pressed(restartButton.Value, ref restartBinding, now);
+                lastPracticeShortcutPressed = InputBinding.Pressed(practiceButton.Value, ref practiceBinding, now);
+            }
+            else if (!shortcutContext)
+            {
+                lastRestartShortcutPressed = lastPracticeShortcutPressed = false;
+            }
+            bool restartPressed = shortcutContext && lastRestartShortcutPressed;
+            bool practicePressed = shortcutContext && lastPracticeShortcutPressed;
             bool statsRefreshDue = gameplay && gameplayInitialized && now >= nextStats;
             bool gameStateRefreshDue = now >= nextGameStateRefresh;
             if (!shortcutContext && !gameplay)
@@ -442,7 +455,7 @@ public sealed partial class Core : MelonMod
             bool pauseUiRequested = pauseGameplayUiProcessing.Value && gameplayUiEvents.IsInstalled;
             bool workerLimitRequested = reduceUnityJobWorkers.Value;
             bool mouseSamplerRequested = pauseRewiredMousePolling.Value;
-            bool spriteAttachCacheRequested = cacheSpriteAttachTransforms.Value;
+            bool keyboardSamplerRequested = pauseRewiredKeyboardPolling.Value;
             bool backgroundCameraRequested = skipBackgroundCamera.Value;
             bool workerLimitCandidate = workerLimitRequested && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
@@ -450,7 +463,7 @@ public sealed partial class Core : MelonMod
             bool skipMouseUiRequested = skipGameplayMouseUi.Value;
             bool skipLegacyMouseRequested = skipLegacyMouseEvents.Value;
             bool needsOfflineSoloGate = pauseHighwayRequested || pauseCheatsActive || pauseUiRequested
-                || workerLimitRequested || mouseSamplerRequested || spriteAttachCacheRequested
+                || workerLimitRequested || mouseSamplerRequested || keyboardSamplerRequested
                 || backgroundCameraRequested || skipMouseUiRequested || skipLegacyMouseRequested;
             bool soloOptimizationCandidate = needsOfflineSoloGate && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
@@ -518,7 +531,7 @@ public sealed partial class Core : MelonMod
             legacyMouseEvents.Update(skipLegacyMouseRequested, activeSongMouseSuppression);
             // These three experiments share the same offline solo gate. Read
             // the IL2CPP game properties once, and only when one is requested.
-            bool scopedExperimentRequested = mouseSamplerRequested || spriteAttachCacheRequested
+            bool scopedExperimentRequested = mouseSamplerRequested || keyboardSamplerRequested
                 || backgroundCameraRequested;
             bool eligibleScopedExperiment = scopedExperimentRequested && OfflineSoloSongScope.IsEligible(
                 requested: true, gameReady: ready, songPlaying: songPlaying,
@@ -534,10 +547,9 @@ public sealed partial class Core : MelonMod
                 online: !isOfflineSolo);
             bool pauseMouseSampler = mouseSamplerRequested && eligibleScopedExperiment;
             rewiredMousePolling.Update(HarmonyInstance, mouseSamplerRequested, pauseMouseSampler);
-            bool cacheSpriteAttach = spriteAttachCacheRequested && eligibleScopedExperiment;
-            spriteAttachCache.Update(HarmonyInstance, spriteAttachCacheRequested, cacheSpriteAttach);
-            if (spriteAttachCache.ConsumeFailure() is string cacheFailure)
-                LoggerInstance.Warning($"SpriteAttach cache experiment stopped; vanilla updates remain enabled: {cacheFailure}");
+            bool pauseKeyboardSampler = keyboardSamplerRequested && eligibleScopedExperiment;
+            if (keyboardSamplerRequested || rewiredKeyboardPolling.IsInstalled)
+                rewiredKeyboardPolling.Update(HarmonyInstance, keyboardSamplerRequested, pauseKeyboardSampler);
             bool skipBackground = backgroundCameraRequested && eligibleScopedExperiment;
             backgroundCamera.Update(backgroundCameraRequested, skipBackground, game);
             if (backgroundCamera.ConsumeFailure() is string backgroundFailure)
@@ -644,7 +656,7 @@ public sealed partial class Core : MelonMod
             mouseUiGameplay.Clear(HarmonyInstance);
             legacyMouseEvents.Clear();
             rewiredMousePolling.Clear(HarmonyInstance);
-            spriteAttachCache.Clear(HarmonyInstance);
+            rewiredKeyboardPolling.Clear(HarmonyInstance);
             backgroundCamera.Clear();
             whammyTextureThrottle.Clear(HarmonyInstance);
             unityJobWorkerLimit.Clear();
@@ -665,7 +677,7 @@ public sealed partial class Core : MelonMod
         if (pause == null) { Notice("Could not find the game's restart handler."); return; }
         mouseUiGameplay.Disable();
         legacyMouseEvents.Disable();
-        spriteAttachCache.Disable();
+        rewiredKeyboardPolling.Disable();
         backgroundCamera.Restore();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
@@ -688,7 +700,7 @@ public sealed partial class Core : MelonMod
         practiceWaitState = "";
         mouseUiGameplay.Disable();
         legacyMouseEvents.Disable();
-        spriteAttachCache.Disable();
+        rewiredKeyboardPolling.Disable();
         backgroundCamera.Restore();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
@@ -1056,7 +1068,7 @@ public sealed partial class Core : MelonMod
         mouseUiGameplay.Clear(HarmonyInstance);
         legacyMouseEvents.Clear();
         rewiredMousePolling.Clear(HarmonyInstance);
-        spriteAttachCache.Clear(HarmonyInstance);
+        rewiredKeyboardPolling.Clear(HarmonyInstance);
         backgroundCamera.Clear();
         optionalHudAnimations.Clear();
         gameplayUiEvents.Clear(HarmonyInstance);

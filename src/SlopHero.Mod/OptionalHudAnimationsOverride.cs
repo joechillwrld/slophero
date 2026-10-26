@@ -66,7 +66,7 @@ internal sealed class OptionalHudAnimationsOverride
         }
     }
 
-    public void Apply(GameManager? game, bool hidePb, bool hideGlows, double now)
+    public void Apply(GameManager? game, bool hidePb, bool hideGlows, double now, bool forceReapply = false)
     {
         bool reconcile = now >= nextReconcile;
         if (glowRoot != IntPtr.Zero && (leftGlow == null || rightGlow == null))
@@ -80,7 +80,7 @@ internal sealed class OptionalHudAnimationsOverride
         else
         {
             if (findPb) DiscoverPb(now);
-            if (pbCanvas != null && pbAnimator != null && (!pbSuppressed || reconcile))
+            if (pbCanvas != null && pbAnimator != null && (!pbSuppressed || reconcile || forceReapply))
             {
                 if (pbCanvas.enabled) pbCanvas.enabled = false;
                 if (pbAnimator.enabled) pbAnimator.enabled = false;
@@ -94,7 +94,7 @@ internal sealed class OptionalHudAnimationsOverride
         {
             if (findGlows) DiscoverGlows(game!, now);
             if (glowRoot != IntPtr.Zero && leftGlow != null && rightGlow != null
-                && (!glowSuppressed || reconcile))
+                && (!glowSuppressed || reconcile || forceReapply))
             {
                 if (leftGlow.activeSelf) leftGlow.SetActive(false);
                 if (rightGlow.activeSelf) rightGlow.SetActive(false);

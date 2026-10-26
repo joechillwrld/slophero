@@ -76,6 +76,27 @@ Check(!MouseSamplerScope(transition: true), "Mouse sampler resumes during mod tr
 Check(!MouseSamplerScope(menu: true), "Mouse sampler resumes while SlopHero settings are open");
 Check(!MouseSamplerScope(focused: false), "Mouse sampler resumes when the game loses focus");
 Check(!MouseSamplerScope(ready: false), "Mouse sampler fails open until game state is ready");
+var shortcutPolling = new ShortcutPollingGate();
+Check(shortcutPolling.ShouldPoll(true, true, 0, "Key:R", "Key:P"),
+    "Throttled hotkeys sample immediately when song play starts");
+Check(!shortcutPolling.ShouldPoll(true, true, .004, "Key:R", "Key:P"),
+    "Throttled hotkeys skip redundant checks inside the 120 Hz interval");
+Check(shortcutPolling.ShouldPoll(true, true, 1d / 120d, "Key:R", "Key:P"),
+    "Throttled hotkeys sample again at 120 Hz");
+Check(shortcutPolling.ShouldPoll(true, true, 1d / 120d + .001, "Key:T", "Key:P"),
+    "Changing a hotkey binding refreshes its sampled state immediately");
+Check(shortcutPolling.ShouldPoll(false, true, 1d / 120d + .002, "Key:T", "Key:P"),
+    "Disabling the throttle restores per-update shortcut checks immediately");
+Check(shortcutPolling.ShouldPoll(true, true, 1d / 120d + .003, "Key:T", "Key:P"),
+    "Enabling the throttle starts with an immediate hotkey sample");
+Check(!shortcutPolling.ShouldPoll(true, false, 1d / 120d + .004, "Key:T", "Key:P"),
+    "Hotkey samples stop outside the shortcut context");
+Check(shortcutPolling.ShouldPoll(true, true, 1d / 120d + .005, "Key:T", "Key:P"),
+    "Re-entering gameplay samples the current hotkey state immediately");
+var unthrottledShortcuts = new ShortcutPollingGate();
+Check(unthrottledShortcuts.ShouldPoll(false, true, 0, "Key:R", "Key:P")
+    && unthrottledShortcuts.ShouldPoll(false, true, .001, "Key:R", "Key:P"),
+    "Default shortcut behavior remains per-update when throttling is off");
 var speed = new ScrollSpeedCompensation();
 Check(speed.Update(10, .5f, true) == 20, "Half game-clock rate compensates inferred renderer speed");
 Check(speed.Update(20, .5f, true) == 20, "Repeated frames preserve compensated speed");
