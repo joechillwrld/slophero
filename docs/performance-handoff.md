@@ -423,9 +423,11 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 - Latest packaged build: SlopHero **0.4.104** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.102 (SHA-256
-  `dd91a809156a86dab321d7563aef1d07b6f8c9e8f498812394ad0e039cf9e0c6`)
-  and is analyzed below. The earlier 0.4.101 log has SHA-256
+  0.4.104 (SHA-256
+  `d2efc6c8fe437a8da516491a7ca2ece1fa6fa89844d9c88c363de0f012f7c345`)
+  and is analyzed below. The earlier 0.4.102 log has SHA-256
+  `dd91a809156a86dab321d7563aef1d07b6f8c9e8f498812394ad0e039cf9e0c6`.
+  The earlier 0.4.101 log has SHA-256
   `8361a5c0873b28ce1e18f39cf9e952c5debf2a71d3a72b80ae77b82db7590f36`.
   The earlier 0.4.100 log has SHA-256
   `4516179dc70583a82f5358c028afe03104f8cec06a3cc3b5c0f73aadec32cf75`.
@@ -1380,14 +1382,56 @@ older online `Client_GameplayScene.Update` contains `GameObject.Find`, but
 only while waiting for the `GameManager` before the network song starts; it
 is not a per-frame lookup throughout active gameplay.
 
+## v0.4.104 camera capture and later presented frames
+
+The uploaded 0.4.104 `Latest.log` (SHA above) includes one complete 30.0 s
+camera timing capture from 20:25:43 to 20:26:13. The black-background option
+activated at 20:25:43.478. `Background Cam` rendered 401 times during startup;
+`PlayerCamera` and `HUDCam` each rendered 48,724 times. Average callback
+intervals, in milliseconds per rendered camera frame:
+
+| Camera | Pre-cull to pre-render | Pre-render to post-render |
+| --- | ---: | ---: |
+| Background Cam | 0.021 | 0.024 |
+| PlayerCamera | 0.026 | 0.058 |
+| HUDCam | 0.022 | 0.040 |
+
+The intervals prove that the callbacks execute and identify the two persistent
+camera passes. They do not enclose all of Unity's native
+`Camera::CustomCull`, nor are they an additive decomposition of the older WPA
+tree. The background-camera option already removes its pass during the active
+song. The HUD pass still draws score and input feedback, including the 48 live
+guitar input-viewer sprites; suspending it would visibly remove useful UI.
+
+The uploaded PresentMon raw CSV (SHA-256
+`7bfe314975c9b13056f00d85833713d124ba3279e8b3211f962a39e60f6818d9`)
+records a different 29.950 s song window beginning around 20:26:31, after the
+camera capture ended. It has 48,804 presents, 1,629.5 presented FPS, 0.614 ms
+mean / 0.893 ms p99 present interval, and 0.583 ms mean CPU busy versus
+0.242 ms mean GPU busy. Fourteen frames exceed 2 ms; none exceed 5 ms. The
+largest 3.784 ms present has 3.749 ms CPU busy and 0.281 ms GPU busy. Mean GPU
+busy stays near 0.24 ms in each five-second segment while CPU busy rises in
+the slower segments. This supports further CPU work but does not attribute
+those spikes to a camera, mod hook, or specific game callback. Because the
+windows do not overlap, do not subtract their numbers to claim an FPS gain or
+estimate a camera's fraction of that PresentMon frame.
+
+The exact Gameplay camera assets also have HDR, MSAA, and occlusion culling
+disabled, and the regular guitar camera's far clip is already 120 units.
+Those settings do not offer a new guitar optimization. The next rendering
+experiment needs to preserve the live HUD and note visuals and isolate a
+specific native operation; a blanket culling-mask or HUD-camera skip is not
+supported by this capture.
+
 ## v0.4.104 package
 
 The release build succeeds against the supplied generated assemblies with
 zero warnings/errors, and all 114 Core checks pass. The ZIP contains only
 `Mods/SlopHero.dll`. The optional capture now reports per-camera pre-cull to
 pre-render and pre-render to post-render CPU averages. No FPS gain is claimed;
-those callback intervals are attribution data and have not yet been runtime
-validated on Windows.
+those callback intervals are attribution data. The subsequent uploaded log
+confirms both camera callbacks and normal song completion, but provides no
+matched FPS comparison.
 
 - ZIP SHA-256: `6d60c6a85b65510856a5e05e62b18fb5627ba426a679467d837c48273a615cf8`
 - DLL SHA-256: `ae1090753e77ed9919bd2fa1f4852742ae3fed37eda303a1e2fd6eba42965e7f`
