@@ -1345,6 +1345,22 @@ default-off background-camera experiment is the bounded camera prototype.
 The Unity WPA render/cull weights still lack per-camera or per-renderer
 attribution, so they cannot justify a broader camera removal.
 
+The next local prototype adds per-camera CPU phase intervals to the optional
+30-second timing capture using Unity's pre-cull, pre-render, and post-render
+callbacks. It registers callbacks only during capture and removes them on
+completion. The pre-cull/pre-render interval includes culling and any camera
+callbacks between those points; the pre-render/post-render interval includes
+render submission and callbacks, not GPU presentation. These are useful for
+comparing Background Cam, PlayerCamera, and HUDCam within one run, but are not
+an exact decomposition of the older WPA `Camera::CustomCull` samples. The
+current scene and player-camera prefabs already have occlusion culling off, so
+a new occlusion toggle would do nothing. The regular guitar `PlayerCamera`
+already has a 120-unit far plane; the 10,000-unit far planes belong to GHL
+and drums. A proposed guitar far-plane cap was therefore rejected before
+implementation. All three camera masks are specific to their visual layers;
+changing the HUD or player masks could hide score/input elements or notes and
+needs a narrower runtime target first.
+
 The prefab's active guitar SpriteRenderers are already concentrated on two
 material references: 60 use material path ID 21 and 56 use 23; only 16 use
 the other five references. There are two active `SortingGroup` components
