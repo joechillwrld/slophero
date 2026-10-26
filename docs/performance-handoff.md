@@ -421,10 +421,10 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.106** on the private
+- Latest packaged build: SlopHero **0.4.107** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.104 (SHA-256
-  `d2efc6c8fe437a8da516491a7ca2ece1fa6fa89844d9c88c363de0f012f7c345`)
+  0.4.106 (SHA-256
+  `4ac81cbd9bd988c148ed9da5fbe4524811cb3455e48f8bc287bb98f1081af183`)
   and is analyzed below. The earlier 0.4.102 log has SHA-256
   `dd91a809156a86dab321d7563aef1d07b6f8c9e8f498812394ad0e039cf9e0c6`.
   The earlier 0.4.101 log has SHA-256
@@ -1547,6 +1547,29 @@ class declares no `Update`, so hiding the sidebar renderers does not leave a
 per-frame sidebar script to suspend. The separate fret-string objects do have
 `SpriteAttach` (resource script type 75) and are already handled by the
 hide-strings option. This rules out a redundant sidebar hook.
+
+## v0.4.107 package
+
+The release build succeeds against the supplied generated assemblies with
+zero warnings/errors, and all 114 Core checks pass. The ZIP contains only
+`Mods/SlopHero.dll`. The v0.4.106 runtime log confirms that both optional
+visual settings were active and the side-glow branches were being suppressed;
+the reported flash occurs on pause/focus resume, between the existing 20 Hz
+visual passes. v0.4.107 re-applies suppression immediately when the song
+unpauses and when Clone Hero regains application focus. The focus hook is
+installed only while one of those visual options is enabled in Gameplay; the
+pause-state check runs only while waiting for an eligible offline solo resume.
+This corrects the visible gap, with no measured FPS claim.
+
+The optional native legacy-mouse detour is now prepared at mod startup rather
+than during Gameplay initialization when its setting is enabled. This moves
+the one-time setup cost; it does not remove it. The Rewired mouse prefix still
+prepares during Gameplay initialization. The v0.4.106 log reports about
+38.5 ms for native detour preparation and 17 ms for the Rewired prefix, so a
+Windows log should confirm the native setup now happens before Gameplay.
+
+- ZIP SHA-256: `7ff6599a71e2f4a805888e73ce567f44e9f4d507bfb838559bf47ed7c20ac476`
+- DLL SHA-256: `33560bfb5f7e2b13932f171cf163501e40b291a636cfd454bdd22207f687a547`
 
 ## v0.4.104 package
 

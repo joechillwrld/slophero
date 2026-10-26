@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.106", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.107", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -97,6 +97,10 @@ public sealed partial class Core : MelonMod
         if (compatible)
         {
             LoggerInstance.Msg(status);
+            // Prepare the exact-build native trampoline at mod startup, well
+            // before Gameplay scene loading. Preparation immediately undoes
+            // the hook; eligible solo songs still control when it is active.
+            legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
         }
         else LoggerInstance.Warning(status);
         LoggerInstance.Msg("F8: SlopHero settings. Default: hold R to restart, hold P to practice the current section.");
@@ -110,6 +114,8 @@ public sealed partial class Core : MelonMod
         spriteAttachCache.Clear(HarmonyInstance);
         backgroundCamera.Clear();
         optionalHudAnimations.Clear();
+        optionalHudGame = null;
+        optionalHudWaitingForResume = false;
         optionalHudAnimationsError = false;
         staticTmpScaleError = false;
         SongSpeedControl.ResetMenuCache();
@@ -127,7 +133,9 @@ public sealed partial class Core : MelonMod
         lastGameplayUiSuspendState = null;
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
-        legacyMouseEvents.Clear();
+        // Retain the already prepared, inactive trampoline across scenes so
+        // its one-time setup does not recur during Gameplay loading.
+        legacyMouseEvents.Disable();
         highwayAnimations.Clear(HarmonyInstance);
         lastHighwayPauseSetting = null;
         nextOptionalHookSettingsPass = 0;
@@ -206,6 +214,8 @@ public sealed partial class Core : MelonMod
         spriteAttachCache.Clear(HarmonyInstance);
         backgroundCamera.Clear();
         optionalHudAnimations.Clear();
+        optionalHudGame = null;
+        optionalHudWaitingForResume = false;
         optionalHudAnimationsError = false;
         staticTmpScaleError = false;
         SongSpeedControl.ResetMenuCache();
@@ -217,7 +227,7 @@ public sealed partial class Core : MelonMod
         lastGameplayUiSuspendState = null;
         gameplayUiEvents.Clear(HarmonyInstance);
         mouseUiGameplay.Clear(HarmonyInstance);
-        legacyMouseEvents.Clear();
+        legacyMouseEvents.Disable();
         highwayAnimations.Clear(HarmonyInstance);
         lastHighwayPauseSetting = null;
         nextOptionalHookSettingsPass = 0;

@@ -1104,6 +1104,8 @@ public sealed partial class Core
     private bool comboSmokeScrollError;
     private bool staticTmpScaleError;
     private bool optionalHudAnimationsError;
+    private Il2Cpp.GameManager? optionalHudGame;
+    private bool optionalHudWaitingForResume;
     public override void OnLateUpdate()
     {
         if (!compatible || !gameplay || !gameplayInitialized || transition)
@@ -1117,6 +1119,7 @@ public sealed partial class Core
         // cadence as the actual visual work. On an unlocked game, doing these
         // checks first would still repeat them thousands of times per second.
         double now = clock.Elapsed.TotalSeconds;
+        HandleOptionalHudResume(now);
         if (now < nextOverridePass) return;
         nextOverridePass = now + .05;
         // This shares the existing 20 Hz override cadence. A separate timer
@@ -1177,6 +1180,8 @@ public sealed partial class Core
             && (staticTmpScaleDuringSong.Value || staticTmpScale.IsActive || staticTmpScale.NeedsRestore);
         bool optionalHudPassDue = !optionalHudAnimationsError
             && (hidePbPopup.Value || hideStarPowerSideGlows.Value || optionalHudAnimations.NeedsRestore);
+        optionalHudAnimations.UpdateFocusHook(HarmonyInstance,
+            hidePbPopup.Value || hideStarPowerSideGlows.Value, gameplay);
         bool visualPending = !visualError && (visualRequested || practiceSpeedRequested || visuals.NeedsUpdate
             || ringUpdateDue);
         if (!nativeHudPending && !visualPending && !comboSmokeRequested && !performanceApplyDue
@@ -1307,21 +1312,57 @@ public sealed partial class Core
     {
         try
         {
-            bool eligible = game != null && game.songLoaded && game.playersInit
-                && game.globalVariables != null && game.isSongPlaying && !game.isPaused
+            optionalHudGame = game;
+            bool requested = hidePbPopup.Value || hideStarPowerSideGlows.Value;
+            bool eligibleExceptPauseOrFocus = game != null && game.songLoaded && game.playersInit
+                && game.globalVariables != null && game.isSongPlaying
                 && !game.isSongOver && game.coroutinesRunning == 0
                 && game.actualPlayerCount == 1 && (int)game.globalVariables.gameMode == 0
                 && !game.globalVariables.isPlayingSetlist && !transition && !settingsOpen
                 && !moveHud && resizeTarget < 0 && nativeMoveTarget == 0
-                && editApply == null && capture == null && Application.isFocused && !IsOnline(now);
+                && editApply == null && capture == null && !IsOnline(now);
+            bool paused = game != null && game.isPaused;
+            bool focused = Application.isFocused;
+            bool eligible = eligibleExceptPauseOrFocus && !paused && focused;
+            optionalHudWaitingForResume = requested && eligibleExceptPauseOrFocus && (paused || !focused);
             optionalHudAnimations.Apply(game, eligible && hidePbPopup.Value,
                 eligible && hideStarPowerSideGlows.Value, now);
         }
         catch (Exception ex)
         {
             optionalHudAnimations.Clear();
+            optionalHudGame = null;
+            optionalHudWaitingForResume = false;
             optionalHudAnimationsError = true;
             LoggerInstance.Warning($"Optional HUD animation optimization stopped; visuals were restored: {ex.Message}");
+        }
+    }
+
+    private void HandleOptionalHudResume(double now)
+    {
+        if (!optionalHudAnimations.FocusResumePending && !optionalHudWaitingForResume) return;
+        if (!Application.isFocused) return;
+        var game = optionalHudGame;
+        if (game == null)
+        {
+            optionalHudAnimations.ClearFocusResumePending();
+            optionalHudWaitingForResume = false;
+            return;
+        }
+        try
+        {
+            if (game.isPaused) return;
+            optionalHudAnimations.ClearFocusResumePending();
+            optionalHudWaitingForResume = false;
+            UpdateOptionalHudAnimations(game, now);
+        }
+        catch (Exception ex)
+        {
+            optionalHudAnimations.Clear();
+            optionalHudGame = null;
+            optionalHudWaitingForResume = false;
+            optionalHudAnimationsError = true;
+            LoggerInstance.Warning($"Optional HUD animation resume fix stopped; visuals were restored: {ex.Message}");
         }
     }
 

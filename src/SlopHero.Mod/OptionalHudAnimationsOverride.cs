@@ -1,4 +1,6 @@
 using Il2Cpp;
+using HarmonyLib;
+using System.Reflection;
 using UnityEngine;
 using UnityAnimator = UnityEngine.Animator;
 
@@ -19,12 +21,50 @@ internal sealed class OptionalHudAnimationsOverride
     private bool leftGlowWasActive, rightGlowWasActive;
     private IntPtr glowRoot;
     private bool pbSuppressed, glowSuppressed;
+    private HarmonyLib.Harmony? focusHarmony;
+    private MethodInfo? focusMethod;
+    private bool focusHookInstalled, focusHookFailed, focusResumePending;
     private double nextPbDiscovery, nextGlowDiscovery, nextReconcile;
     private int pbDiscoveryMisses, glowDiscoveryMisses;
 
     public bool NeedsRestore => pbSuppressed || glowSuppressed;
     public bool PbSuppressed => pbSuppressed;
     public bool GlowSuppressed => glowSuppressed;
+    public bool FocusResumePending => focusResumePending;
+
+    public void UpdateFocusHook(HarmonyLib.Harmony harmony, bool requested, bool gameplayScene)
+    {
+        if (!requested || !gameplayScene)
+        {
+            if (focusHookInstalled || focusHookFailed || focusResumePending)
+            {
+                RemoveFocusHook();
+                focusHookFailed = false;
+                focusResumePending = false;
+            }
+            return;
+        }
+        if (focusHookInstalled || focusHookFailed) return;
+        try
+        {
+            focusMethod = typeof(GameManager).GetMethod("OnApplicationFocus",
+                BindingFlags.Instance | BindingFlags.NonPublic, binder: null,
+                types: new[] { typeof(bool) }, modifiers: null)
+                ?? throw new MissingMethodException("GameManager.OnApplicationFocus(bool)");
+            focusHarmony = harmony;
+            focusHookOwner = this;
+            var postfix = typeof(OptionalHudAnimationsOverride).GetMethod(nameof(AfterApplicationFocus),
+                BindingFlags.Static | BindingFlags.NonPublic)!;
+            harmony.Patch(focusMethod, postfix: new HarmonyMethod(postfix));
+            focusHookInstalled = true;
+        }
+        catch (Exception ex)
+        {
+            RemoveFocusHook();
+            focusHookFailed = true;
+            MelonLoader.MelonLogger.Warning($"Sloptifine could not install its optional visual-resume hook; normal visual refresh remains active: {ex.Message}");
+        }
+    }
 
     public void Apply(GameManager? game, bool hidePb, bool hideGlows, double now)
     {
@@ -67,6 +107,9 @@ internal sealed class OptionalHudAnimationsOverride
 
     public void Clear()
     {
+        RemoveFocusHook();
+        focusHookFailed = false;
+        focusResumePending = false;
         RestorePb();
         RestoreGlows();
         pbCanvas = null;
@@ -75,6 +118,8 @@ internal sealed class OptionalHudAnimationsOverride
         nextPbDiscovery = nextGlowDiscovery = nextReconcile = 0;
         pbDiscoveryMisses = glowDiscoveryMisses = 0;
     }
+
+    public void ClearFocusResumePending() => focusResumePending = false;
 
     private void ResetGlowReferences()
     {
@@ -178,5 +223,29 @@ internal sealed class OptionalHudAnimationsOverride
         try { if (rightGlow != null && rightGlow.activeSelf != rightGlowWasActive) rightGlow.SetActive(rightGlowWasActive); }
         catch { }
         glowSuppressed = false;
+    }
+
+    private static OptionalHudAnimationsOverride? focusHookOwner;
+
+    private static void AfterApplicationFocus(bool __0)
+    {
+        if (__0 && focusHookOwner != null) focusHookOwner.focusResumePending = true;
+    }
+
+    private void RemoveFocusHook()
+    {
+        if (ReferenceEquals(focusHookOwner, this)) focusHookOwner = null;
+        try
+        {
+            if (focusHarmony != null && focusMethod != null)
+                focusHarmony.Unpatch(focusMethod, HarmonyPatchType.All, focusHarmony.Id);
+        }
+        catch (Exception ex)
+        {
+            MelonLoader.MelonLogger.Warning($"Sloptifine focus-resume hook cleanup failed: {ex.Message}");
+        }
+        focusHarmony = null;
+        focusMethod = null;
+        focusHookInstalled = false;
     }
 }
