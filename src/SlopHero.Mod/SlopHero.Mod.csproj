@@ -6,13 +6,14 @@
     <AssemblyName>SlopHero</AssemblyName>
     <PlatformTarget>x64</PlatformTarget>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.4.108</Version>
+    <Version>0.4.109</Version>
     <GameReferences Condition="'$(GameReferences)' == ''">../../references</GameReferences>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="$(GameReferences)/net6/*.dll"><Private>false</Private></Reference>
     <Reference Include="$(GameReferences)/Il2CppAssemblies/*.dll"><Private>false</Private></Reference>
     <Compile Include="../SlopHero.Core/*.cs" Link="Core/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets/boymoder.png" LogicalName="SlopHero.Mod.Assets.boymoder.png" />
   </ItemGroup>
   <Target Name="CheckReferences" BeforeTargets="ResolveReferences">
     <Error Condition="!Exists('$(GameReferences)/net6/MelonLoader.dll')" Text="Set GameReferences to the directory containing net6 and Il2CppAssemblies from your MelonLoader installation." />

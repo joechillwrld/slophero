@@ -422,11 +422,13 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.108** on the private
+- Latest packaged build: SlopHero **0.4.109** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.106 (SHA-256
-  `4ac81cbd9bd988c148ed9da5fbe4524811cb3455e48f8bc287bb98f1081af183`)
-  and is analyzed below. The earlier 0.4.102 log has SHA-256
+  0.4.108 (SHA-256
+  `cd30bd2c138e790abc48da678e72bc4e896318ac4c47331d8dfe3ed86d943a2a`)
+  and is analyzed below. The earlier 0.4.106 log has SHA-256
+  `4ac81cbd9bd988c148ed9da5fbe4524811cb3455e48f8bc287bb98f1081af183`.
+  The earlier 0.4.102 log has SHA-256
   `dd91a809156a86dab321d7563aef1d07b6f8c9e8f498812394ad0e039cf9e0c6`.
   The earlier 0.4.101 log has SHA-256
   `8361a5c0873b28ce1e18f39cf9e952c5debf2a71d3a72b80ae77b82db7590f36`.
@@ -1571,6 +1573,35 @@ Windows log should confirm the native setup now happens before Gameplay.
 
 - ZIP SHA-256: `7ff6599a71e2f4a805888e73ce567f44e9f4d507bfb838559bf47ed7c20ac476`
 - DLL SHA-256: `33560bfb5f7e2b13932f171cf163501e40b291a636cfd454bdd22207f687a547`
+
+## v0.4.109 package
+
+The uploaded 0.4.108 log exposed an F8 renderer error: `GUIStyle.get_border`
+is an unavailable unstripped IL2CPP wrapper in this game build. The menu also
+attempted to patch `GameManager.OnApplicationFocus(bool)`, which is not present
+in the supplied generated assembly. Version 0.4.109 removes GUIStyle border,
+margin, and padding getter calls, and subscribes to Unity's `Application.focusChanged`
+event through the verified IL2CPP delegate wrapper.
+
+The log's three 30-second timing captures report scheduled render callback
+rates of 1,583–1,662/s and p99 intervals of 0.82–1.17 ms. Those are Unity
+callback intervals, not PresentMon frame presentation, and the settings
+changed between captures. They do not isolate an optimization or establish
+an FPS gain. The log confirms the Rewired keyboard hook installs, but its
+timing snapshots show it unsuppressed; this capture does not verify its active
+song behavior.
+
+The F8 menu now groups its eleven former pages into seven categories. HUD and
+Performance use scroll views; toggle rows have less card-like fill. The
+invented green readiness label was removed. The existing Menu Accent remains
+customizable and colors selected navigation, section markers, and active
+switches. The transparent character cutout sits on the right side; its PNG is
+decoded on first open and drawn only while F8 is open. Build and Core checks
+pass; the revised menu and focus event still need in-game verification. No
+performance gain is claimed.
+
+- ZIP SHA-256: `11626126073145e5c2669828538b604103eec821f2582a5e4ab6f69dd6ea1f26`
+- DLL SHA-256: `10aa07057b19eb7d7fe673f102fbd7be62385faf8819733041b6c12df35e7245`
 
 ## v0.4.108 package
 

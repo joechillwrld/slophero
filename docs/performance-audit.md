@@ -2275,3 +2275,27 @@ The settings window was restyled around the supplied dark-purple mockup; the
 existing Menu Accent setting now controls selected navigation, section bars,
 and active toggle tracks. The menu is drawn only when open. No gameplay FPS
 effect is claimed for the visual update.
+
+### v0.4.109 log-driven menu and focus fixes
+
+The uploaded `Latest.log` from v0.4.108 (SHA-256
+`cd30bd2c138e790abc48da678e72bc4e896318ac4c47331d8dfe3ed86d943a2a`)
+records a settings-renderer exception at `UnityEngine.GUIStyle.get_border`;
+IL2CPP reports that this wrapper could not be unstripped, so the F8 editor
+closed. The menu no longer reads GUIStyle border, margin, or padding
+properties. The same log repeatedly reported that `GameManager.OnApplicationFocus`
+does not exist. v0.4.109 subscribes to the generated Unity
+`Application.focusChanged` event instead.
+
+The log contains three 30-second mod timing windows. Scheduled render callback
+rates were 1,583–1,662/s, with p99 callback intervals of 0.82–1.17 ms. These
+are CPU callback intervals, not presented frame times. Settings differed
+between windows, so they cannot establish an A/B result. The Rewired keyboard
+hook is shown installed, but timing snapshots show it unsuppressed; this log
+does not verify that option during an eligible active song.
+
+The revised F8 layout groups eleven pages into seven, with scroll views on
+the longer HUD and Performance pages. Toggle rows have reduced background
+fill; the fabricated green READY label is removed. Menu Accent stays
+customizable and affects the menu only while open. The UI and focus changes
+are not performance claims; the updated menu requires runtime confirmation.

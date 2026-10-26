@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.108", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.109", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -1065,6 +1065,7 @@ public sealed partial class Core : MelonMod
 
     public override void OnDeinitializeMelon()
     {
+        ClearMenuArtwork();
         mouseUiGameplay.Clear(HarmonyInstance);
         legacyMouseEvents.Clear();
         rewiredMousePolling.Clear(HarmonyInstance);

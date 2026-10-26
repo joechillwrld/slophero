@@ -1,6 +1,5 @@
 using Il2Cpp;
-using HarmonyLib;
-using System.Reflection;
+using Il2CppInterop.Runtime;
 using UnityEngine;
 using UnityAnimator = UnityEngine.Animator;
 
@@ -21,8 +20,7 @@ internal sealed class OptionalHudAnimationsOverride
     private bool leftGlowWasActive, rightGlowWasActive;
     private IntPtr glowRoot;
     private bool pbSuppressed, glowSuppressed;
-    private HarmonyLib.Harmony? focusHarmony;
-    private MethodInfo? focusMethod;
+    private Il2CppSystem.Action<bool>? focusChangedCallback;
     private bool focusHookInstalled, focusHookFailed, focusResumePending;
     private double nextPbDiscovery, nextGlowDiscovery, nextReconcile;
     private int pbDiscoveryMisses, glowDiscoveryMisses;
@@ -32,7 +30,7 @@ internal sealed class OptionalHudAnimationsOverride
     public bool GlowSuppressed => glowSuppressed;
     public bool FocusResumePending => focusResumePending;
 
-    public void UpdateFocusHook(HarmonyLib.Harmony harmony, bool requested, bool gameplayScene)
+    public void UpdateFocusHook(bool requested, bool gameplayScene)
     {
         if (!requested || !gameplayScene)
         {
@@ -47,22 +45,16 @@ internal sealed class OptionalHudAnimationsOverride
         if (focusHookInstalled || focusHookFailed) return;
         try
         {
-            focusMethod = typeof(GameManager).GetMethod("OnApplicationFocus",
-                BindingFlags.Instance | BindingFlags.NonPublic, binder: null,
-                types: new[] { typeof(bool) }, modifiers: null)
-                ?? throw new MissingMethodException("GameManager.OnApplicationFocus(bool)");
-            focusHarmony = harmony;
-            focusHookOwner = this;
-            var postfix = typeof(OptionalHudAnimationsOverride).GetMethod(nameof(AfterApplicationFocus),
-                BindingFlags.Static | BindingFlags.NonPublic)!;
-            harmony.Patch(focusMethod, postfix: new HarmonyMethod(postfix));
+            focusChangedCallback = DelegateSupport.ConvertDelegate<Il2CppSystem.Action<bool>>(
+                new Action<bool>(OnApplicationFocusChanged));
+            Application.focusChanged += focusChangedCallback;
             focusHookInstalled = true;
         }
         catch (Exception ex)
         {
             RemoveFocusHook();
             focusHookFailed = true;
-            MelonLoader.MelonLogger.Warning($"Sloptifine could not install its optional visual-resume hook; normal visual refresh remains active: {ex.Message}");
+            MelonLoader.MelonLogger.Warning($"Sloptifine could not subscribe to Unity's focus-change event; normal visual refresh remains active: {ex.Message}");
         }
     }
 
@@ -225,27 +217,22 @@ internal sealed class OptionalHudAnimationsOverride
         glowSuppressed = false;
     }
 
-    private static OptionalHudAnimationsOverride? focusHookOwner;
-
-    private static void AfterApplicationFocus(bool __0)
+    private void OnApplicationFocusChanged(bool focused)
     {
-        if (__0 && focusHookOwner != null) focusHookOwner.focusResumePending = true;
+        if (focused) focusResumePending = true;
     }
 
     private void RemoveFocusHook()
     {
-        if (ReferenceEquals(focusHookOwner, this)) focusHookOwner = null;
         try
         {
-            if (focusHarmony != null && focusMethod != null)
-                focusHarmony.Unpatch(focusMethod, HarmonyPatchType.All, focusHarmony.Id);
+            if (focusChangedCallback != null) Application.focusChanged -= focusChangedCallback;
         }
         catch (Exception ex)
         {
-            MelonLoader.MelonLogger.Warning($"Sloptifine focus-resume hook cleanup failed: {ex.Message}");
+            MelonLoader.MelonLogger.Warning($"Sloptifine focus-change event cleanup failed: {ex.Message}");
         }
-        focusHarmony = null;
-        focusMethod = null;
+        focusChangedCallback = null;
         focusHookInstalled = false;
     }
 }

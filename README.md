@@ -1,22 +1,26 @@
-# SlopHero 0.4.108 alpha
+# SlopHero 0.4.109 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.108
-fixes the remaining optional Star Power side-glow/personal-best flash by
-forcing target-state checks on song resume and focus return. It adds separate
-default-off experiments to pause Rewired keyboard snapshots in offline solo
-songs and sample SlopHero restart/practice hotkeys at 120 Hz. The keyboard
-switch also pauses keyboard-bound game controls; the hotkey switch can add up
-to 8 ms to those shortcuts. Neither touches joystick/controller or instrument
-polling. The slower SpriteAttach cache was removed. It also restyles the F8
-menu after the supplied dark-purple mockup; the existing customizable Menu
-Accent now colors selected pages, section marks, and active switches. That
-visual work runs only while the settings menu is open. These changes have no
-measured FPS result. Version 0.4.107 moved the visual resume attempt into the
+build, compiled against its loader and generated assemblies. Version 0.4.109
+fixes the F8 renderer failure reported in the latest log, removes the invented
+green readiness label, and consolidates the settings into seven categories
+with scrolling on the long HUD and Performance pages. Settings rows use less
+boxed styling. Focus restoration now subscribes to Unity's focus-change event.
+The transparent wheelchair illustration appears at the right of the settings
+panel; the PNG is decoded on first open and drawn only while F8 is open.
+Version 0.4.108 added separate default-off experiments to pause Rewired
+keyboard snapshots in offline solo songs and sample SlopHero restart/practice
+hotkeys at 120 Hz. The keyboard switch also pauses keyboard-bound game
+controls; the hotkey switch can add up to 8 ms to those shortcuts. Neither
+touches joystick/controller or instrument polling. The slower SpriteAttach
+cache was removed, and resume reapplication for the optional Star Power side
+glows and personal-best popup was added. The customizable Menu Accent colors
+selected pages, section marks, and active switches only while F8 is open.
+These changes have no measured FPS result. Version 0.4.107 moved the visual resume attempt into the
 next LateUpdate and moved setup for the optional legacy-mouse detour out of
 Gameplay scene initialization and into mod startup. Version 0.4.106
 reduces repeat discovery work in the fret-effect and combo-smoke overrides.
@@ -211,7 +215,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.108 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.108-alpha.zip)
+[Download SlopHero v0.4.109 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.109-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -241,7 +245,7 @@ Backspace removes the last digit; Delete clears the entry; Escape cancels the ed
 game's normal left/right controls to change the value by the configured step (5%
 by default). Set that step on the SlopHero **Controls** page.
 
-F8 has eleven pages: **General**, **Counters**, **Song HUD**, **Highway**, **Colors**, **Game HUD**, **Sizing**, **Profiles**, **Sloptifine**, **Sloptifine 2**, and **Sloptifine 3**. The black-background camera option is under **Sloptifine**; the optional side-glow and personal-best popup switches are under **Sloptifine 3**. The centered window uses a left category sidebar and a separate options panel. Boolean options use checkboxes throughout. The **Menu accent** color on the Colors page applies to the title bar, selected page, and resize outline; it is included in color themes.
+F8 has seven pages: **General**, **Counters**, **HUD**, **Visuals**, **Colors**, **Profiles**, and **Performance**. Long HUD and Performance pages scroll. The centered window uses a left category sidebar and a separate options panel. Boolean options use switches throughout. The **Menu accent** color on the Colors page applies to the title bar, selected page, section marks, and active switches; it is included in color themes.
 
 - Click a numeric or color value and type a replacement. Enter or **Apply** saves;
   Escape or **Cancel** discards. Ctrl+A selects the whole value, Ctrl+V pastes.
