@@ -32,6 +32,7 @@ internal sealed class SustainStaticWriteCachePrototype
     private MethodInfo? spriteSetter, colorSetter, setPropertyBlock, blockSetFloat, blockClear;
     private bool installed, failed, enabled;
     private int sustainLengthProperty;
+    private string installStage = "initialize";
 
     internal bool IsInstalled => installed;
     internal bool IsActive => installed && enabled;
@@ -54,7 +55,7 @@ internal sealed class SustainStaticWriteCachePrototype
             {
                 Restore(harmony);
                 failed = true;
-                MelonLogger.Warning($"Sloptifine sustain write-cache prototype stopped safely: {ex.Message}");
+                MelonLogger.Warning($"Sloptifine sustain write-cache prototype stopped safely at '{installStage}': {ex}");
                 return;
             }
         }
@@ -70,31 +71,43 @@ internal sealed class SustainStaticWriteCachePrototype
 
     private void Install(HarmonyLib.Harmony harmony, GameManager game)
     {
+        installStage = "scan regular sustain renderers";
         foreach (var renderer in FindRegularSustainRenderers(game))
             if (renderer != null) sustainRenderers.Add(renderer.Pointer);
         if (sustainRenderers.Count == 0)
             throw new InvalidOperationException("No regular sustain renderers with the mapped CloneHero/Sustains shader were found.");
 
         const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+        installStage = "resolve SpriteRenderer.sprite setter";
         spriteSetter = typeof(SpriteRenderer).GetProperty("sprite", flags)?.GetSetMethod(true)
             ?? throw new MissingMethodException("UnityEngine.SpriteRenderer.sprite setter");
+        installStage = "resolve SpriteRenderer.color setter";
         colorSetter = typeof(SpriteRenderer).GetProperty("color", flags)?.GetSetMethod(true)
             ?? throw new MissingMethodException("UnityEngine.SpriteRenderer.color setter");
+        installStage = "resolve Renderer.SetPropertyBlock";
         setPropertyBlock = typeof(Renderer).GetMethod("SetPropertyBlock", flags, null,
             new[] { typeof(MaterialPropertyBlock) }, null)
             ?? throw new MissingMethodException("UnityEngine.Renderer.SetPropertyBlock(MaterialPropertyBlock)");
+        installStage = "resolve MaterialPropertyBlock.SetFloat";
         blockSetFloat = typeof(MaterialPropertyBlock).GetMethod("SetFloat", flags, null,
             new[] { typeof(int), typeof(float) }, null)
             ?? throw new MissingMethodException("UnityEngine.MaterialPropertyBlock.SetFloat(int, float)");
+        installStage = "resolve MaterialPropertyBlock.Clear";
         blockClear = typeof(MaterialPropertyBlock).GetMethod("Clear", flags, null, Type.EmptyTypes, null)
             ?? throw new MissingMethodException("UnityEngine.MaterialPropertyBlock.Clear()");
+        installStage = "resolve _SustainLength shader property";
         sustainLengthProperty = Shader.PropertyToID("_SustainLength");
 
         active = this;
+        installStage = "patch Unity SpriteRenderer.sprite setter";
         Patch(harmony, spriteSetter, nameof(BeforeSprite), nameof(AfterSprite));
+        installStage = "patch Unity SpriteRenderer.color setter";
         Patch(harmony, colorSetter, nameof(BeforeColor), nameof(AfterColor));
+        installStage = "patch Unity Renderer.SetPropertyBlock";
         Patch(harmony, setPropertyBlock, null, nameof(AfterSetPropertyBlock));
+        installStage = "patch Unity MaterialPropertyBlock.SetFloat";
         Patch(harmony, blockSetFloat, nameof(BeforeSetFloat), nameof(AfterSetFloat));
+        installStage = "patch Unity MaterialPropertyBlock.Clear";
         Patch(harmony, blockClear, null, nameof(AfterClearBlock));
         installed = true;
         MelonLogger.Msg($"Sloptifine sustain write-cache prototype active for {sustainRenderers.Count} regular sustain renderers; positions and per-frame changing output remain vanilla.");
@@ -267,6 +280,7 @@ internal sealed class SustainBatchingPrototype
     private sealed record MaterialState(Material Material, bool EnableInstancing, string DisableBatchingTag);
     private readonly Dictionary<IntPtr, MaterialState> changed = new();
     private bool failed;
+    private string updateStage = "initialize";
 
     internal void Update(bool requested, bool eligible, GameManager? game)
     {
@@ -279,17 +293,23 @@ internal sealed class SustainBatchingPrototype
         if (failed || changed.Count > 0) return;
         try
         {
+            updateStage = "scan regular sustain renderers";
             foreach (var renderer in SustainStaticWriteCachePrototype.FindRegularSustainRenderers(game))
             {
+                updateStage = "read sustain shared material";
                 Material? material = renderer == null ? null : renderer.sharedMaterial;
                 if (material == null || material.shader == null) continue;
                 IntPtr pointer = material.Pointer;
                 if (changed.ContainsKey(pointer)) continue;
+                updateStage = "read material DisableBatching tag";
                 string currentTag = material.GetTag("DisableBatching", false);
                 if (!string.Equals(currentTag, "True", StringComparison.OrdinalIgnoreCase)) continue;
+                updateStage = "read material instancing flag";
                 bool instancing = material.enableInstancing;
                 changed.Add(pointer, new MaterialState(material, instancing, currentTag));
+                updateStage = "set material DisableBatching override";
                 material.SetOverrideTag("DisableBatching", "False");
+                updateStage = "enable material instancing";
                 material.enableInstancing = true;
             }
             if (changed.Count == 0)
@@ -300,7 +320,7 @@ internal sealed class SustainBatchingPrototype
         {
             Restore();
             failed = true;
-            MelonLogger.Warning($"Sloptifine sustain batching prototype stopped and restored materials: {ex.Message}");
+            MelonLogger.Warning($"Sloptifine sustain batching prototype stopped and restored materials at '{updateStage}': {ex}");
         }
     }
 
@@ -331,8 +351,9 @@ internal sealed class SustainBatchingPrototype
 /// <summary>Suppresses only sustain glow renderers; base sustain bodies remain intact.</summary>
 internal sealed class PlainHeldSustainPrototype
 {
-    private readonly Dictionary<IntPtr, (SpriteRenderer Renderer, bool WasForcedOff)> renderers = new();
+    private readonly Dictionary<IntPtr, (SpriteRenderer Renderer, bool WasEnabled)> renderers = new();
     private bool failed;
+    private string updateStage = "initialize";
 
     internal bool IsActive => renderers.Count != 0;
 
@@ -347,14 +368,18 @@ internal sealed class PlainHeldSustainPrototype
         if (failed || renderers.Count != 0) return;
         try
         {
+            updateStage = "scan live guitar sprite renderers";
             foreach (var renderer in SustainStaticWriteCachePrototype.FindGuitarSpriteRenderers(game))
             {
+                updateStage = "read guitar sprite material";
                 if (renderer == null || !IsGlow(renderer.sharedMaterial)) continue;
                 IntPtr pointer = renderer.Pointer;
                 if (renderers.ContainsKey(pointer)) continue;
-                bool prior = renderer.forceRenderingOff;
+                updateStage = "read glow renderer enabled state";
+                bool prior = renderer.enabled;
                 renderers.Add(pointer, (renderer, prior));
-                renderer.forceRenderingOff = true;
+                updateStage = "disable glow renderer using the game's supported enabled property";
+                renderer.enabled = false;
             }
             if (renderers.Count == 0)
                 throw new InvalidOperationException("No sustain glow renderers were found under the active guitar renderer.");
@@ -364,7 +389,7 @@ internal sealed class PlainHeldSustainPrototype
         {
             Restore();
             failed = true;
-            MelonLogger.Warning($"Sloptifine plain-held-sustain prototype stopped safely: {ex.Message}");
+            MelonLogger.Warning($"Sloptifine plain-held-sustain prototype stopped safely at '{updateStage}': {ex}");
         }
     }
 
@@ -385,12 +410,12 @@ internal sealed class PlainHeldSustainPrototype
 
     private void Restore()
     {
-        foreach (var (renderer, wasForcedOff) in renderers.Values)
+        foreach (var (renderer, wasEnabled) in renderers.Values)
         {
             try
             {
-                if (renderer != null && renderer.forceRenderingOff)
-                    renderer.forceRenderingOff = wasForcedOff;
+                if (renderer != null && renderer.enabled != wasEnabled)
+                    renderer.enabled = wasEnabled;
             }
             catch { /* Scene teardown may have destroyed the renderer. */ }
         }

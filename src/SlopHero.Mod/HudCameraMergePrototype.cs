@@ -24,6 +24,7 @@ internal sealed class HudCameraMergePrototype
     private bool retainedCameraCanvas;
     private bool active, failed;
     private string? failure;
+    private string activationStage = "initialize";
 
     internal bool IsActive => active;
 
@@ -48,13 +49,15 @@ internal sealed class HudCameraMergePrototype
         {
             Restore();
             failed = true;
-            failure = ex.Message;
+            failure = $"{activationStage}: {ex}";
         }
     }
 
     private void Activate(GameManager game)
     {
+        activationStage = "find HUDCam";
         var hud = GameObject.Find("HUDCam")?.GetComponent<Camera>();
+        activationStage = "validate HUDCam configuration";
         if (hud == null || !hud.enabled || hud.targetTexture != null
             || hud.clearFlags != CameraClearFlags.Nothing || !Mathf.Approximately(hud.depth, 6)
             || hud.cullingMask != 4128 || hud.rect != new Rect(0, 0, 1, 1)
@@ -62,6 +65,7 @@ internal sealed class HudCameraMergePrototype
             throw new InvalidOperationException("HUDCam did not match the validated Gameplay camera setup.");
 
         Camera? guitar = null;
+        activationStage = "find the local guitar PlayerCamera";
         if (game.playerObjects == null) throw new InvalidOperationException("Gameplay player objects are unavailable.");
         foreach (var playerObject in game.playerObjects)
         {
@@ -83,7 +87,11 @@ internal sealed class HudCameraMergePrototype
 
         Scene scene = SceneManager.GetActiveScene();
         int canvasLayerMask = 0;
-        foreach (var canvas in Resources.FindObjectsOfTypeAll<Canvas>())
+        activationStage = "find active camera-space HUD canvases";
+        // Object.FindObjectsOfType is used elsewhere in the mod and is known
+        // to be preserved by this game's IL2CPP build. FindObjectsOfTypeAll
+        // can resolve to a stripped Unity generic wrapper in this player.
+        foreach (var canvas in UnityEngine.Object.FindObjectsOfType<Canvas>())
         {
             if (canvas == null || !canvas.gameObject.scene.IsValid() || canvas.gameObject.scene != scene
                 || !canvas.enabled || !canvas.gameObject.activeInHierarchy
@@ -100,7 +108,8 @@ internal sealed class HudCameraMergePrototype
 
         // The command buffer runs immediately after PlayerCamera. Refuse a
         // camera stack that would otherwise draw over the replacement HUD.
-        foreach (var camera in Resources.FindObjectsOfTypeAll<Camera>())
+        activationStage = "check active camera render order";
+        foreach (var camera in UnityEngine.Object.FindObjectsOfType<Camera>())
         {
             if (camera == null || camera == hud || camera == guitar || !camera.enabled
                 || !camera.gameObject.activeInHierarchy || !camera.gameObject.scene.IsValid()
@@ -113,7 +122,8 @@ internal sealed class HudCameraMergePrototype
         if (mergeMask == 0)
             throw new InvalidOperationException("All HUDCam layers are occupied by camera-space Canvas content; no renderers can be moved to the guitar camera.");
         var candidates = new List<Renderer>();
-        foreach (var renderer in Resources.FindObjectsOfTypeAll<Renderer>())
+        activationStage = "find visible HUD renderers";
+        foreach (var renderer in UnityEngine.Object.FindObjectsOfType<Renderer>())
         {
             if (renderer == null || !renderer.gameObject.scene.IsValid() || renderer.gameObject.scene != scene
                 || (mergeMask & (1 << renderer.gameObject.layer)) == 0) continue;
@@ -123,6 +133,7 @@ internal sealed class HudCameraMergePrototype
         if (items.Count == 0) throw new InvalidOperationException("No active renderer was found on HUDCam's culling layers.");
 
         var buffer = new CommandBuffer { name = "Sloptifine Experimental HUD Camera Merge" };
+        activationStage = "record the HUD camera draw list";
         RecordCommands(buffer, hud, guitar, items, clearDepth: !retainedCameraCanvas);
 
         hudCamera = hud;
@@ -132,10 +143,12 @@ internal sealed class HudCameraMergePrototype
         originalHudCullingMask = hud.cullingMask;
         candidateRenderers = candidates;
         drawItems = items;
+        activationStage = "change HUDCam render scope";
         if (retainedCameraCanvas)
             hud.cullingMask = originalHudCullingMask & canvasLayerMask;
         else
             hud.enabled = false;
+        activationStage = "attach HUD draw list to PlayerCamera";
         guitar.AddCommandBuffer(CameraEvent.AfterEverything, buffer);
         active = true;
         MelonLogger.Msg($"Sloptifine HUD-camera merge prototype active with {items.Count} explicit renderers. HUDCam's orthographic matrices are retained; camera-space Canvas={(retainedCameraCanvas ? "kept on HUDCam" : "none")}.");
@@ -183,6 +196,7 @@ internal sealed class HudCameraMergePrototype
         if (!active || hudCamera == null || guitarCamera == null || commandBuffer == null) return;
         try
         {
+            activationStage = "refresh HUD camera projection and visible draw list";
             drawItems = BuildDrawItems(candidateRenderers, hudCamera);
             if (drawItems.Count == 0)
                 throw new InvalidOperationException("HUDCam's current layers no longer have visible renderer content.");
@@ -192,7 +206,7 @@ internal sealed class HudCameraMergePrototype
         {
             Restore();
             failed = true;
-            failure = $"The HUD projection refresh failed; the original HUDCam was restored: {ex.Message}";
+            failure = $"The HUD projection refresh failed at '{activationStage}'; the original HUDCam was restored: {ex}";
         }
     }
 

@@ -80,11 +80,14 @@ Current sustain shaders explicitly disable ordinary batching, while the
 regular-tail producer has unguarded per-tail setter/property-block sequences.
 Four default-off prototypes cover repeated sustain-output write caching,
 Unity's existing sustain batching flags, plain held tails, and explicit HUD
-renderer submission. These are implemented in 0.4.115 but still need Windows
-visual and PresentMon validation. The cache uses managed setter hooks, the
-batching toggle does not build new geometry, and the HUD path keeps HUDCam for
-camera-space Canvas layers. Do not replace note-head state caching (already
-present), lower input polling, or disable note updates.
+renderer submission. The 0.4.115 runtime log showed all four stopping on
+`Method unstripping failed`, before they took effect. Version 0.4.116 replaces
+two likely stripped calls and logs stage plus stack for remaining failures;
+it needs a fresh runtime activation check before visual or PresentMon testing.
+The cache still uses managed setter hooks, the batching toggle does not build
+new geometry, and the HUD path keeps HUDCam for camera-space Canvas layers. Do
+not replace note-head state caching (already present), lower input polling, or
+disable note updates.
 
 1. **Separate the IL2CPP dispatcher from its callbacks.** The 31-second `Sloptifine-CPU.csv`
    puts roughly 9 seconds of *inclusive* weight at
@@ -435,7 +438,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.115** on the private
+- Latest packaged build: SlopHero **0.4.116** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.113 (SHA-256
   `c15196a6f99e034e4033540dfd780a18849f25199d7257ebc876b87cbc3f333c`)
@@ -1933,3 +1936,31 @@ The 0.4.115 Release build completed with zero warnings/errors and the existing
 Core checks passed (127). `downloads/SlopHero-0.4.115-alpha.zip` contains only
 `Mods/SlopHero.dll`; its SHA-256 is
 `e3e731bd473952ccc92cd92afefb62f3e998f2fdbd7c676b62517a393214b639`.
+
+The first 0.4.115 runtime log, uploaded after the user tested these controls,
+shows each prototype failing independently with `Method unstripping failed`:
+write-cache at 16:21:00, batching at 16:21:41, held-glow suppression at
+16:22:18, and HUD merge at 16:23:19. A later run with multiple enabled shows
+the same failures. Each path failed closed, leaving the original renderer and
+camera behavior active. The log omits stack traces and callsite context, so it
+does not identify which Unity wrapper fails. The four experiments therefore
+did not run and have no performance result; add failure-stage/stack detail and
+fix the unsupported runtime calls before asking for another A/B. The log does
+show the separate worker experiment changed the cap from 15 to 14 and restored
+it afterward. Its custom callback timing is not a PresentMon FPS measurement.
+
+### 0.4.116: repair the first runtime blockers
+
+After 0.4.115 failed all four prototypes with `Method unstripping failed`,
+0.4.116 replaces `Renderer.forceRenderingOff` with `Renderer.enabled` for the
+held-glow prototype, matching a renderer property already used by Sloptifine.
+HUD merge discovery now uses `Object.FindObjectsOfType<T>()` instead of the
+stripped `Resources.FindObjectsOfTypeAll<T>()` wrappers. Each prototype logs
+its activation stage and exception stack if another call fails. The write-cache
+Harmony hooks and material batching calls still need a runtime test; no FPS or
+visual improvement is claimed.
+
+The 0.4.116 Release build completed with zero warnings/errors and the Core
+checks passed (127). `downloads/SlopHero-0.4.116-alpha.zip` contains only
+`Mods/SlopHero.dll`; its SHA-256 is
+`de2acd2363f650a67898387e722cef2598e0e5a53895e6e5dc1b049df3b494be`.

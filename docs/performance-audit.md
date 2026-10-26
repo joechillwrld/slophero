@@ -2366,8 +2366,14 @@ the visibility list refreshes at 20 Hz. This can reorder elements, briefly
 show stale visibility, or cost more CPU than it saves. The prototype fails open
 if the active camera setup cannot be separated.
 
-The prototypes compile against supplied assemblies and default to off. They
-have no Windows visual validation or matched PresentMon result. An activation
-log is not a performance result; compare one option at a time using raw frame
-intervals and check note/HUD parity. The 0.4.115 Release build completed with
-zero warnings/errors and the existing Core checks passed (127).
+The prototypes compile against supplied assemblies and default to off. The
+first Windows runtime test in the supplied `Latest.log` did not activate any
+of them: the write-cache, batching, plain-held-glow, and HUD-camera merge
+prototypes each aborted with `Method unstripping failed`. They fail closed, so
+the stock paths remained in effect. The log records only the exception
+message, not the failing Unity callsite. Version 0.4.116 replaces the
+held-glow API with the supported `Renderer.enabled` property, changes HUD
+discovery to the active-object lookup already used in the mod, and logs the
+activation stage plus stack for remaining failures. It compiled with zero
+warnings/errors and all 127 Core checks passed; these changes still need an
+in-game activation check. No FPS impact is claimed.

@@ -12,10 +12,12 @@ Use the existing binaries, symbols, source archive, and captures to pursue
 several independent leads before building. A diagnostic log or another
 capture request alone is not the performance work the user asked for.
 The newest aggressive candidates and exact callsite/shader evidence are in
-`docs/aggressive-render-targets-2026-10-26.md` and its linked JSON. The four
-default-off prototypes are now implemented for 0.4.115; none has Windows
-runtime or FPS validation yet. Follow the documented boundaries and don't
-report gains as measured.
+`docs/aggressive-render-targets-2026-10-26.md` and its linked JSON. The first
+0.4.115 Windows runtime log showed all four rendering prototypes failing with
+`Method unstripping failed`. The 0.4.116 candidate replaces two likely stripped
+calls and adds failure-stage/stack detail for the rest; it still needs an
+in-game activation check. See the performance audit and handoff. Do not report
+gains as measured.
 The handoff indexes current mod code, older source, exact-game binaries,
 Unity symbols, logs, captures, and local raw uploads. `references/` and
 `/workspace/attachments` are not committed to Git; in a fresh environment,
@@ -42,11 +44,14 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.114. It makes the solo guitar-camera far-clip
-cap configurable from 40 to 120 units (default 80) and suspends it during the
-camera-isolation benchmarks so those tests use the stock distance. The latest
-PresentMon captures are directional, not a matched A/B, and do not establish a
-FPS gain. Version 0.4.113 removes the remaining activation gate that blocked
+The latest packaged build is 0.4.116, a repair/test candidate for the failed
+0.4.115 rendering prototypes. It replaces the held-glow suppression API with
+the game's already-used renderer enabled property, uses the preserved active
+object lookup for HUD discovery, and includes stage/stack details in prototype
+failures. The fixes need an in-game activation check. The 0.4.114 camera cap
+and previous camera-test findings remain below. PresentMon captures are
+directional, not a matched A/B, and do not establish a FPS gain. Version
+0.4.113 removes the remaining activation gate that blocked
 the guitar-camera render benchmark with black-background mode on.
 It preserves the black screen by moving the clear to HUDCam for the test, then
 restores its prior state. Version 0.4.112 enlarged and bottom-anchored the menu
