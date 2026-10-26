@@ -1,0 +1,337 @@
+{
+  "sha256": {
+    "GameAssembly.dll": "12bc21e5a88a2fc9abc259d5d67f24835145eabca6c3f863b075ba37ad75f197",
+    "globalgamemanagers.assets": "255ca3e4fd36c07517e5688d6433500575c9440ff14227868f4619cc8165cbd1",
+    "resources.assets": "ddc9ccb689eb269f178df2abbc0c4d1a26a2750a9e5afcb6bcb17e9c547aa784"
+  },
+  "native": {
+    "guitar_render_update": {
+      "rva": "0x115a2f0",
+      "bytes_sha256": "c393868cd12602f241a2b5a6010fd828df12b1fbf44a20214593fa81cdca7828",
+      "call_sites_not_execution_counts": [
+        {
+          "callsite": "0x115a364",
+          "target": "OnDemandRendering.willCurrentFrameRender"
+        }
+      ]
+    },
+    "upcoming_sustain_helper": {
+      "rva": "0x1156710",
+      "bytes_sha256": "a1d4b7969621bacc3584cabd55e9289b71aab2b422c441226aa613f9a01c89bb",
+      "call_sites_not_execution_counts": [
+        {
+          "callsite": "0x1156987",
+          "target": "Renderer.enabled="
+        },
+        {
+          "callsite": "0x11569bf",
+          "target": "Renderer.enabled="
+        },
+        {
+          "callsite": "0x1156afe",
+          "target": "SpriteRenderer.sprite="
+        },
+        {
+          "callsite": "0x1156b10",
+          "target": "Renderer.GetPropertyBlock"
+        },
+        {
+          "callsite": "0x1156b32",
+          "target": "MaterialPropertyBlock.SetFloat"
+        },
+        {
+          "callsite": "0x1156b44",
+          "target": "Renderer.SetPropertyBlock"
+        },
+        {
+          "callsite": "0x1156b6e",
+          "target": "SpriteRenderer.color="
+        },
+        {
+          "callsite": "0x1156c33",
+          "target": "Renderer.enabled="
+        },
+        {
+          "callsite": "0x1156d84",
+          "target": "SpriteRenderer.color="
+        },
+        {
+          "callsite": "0x1156dad",
+          "target": "SpriteRenderer.sprite="
+        },
+        {
+          "callsite": "0x1156dec",
+          "target": "Renderer.GetPropertyBlock"
+        },
+        {
+          "callsite": "0x1156e13",
+          "target": "MaterialPropertyBlock.SetVector"
+        },
+        {
+          "callsite": "0x1156e40",
+          "target": "MaterialPropertyBlock.SetVector"
+        },
+        {
+          "callsite": "0x1156e62",
+          "target": "MaterialPropertyBlock.SetFloat"
+        },
+        {
+          "callsite": "0x1156e74",
+          "target": "Renderer.SetPropertyBlock"
+        },
+        {
+          "callsite": "0x1156ede",
+          "target": "Transform.localPosition="
+        },
+        {
+          "callsite": "0x1156ef9",
+          "target": "GameObject.SetActive"
+        }
+      ]
+    },
+    "held_sustain_helper": {
+      "rva": "0x1155460",
+      "bytes_sha256": "812eec1114f1cc99a1e248dff683c2f8270c3308d310b68e2730b9de4a876af5",
+      "call_sites_not_execution_counts": [
+        {
+          "callsite": "0x115590e",
+          "target": "SpriteRenderer.sprite="
+        },
+        {
+          "callsite": "0x11559bf",
+          "target": "SpriteRenderer.sprite="
+        },
+        {
+          "callsite": "0x11559db",
+          "target": "Renderer.enabled="
+        },
+        {
+          "callsite": "0x1155a0e",
+          "target": "SpriteRenderer.color="
+        },
+        {
+          "callsite": "0x1155a38",
+          "target": "SpriteRenderer.color="
+        },
+        {
+          "callsite": "0x1155a53",
+          "target": "GameObject.SetActive"
+        },
+        {
+          "callsite": "0x1155abd",
+          "target": "Transform.localPosition="
+        },
+        {
+          "callsite": "0x1155b17",
+          "target": "Renderer.GetPropertyBlock"
+        },
+        {
+          "callsite": "0x1155b40",
+          "target": "MaterialPropertyBlock.SetVector"
+        },
+        {
+          "callsite": "0x1155b69",
+          "target": "MaterialPropertyBlock.SetVector"
+        },
+        {
+          "callsite": "0x1155b8b",
+          "target": "MaterialPropertyBlock.SetFloat"
+        },
+        {
+          "callsite": "0x1155b9d",
+          "target": "Renderer.SetPropertyBlock"
+        },
+        {
+          "callsite": "0x1155baf",
+          "target": "Renderer.GetPropertyBlock"
+        },
+        {
+          "callsite": "0x1155bef",
+          "target": "MaterialPropertyBlock.SetVector"
+        },
+        {
+          "callsite": "0x1155c1e",
+          "target": "MaterialPropertyBlock.SetVector"
+        },
+        {
+          "callsite": "0x1155c40",
+          "target": "MaterialPropertyBlock.SetFloat"
+        },
+        {
+          "callsite": "0x1155c52",
+          "target": "Renderer.SetPropertyBlock"
+        }
+      ]
+    },
+    "note_head_state_apply": {
+      "rva": "0x353210",
+      "bytes_sha256": "93d57e8f60c70aac675ca7ac8df3be8e5aa3363c129607d746579656056fe6f7",
+      "call_sites_not_execution_counts": [
+        {
+          "callsite": "0x353299",
+          "target": "SpriteRenderer.sprite="
+        },
+        {
+          "callsite": "0x3532e1",
+          "target": "SpriteRenderer.sprite="
+        },
+        {
+          "callsite": "0x353329",
+          "target": "SpriteRenderer.sprite="
+        },
+        {
+          "callsite": "0x353371",
+          "target": "SpriteRenderer.sprite="
+        },
+        {
+          "callsite": "0x353431",
+          "target": "SpriteRenderer.color="
+        },
+        {
+          "callsite": "0x3534e9",
+          "target": "SpriteRenderer.color="
+        },
+        {
+          "callsite": "0x3535a1",
+          "target": "SpriteRenderer.color="
+        },
+        {
+          "callsite": "0x353659",
+          "target": "SpriteRenderer.color="
+        },
+        {
+          "callsite": "0x35367c",
+          "target": "SortingGroup.sortingOrder="
+        },
+        {
+          "callsite": "0x3536ad",
+          "target": "GameObject.SetActive"
+        },
+        {
+          "callsite": "0x3536cf",
+          "target": "Renderer.sortingOrder="
+        },
+        {
+          "callsite": "0x3536f1",
+          "target": "Renderer.sortingOrder="
+        },
+        {
+          "callsite": "0x35370f",
+          "target": "Renderer.sortingOrder="
+        },
+        {
+          "callsite": "0x35372d",
+          "target": "Renderer.sortingOrder="
+        }
+      ]
+    },
+    "inactive_pool_cleanup": {
+      "rva": "0x1160a20",
+      "bytes_sha256": "0caaac36741ff75fbe2d7280b5d7ffe374cebed9404820beefaeae14a109a72a",
+      "call_sites_not_execution_counts": [
+        {
+          "callsite": "0x1160a5c",
+          "target": "GameObject.activeSelf"
+        },
+        {
+          "callsite": "0x1160a6d",
+          "target": "GameObject.SetActive"
+        }
+      ]
+    }
+  },
+  "shaders": [
+    {
+      "path_id": 14,
+      "name": "CloneHero/Sustains",
+      "properties": [
+        "_MainTex",
+        "_Color",
+        "PixelSnap",
+        "TrackFade",
+        "ExternalVertexSizing",
+        "_RendererColor",
+        "_Flip",
+        "_AlphaTex",
+        "_EnableExternalAlpha",
+        "_FadeParams",
+        "_TextureScaleOffset",
+        "_OutputSaturation",
+        "_BlendColor",
+        "_SustainLength"
+      ],
+      "subshader_tags": [
+        {
+          "CanUseSpriteAtlas": "true",
+          "DisableBatching": "true",
+          "IGNOREPROJECTOR": "true",
+          "PreviewType": "Plane",
+          "QUEUE": "Transparent",
+          "RenderType": "Transparent"
+        }
+      ]
+    },
+    {
+      "path_id": 15,
+      "name": "CloneHero/SustainGlow",
+      "properties": [
+        "_MainTex",
+        "_uSustainProperties",
+        "_uUVProperties",
+        "_Color",
+        "TrackFade",
+        "_RendererColor",
+        "_FadeParams",
+        "_SustainLength"
+      ],
+      "subshader_tags": [
+        {
+          "CanUseSpriteAtlas": "False",
+          "DisableBatching": "true",
+          "IGNOREPROJECTOR": "true",
+          "PreviewType": "Plane",
+          "QUEUE": "Transparent",
+          "RenderType": "Transparent"
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "path_id": 25,
+      "name": "OpenSustainGlow",
+      "shader_reference": {
+        "m_FileID": 0,
+        "m_PathID": 1110
+      },
+      "instancing_enabled_in_asset": false
+    },
+    {
+      "path_id": 26,
+      "name": "OpenSustainMat",
+      "shader_reference": {
+        "m_FileID": 0,
+        "m_PathID": 1108
+      },
+      "instancing_enabled_in_asset": false
+    },
+    {
+      "path_id": 29,
+      "name": "SustainGlow",
+      "shader_reference": {
+        "m_FileID": 1,
+        "m_PathID": 15
+      },
+      "instancing_enabled_in_asset": false
+    },
+    {
+      "path_id": 30,
+      "name": "Sustains",
+      "shader_reference": {
+        "m_FileID": 1,
+        "m_PathID": 14
+      },
+      "instancing_enabled_in_asset": false
+    }
+  ]
+}

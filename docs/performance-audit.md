@@ -2320,3 +2320,21 @@ with 120 meaning stock rendering. It restores the stock far plane during both
 camera-isolation tests, then reapplies the selected cap afterward. The
 experiment only targets the known solo guitar camera and may cull distant
 notes/effects. Its FPS effect has not been isolated or measured.
+
+### Aggressive rendering research after 0.4.114
+
+The current supplied shaders and native sustain helpers support a deeper
+investigation than another camera-distance control. Shader IDs 14 and 15 in
+`globalgamemanagers.assets` explicitly declare `DisableBatching=true` and map
+to the ordinary sustain-body/glow resource materials. The regular upcoming-tail
+helper at `0x1156710` repeatedly submits length property blocks and sprite/color
+states without the note-head container's existing output comparisons. The
+held-tail helper at `0x1155460` also submits dynamic whammy data, so it cannot
+share a simple static-length skip. Existing particle switches do not remove
+those glow renderers.
+
+The [new implementation plan](aggressive-render-targets-2026-10-26.md) records
+four proposals, exact callsites, prototype boundaries, visual risks, and
+remaining unknowns. A fingerprint-checked read-only extraction tool and JSON
+evidence are included. This research adds no runtime patch or binary version
+and establishes no new FPS gain.

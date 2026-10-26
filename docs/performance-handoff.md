@@ -73,6 +73,17 @@ remaining cost of eligible rendered-frame work.
 
 ## Still open: evidence to turn into code
 
+**New aggressive rendering proposals (2026-10-26):** read
+[the sustain/HUD implementation plan](aggressive-render-targets-2026-10-26.md)
+and its [exact-build evidence](sustain-rendering-evidence-2026-10-26.json).
+Current sustain shaders explicitly disable ordinary batching, while the
+regular-tail producer has unguarded per-tail setter/property-block sequences.
+Four separate proposals cover static sustain-output caching, batched regular
+tail geometry, an optional plain held-tail mode, and explicit HUD rendering
+without HUDCam's automatic pass. None is implemented or measured; consult the
+user before adding the riskier visual behavior. Do not replace note-head state
+caching (already present), lower input polling, or disable note updates.
+
 1. **Separate the IL2CPP dispatcher from its callbacks.** The 31-second `Sloptifine-CPU.csv`
    puts roughly 9 seconds of *inclusive* weight at
    `GameAssembly+0x2FAB159` / `+0x2FAB63D` and matching `version.dll`
@@ -424,8 +435,11 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 - Latest packaged build: SlopHero **0.4.114** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
-  0.4.108 (SHA-256
-  `cd30bd2c138e790abc48da678e72bc4e896318ac4c47331d8dfe3ed86d943a2a`)
+  0.4.113 (SHA-256
+  `c15196a6f99e034e4033540dfd780a18849f25199d7257ebc876b87cbc3f333c`)
+  and overlaps the two 2026-10-26 PresentMon camera tests analyzed below.
+  The earlier 0.4.108 log has SHA-256
+  `cd30bd2c138e790abc48da678e72bc4e896318ac4c47331d8dfe3ed86d943a2a`
   and is analyzed below. The earlier 0.4.106 log has SHA-256
   `4ac81cbd9bd988c148ed9da5fbe4524811cb3455e48f8bc287bb98f1081af183`.
   The earlier 0.4.102 log has SHA-256
