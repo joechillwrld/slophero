@@ -1,12 +1,17 @@
-# SlopHero 0.4.109 alpha
+# SlopHero 0.4.110 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.109
-fixes the F8 renderer failure reported in the latest log, removes the invented
+build, compiled against its loader and generated assemblies. Version 0.4.110
+adds a default-off guitar-camera far-clip experiment. It limits the camera's
+120-unit far plane to 80 during eligible offline solo songs and restores the
+original value on pause, online play, focus loss, menus, transitions, scene
+changes, or when the switch is disabled. Distant notes or effects may disappear; no FPS
+gain is claimed before a matched capture. Version 0.4.109 fixes the F8 renderer
+failure reported in the latest log, removes the invented
 green readiness label, and consolidates the settings into seven categories
 with scrolling on the long HUD and Performance pages. Settings rows use less
 boxed styling. Focus restoration now subscribes to Unity's focus-change event.
@@ -215,7 +220,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.109 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.109-alpha.zip)
+[Download SlopHero v0.4.110 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.110-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

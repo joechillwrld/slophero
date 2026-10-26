@@ -422,7 +422,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.109** on the private
+- Latest packaged build: SlopHero **0.4.110** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.108 (SHA-256
   `cd30bd2c138e790abc48da678e72bc4e896318ac4c47331d8dfe3ed86d943a2a`)
@@ -1602,6 +1602,37 @@ performance gain is claimed.
 
 - ZIP SHA-256: `11626126073145e5c2669828538b604103eec821f2582a5e4ab6f69dd6ea1f26`
 - DLL SHA-256: `10aa07057b19eb7d7fe673f102fbd7be62385faf8819733041b6c12df35e7245`
+
+## v0.4.110 package
+
+The 2026-10-25 v0.4.104 PresentMon capture contains 48,804 frames over
+29.95 seconds in Hardware Independent Flip. It reports 1,629.5 presents/s,
+0.614 ms mean and 0.893 ms p99 present intervals, 0.583 ms mean CPU busy,
+and 0.242 ms mean GPU busy. The matching log reports `PlayerCamera`
+pre-cull-to-pre-render callbacks averaging 0.026 ms and pre-render-to-post-
+render callbacks averaging 0.058 ms. Those callback intervals are not
+exclusive culling costs. Together these establish a CPU-limited reference and
+a render-path lead; they do not measure the far-clip experiment.
+
+The exact Gameplay guitar `PlayerCamera` has a 120-unit far clip, separate from
+the GHL/drum camera values. Version 0.4.110 adds a default-off Performance
+switch that temporarily lowers only this camera to 80 units during eligible
+offline solo songs. It requires the known `PlayerCamera`, 512 culling mask,
+null render target, and 120-unit original clip; if the live camera shape differs,
+the feature fails open and logs the mismatch. The camera restores its captured
+value on pause, online play, menus, focus loss, restart/practice transitions,
+disable, and scene unload. Notes and effects beyond 80 units could pop out.
+
+The Unity job queues and shared IL2CPP dispatcher remain untouched: their
+callbacks include arbitrary game, network, and mod work. Camera/cull WPA rows
+are inclusive shared engine costs, so this experiment is a bounded render
+volume reduction rather than a claim to remove the aggregate call path. Build
+against the supplied references succeeds with zero warnings/errors and the
+Core checks pass (123 checks). Runtime visuals and presented-FPS impact still
+need an in-game A/B; no gain is claimed.
+
+- ZIP SHA-256: `d5fd93e7fb362615739dd41c9bba79b77a5eae7479c17378bfc7467a016c4e94`
+- DLL SHA-256: `cb7b1d20d705b5f808789556604585ba9c4b1d42f94d562ffd9afc8dc668ccfe`
 
 ## v0.4.108 package
 
