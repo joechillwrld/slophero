@@ -11,11 +11,12 @@ namespace SlopHero.Mod;
 /// </summary>
 internal sealed class PlayerCameraFarClipOverride
 {
-    private const float ExpectedVanillaFarClip = 120f;
-    private const float ExperimentalFarClip = 80f;
+    private const int MinimumExperimentalFarClip = 40;
+    private const int ExpectedVanillaFarClip = 120;
 
     private Camera? camera;
     private float originalFarClip;
+    private float appliedFarClip;
     private bool active, failed;
     private string? failure;
 
@@ -28,7 +29,7 @@ internal sealed class PlayerCameraFarClipOverride
         return result;
     }
 
-    internal void Update(bool requested, bool eligible, GameManager? game)
+    internal void Update(bool requested, bool eligible, GameManager? game, int farClipDistance)
     {
         if (!requested || !eligible || game == null)
         {
@@ -38,9 +39,20 @@ internal sealed class PlayerCameraFarClipOverride
         }
 
         if (active && camera == null) active = false;
-        if (active || failed) return;
+        int targetFarClip = Math.Clamp(farClipDistance, MinimumExperimentalFarClip,
+            ExpectedVanillaFarClip);
+        if (targetFarClip == ExpectedVanillaFarClip)
+        {
+            Restore();
+            failed = false;
+            failure = null;
+            return;
+        }
+        if (active && Mathf.Approximately(appliedFarClip, targetFarClip)) return;
+        if (active) Restore();
+        if (failed) return;
 
-        try { Activate(game); }
+        try { Activate(game, targetFarClip); }
         catch (Exception ex)
         {
             Restore();
@@ -49,7 +61,7 @@ internal sealed class PlayerCameraFarClipOverride
         }
     }
 
-    private void Activate(GameManager game)
+    private void Activate(GameManager game, int targetFarClip)
     {
         Camera? guitarCamera = null;
         foreach (var player in game.playerObjects)
@@ -73,23 +85,25 @@ internal sealed class PlayerCameraFarClipOverride
 
         camera = guitarCamera;
         originalFarClip = guitarCamera.farClipPlane;
-        guitarCamera.farClipPlane = ExperimentalFarClip;
+        appliedFarClip = targetFarClip;
+        guitarCamera.farClipPlane = targetFarClip;
         active = true;
-        MelonLogger.Msg($"Sloptifine guitar-camera far clip reduced from {originalFarClip:0} to {ExperimentalFarClip:0} units for offline solo play.");
+        MelonLogger.Msg($"Sloptifine guitar-camera far clip reduced from {originalFarClip:0} to {targetFarClip:0} units for offline solo play.");
     }
 
     internal void Restore()
     {
-        if (camera == null) { active = false; return; }
+        if (camera == null) { appliedFarClip = 0; active = false; return; }
         bool wasActive = active;
         try
         {
             // Preserve a later change made by the game or another mod.
-            if (Mathf.Approximately(camera.farClipPlane, ExperimentalFarClip))
+            if (Mathf.Approximately(camera.farClipPlane, appliedFarClip))
                 camera.farClipPlane = originalFarClip;
         }
         catch { /* The camera may already be unloading. */ }
         camera = null;
+        appliedFarClip = 0;
         active = false;
         if (wasActive) MelonLogger.Msg("Sloptifine guitar-camera far clip restored.");
     }

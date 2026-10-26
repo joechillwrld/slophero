@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.113", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.114", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -589,8 +589,15 @@ public sealed partial class Core : MelonMod
                 eligibleScopedExperiment && !hudCameraBenchmark.IsActive, game);
             if (guitarCameraBenchmark.ConsumeFailure() is string guitarCameraFailure)
                 LoggerInstance.Warning($"Guitar-camera benchmark stopped; original camera restored: {guitarCameraFailure}");
-            bool limitPlayerFarClip = farClipRequested && eligibleScopedExperiment;
-            playerCameraFarClip.Update(farClipRequested, limitPlayerFarClip, game);
+            // Camera-isolation benchmarks compare render paths, so temporarily
+            // restore the guitar camera's stock clip plane for both tests.
+            // Passing requested=false also clears a stale mismatch failure;
+            // the far-clip experiment is reapplied as soon as the benchmark ends.
+            bool cameraBenchmarkActive = hudCameraBenchmark.IsActive || guitarCameraBenchmark.IsActive;
+            bool farClipRequestedForRuntime = farClipRequested && !cameraBenchmarkActive;
+            bool limitPlayerFarClip = farClipRequestedForRuntime && eligibleScopedExperiment;
+            playerCameraFarClip.Update(farClipRequestedForRuntime, limitPlayerFarClip, game,
+                farClipDistance.Value);
             if (playerCameraFarClip.ConsumeFailure() is string farClipFailure)
                 LoggerInstance.Warning($"Guitar-camera far-clip experiment stopped; original camera restored: {farClipFailure}");
             if (ready) CompletePracticeTransition(game!);

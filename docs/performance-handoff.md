@@ -422,7 +422,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.113** on the private
+- Latest packaged build: SlopHero **0.4.114** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.108 (SHA-256
   `cd30bd2c138e790abc48da678e72bc4e896318ac4c47331d8dfe3ed86d943a2a`)
@@ -1857,3 +1857,33 @@ The same patch moves the larger boymoder artwork to the settings window's
 bottom-right edge and reduces the selected-page accent stripe from 3 to 2 UI
 units. The mod builds against the supplied game references with zero warnings
 or errors, and all 127 core checks pass.
+
+## 2026-10-26: 0.4.114 camera capture analysis and far-clip control
+
+The 00:26:31 PresentMon capture overlaps the log's HUD-camera benchmark
+(00:26:30.367–00:27:03.615). Its 30-second export contains 55,792 application
+presents (1,860/s), with `MsBetweenPresents` p50/p95/p99 of
+0.5224/0.6381/0.6888 ms, median GPU-busy time 0.1948 ms, and median GPU
+utilization 19%. During this test the guitar camera remains visible but its
+far plane is capped at 80 units.
+
+The 00:27:14 capture overlaps the guitar-camera benchmark, which hides notes,
+the highway, and 3D effects while leaving the HUD and scoring visible. It has
+58,171 application presents over 30.0345 seconds (1,936.77/s),
+`MsBetweenPresents` p50/p95/p99 of 0.5136/0.5747/0.6223 ms, median GPU-busy
+time 0.1552 ms, and median GPU utilization 15%. In this capture the far-clip
+experiment was inactive and the guitar camera retained its stock 120-unit
+plane. The increase is directionally consistent with the guitar render pass
+being more expensive than the HUD pass, but time-varying load and the different
+far-clip values prevent attributing the full difference to camera removal.
+These are application-present intervals; the roughly 4 ms maximum intervals
+are isolated and do not establish a recurring hitch or physical display
+refresh rate.
+
+Version 0.4.114 exposes a 40–120-unit far-clip cap, default 80 and default-off.
+Choosing 120 restores the original plane. Both camera-isolation benchmarks now
+temporarily restore 120 and reapply the selected cap when the benchmark ends;
+this also prevents the camera visibility change from tripping the strict
+camera-identity check. Lower caps can hide distant notes/effects and need a
+visual check on the user's charts. The captures do not measure the cap in
+isolation, so no gain is claimed.

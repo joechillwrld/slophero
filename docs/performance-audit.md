@@ -2299,3 +2299,24 @@ the longer HUD and Performance pages. Toggle rows have reduced background
 fill; the fabricated green READY label is removed. Menu Accent stays
 customizable and affects the menu only while open. The UI and focus changes
 are not performance claims; the updated menu requires runtime confirmation.
+
+### v0.4.114 camera evidence and adjustable far-clip experiment (2026-10-26)
+
+The two 30-second PresentMon exports overlap separate solo camera-isolation
+tests. With the HUD camera disabled, the log confirms the guitar camera stayed
+visible and its far plane was 80 units: 55,792 application presents (1,860/s),
+`MsBetweenPresents` p50/p95/p99 0.5224/0.6381/0.6888 ms, median GPU busy
+0.1948 ms, and median GPU utilization 19%. With the guitar camera disabled,
+the far-clip option had restored the stock 120-unit plane: 58,171 presents in
+30.0345 s (1,936.77/s), p50/p95/p99 0.5136/0.5747/0.6223 ms, median GPU busy
+0.1552 ms, and median GPU utilization 15%. This points toward a larger cost
+in the guitar-camera render path, but the far-clip mismatch and time-varying
+load make the pair directional rather than a controlled A/B. These report
+application presentation throughput, not monitor refresh. Rare maximum
+intervals near 4.1 ms do not show a repeating frame-time spike.
+
+Version 0.4.114 adds a 40–120-unit far-clip control (default 80, default-off),
+with 120 meaning stock rendering. It restores the stock far plane during both
+camera-isolation tests, then reapplies the selected cap afterward. The
+experiment only targets the known solo guitar camera and may cull distant
+notes/effects. Its FPS effect has not been isolated or measured.

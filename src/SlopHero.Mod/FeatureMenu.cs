@@ -36,6 +36,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> pauseRewiredKeyboardPolling = null!;
     private MelonPreferences_Entry<bool> limitSlopHeroShortcutPolling = null!;
     private MelonPreferences_Entry<bool> skipBackgroundCamera = null!, limitPlayerCameraFarClip = null!;
+    private MelonPreferences_Entry<int> farClipDistance = null!;
     private MelonPreferences_Entry<bool> hidePbPopup = null!, hideStarPowerSideGlows = null!;
     private MelonPreferences_Entry<bool> preserveNetworkTickRemainder = null!;
     private MelonPreferences_Entry<bool> disableHudCameraBenchmark = null!;
@@ -170,6 +171,7 @@ public sealed partial class Core
         limitSlopHeroShortcutPolling = preferences.CreateEntry("PerformanceLimitSlopHeroShortcutPolling", false);
         skipBackgroundCamera = preferences.CreateEntry("PerformanceSkipBackgroundCamera", false);
         limitPlayerCameraFarClip = preferences.CreateEntry("PerformanceLimitPlayerCameraFarClip", false);
+        farClipDistance = preferences.CreateEntry("PerformanceGuitarCameraFarClip", 80);
         disableHudCameraBenchmark = preferences.CreateEntry("PerformanceDisableHudCameraBenchmark", false);
         disableGuitarCameraBenchmark = preferences.CreateEntry("PerformanceDisableGuitarCameraBenchmark", false);
         hidePbPopup = preferences.CreateEntry("PerformanceHidePbPopup", false);
@@ -239,7 +241,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.113", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.114", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
             if (GUI.Button(new Rect(frameX + menuWidth - 48, frameY + 13, 32, 32), "×", menuClickStyle))
@@ -551,16 +553,18 @@ public sealed partial class Core
 
         float renderingY = y + 1340;
         SectionHeader("3D rendering experiment", x, renderingY);
-        Toggle(limitPlayerCameraFarClip, "Limit guitar-camera far clip to 80 units in solo songs", x, renderingY + 30);
-        GUI.Label(new Rect(x + 4, renderingY + 74, 610, 52), "Experimental; default off. May reduce distant rendering, but notes or effects beyond 80 units can pop out. Applies only during offline solo songs and restores the original camera value afterward.");
+        Toggle(limitPlayerCameraFarClip, "Limit guitar-camera far clip in solo songs", x, renderingY + 30);
+        Number("Guitar-camera far clip (units)", farClipDistance.Value, x, renderingY + 74, 40, 120,
+            value => { farClipDistance.Value = Math.Clamp((int)Math.Round(value), 40, 120); preferencesDirty = true; });
+        GUI.Label(new Rect(x + 4, renderingY + 118, 610, 52), "Experimental; default off, cap defaults to 80 units. Lower caps cull more distant rendering, but notes or effects can pop out sooner. Applies only during offline solo play and restores the original value. Camera benchmark tests temporarily use the stock clip distance.");
 
-        Toggle(disableHudCameraBenchmark, "Disable HUD camera for solo FPS benchmark", x, renderingY + 140);
-        GUI.Label(new Rect(x + 4, renderingY + 184, 610, 62), "Aggressive; default off. Hides score, combo, lyrics, and input HUD to measure this camera's upper-bound cost. The HUD camera restores automatically on pause, focus loss, or leaving solo play.");
+        Toggle(disableHudCameraBenchmark, "Disable HUD camera for solo FPS benchmark", x, renderingY + 190);
+        GUI.Label(new Rect(x + 4, renderingY + 234, 610, 62), "Aggressive; default off. Hides score, combo, lyrics, and input HUD to measure this camera's upper-bound cost. The HUD camera restores automatically on pause, focus loss, or leaving solo play.");
 
-        Toggle(disableGuitarCameraBenchmark, "Disable guitar camera for solo FPS benchmark", x, renderingY + 252);
-        GUI.Label(new Rect(x + 4, renderingY + 296, 610, 64), "Very aggressive; default off. Hides the notes, highway, and 3D effects while scoring and HUD remain active. Test this OR the HUD-camera benchmark, not both. If black-background mode is on, the HUD camera temporarily performs its screen clear. Restores on pause, focus loss, or leaving solo play.");
+        Toggle(disableGuitarCameraBenchmark, "Disable guitar camera for solo FPS benchmark", x, renderingY + 302);
+        GUI.Label(new Rect(x + 4, renderingY + 346, 610, 64), "Very aggressive; default off. Hides the notes, highway, and 3D effects while scoring and HUD remain active. Test this OR the HUD-camera benchmark, not both. If black-background mode is on, the HUD camera temporarily performs its screen clear. Restores on pause, focus loss, or leaving solo play.");
 
-        float networkY = renderingY + 376;
+        float networkY = renderingY + 426;
         SectionHeader("Online networking experiment", x, networkY);
         Toggle(preserveNetworkTickRemainder, "Preserve fractional network tick time (online only)", x, networkY + 30);
         GUI.Label(new Rect(x + 4, networkY + 74, 610, 72), "Experimental; default off. Keeps the fractional remainder after a connected network update, but skips whole missed intervals to avoid catch-up bursts. Could change packet timing or worsen desync. Instrument polling is unchanged.");
@@ -1063,6 +1067,7 @@ public sealed partial class Core
             Bool("PerformanceLimitSlopHeroShortcutPolling", limitSlopHeroShortcutPolling);
             Bool("PerformanceSkipBackgroundCamera", skipBackgroundCamera);
             Bool("PerformanceLimitPlayerCameraFarClip", limitPlayerCameraFarClip);
+            Int("PerformanceGuitarCameraFarClip", farClipDistance);
             Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
             Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
             Bool("PerformanceHidePbPopup", hidePbPopup);
@@ -1122,6 +1127,7 @@ public sealed partial class Core
         Bool("PerformanceLimitSlopHeroShortcutPolling", limitSlopHeroShortcutPolling);
         Bool("PerformanceSkipBackgroundCamera", skipBackgroundCamera);
         Bool("PerformanceLimitPlayerCameraFarClip", limitPlayerCameraFarClip);
+        Int("PerformanceGuitarCameraFarClip", farClipDistance, 40, 120);
         Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
         Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
         Bool("PerformanceHidePbPopup", hidePbPopup);
