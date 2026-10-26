@@ -130,9 +130,11 @@ internal sealed class SustainStaticWriteCachePrototype
         {
             if (playerObject == null || !playerObject.enabled || !playerObject.gameObject.activeInHierarchy
                 || playerObject.TryCast<GuitarPlayer>() == null) continue;
-            var noteRenderer = playerObject.GetComponentInChildren<GuitarNoteRenderer>(true);
-            if (noteRenderer == null) continue;
-            foreach (var renderer in noteRenderer.GetComponentsInChildren<SpriteRenderer>(true))
+            // The exact GuitarNoteRenderer generic lookup is stripped from this
+            // Unity player. SpriteRenderer child enumeration is already used
+            // by Sloptifine's working visual controls and is sufficient here:
+            // the callers filter to the sustain body/glow shaders afterward.
+            foreach (var renderer in playerObject.GetComponentsInChildren<SpriteRenderer>(true))
                 if (renderer != null) yield return renderer;
         }
     }

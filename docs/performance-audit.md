@@ -2371,9 +2371,10 @@ first Windows runtime test in the supplied `Latest.log` did not activate any
 of them: the write-cache, batching, plain-held-glow, and HUD-camera merge
 prototypes each aborted with `Method unstripping failed`. They fail closed, so
 the stock paths remained in effect. The log records only the exception
-message, not the failing Unity callsite. Version 0.4.116 replaces the
-held-glow API with the supported `Renderer.enabled` property, changes HUD
-discovery to the active-object lookup already used in the mod, and logs the
-activation stage plus stack for remaining failures. It compiled with zero
-warnings/errors and all 127 Core checks passed; these changes still need an
-in-game activation check. No FPS impact is claimed.
+message, not the failing Unity callsite. Version 0.4.116 added stack logging.
+Its log identified `Component.GetComponentInChildren<GuitarNoteRenderer>(bool)`
+as the sustain scan failure and `GeometryUtility.CalculateFrustumPlanes(Camera)`
+as the HUD merge failure. Version 0.4.117 replaces those calls with existing
+SpriteRenderer enumeration and Camera.WorldToScreenPoint-based bounds culling.
+It compiled with zero warnings/errors and all 127 Core checks passed; in-game
+activation still needs confirmation. No FPS impact is claimed.

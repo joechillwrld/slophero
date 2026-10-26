@@ -233,11 +233,10 @@ internal sealed class HudCameraMergePrototype
     private static List<DrawItem> BuildDrawItems(List<Renderer> candidates, Camera hud)
     {
         var items = new List<DrawItem>(candidates.Count);
-        Plane[] frustum = GeometryUtility.CalculateFrustumPlanes(hud);
         foreach (var renderer in candidates)
         {
             if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy
-                || renderer.forceRenderingOff || !GeometryUtility.TestPlanesAABB(frustum, renderer.bounds)) continue;
+                || !IntersectsCameraViewport(hud, renderer.bounds)) continue;
             var shared = renderer.sharedMaterials;
             if (shared == null || shared.Length == 0) continue;
             var materials = new Material?[shared.Length];
@@ -260,5 +259,37 @@ internal sealed class HudCameraMergePrototype
             return order != 0 ? order : a.CameraDepth.CompareTo(b.CameraDepth);
         });
         return items;
+    }
+
+    // GeometryUtility.CalculateFrustumPlanes/TestPlanesAABB are stripped in
+    // this player. Project the bounds corners through Camera.WorldToScreenPoint
+    // instead; that API is already used by Sloptifine's HUD layout code.
+    private static bool IntersectsCameraViewport(Camera camera, Bounds bounds)
+    {
+        Vector3 center = bounds.center;
+        Vector3 extents = bounds.extents;
+        float minX = float.PositiveInfinity, minY = float.PositiveInfinity;
+        float maxX = float.NegativeInfinity, maxY = float.NegativeInfinity;
+        bool hasFrontCorner = false;
+        for (int i = 0; i < 8; i++)
+        {
+            Vector3 point = camera.WorldToScreenPoint(center + new Vector3(
+                (i & 1) == 0 ? -extents.x : extents.x,
+                (i & 2) == 0 ? -extents.y : extents.y,
+                (i & 4) == 0 ? -extents.z : extents.z));
+            if (!float.IsFinite(point.x) || !float.IsFinite(point.y) || !float.IsFinite(point.z)
+                || point.z < camera.nearClipPlane || point.z > camera.farClipPlane) continue;
+            hasFrontCorner = true;
+            minX = Math.Min(minX, point.x);
+            minY = Math.Min(minY, point.y);
+            maxX = Math.Max(maxX, point.x);
+            maxY = Math.Max(maxY, point.y);
+        }
+
+        if (!hasFrontCorner) return false;
+        float marginX = Math.Max(64, Screen.width * .15f);
+        float marginY = Math.Max(64, Screen.height * .15f);
+        return maxX >= -marginX && minX <= Screen.width + marginX
+            && maxY >= -marginY && minY <= Screen.height + marginY;
     }
 }

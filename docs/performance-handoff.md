@@ -81,9 +81,12 @@ regular-tail producer has unguarded per-tail setter/property-block sequences.
 Four default-off prototypes cover repeated sustain-output write caching,
 Unity's existing sustain batching flags, plain held tails, and explicit HUD
 renderer submission. The 0.4.115 runtime log showed all four stopping on
-`Method unstripping failed`, before they took effect. Version 0.4.116 replaces
-two likely stripped calls and logs stage plus stack for remaining failures;
-it needs a fresh runtime activation check before visual or PresentMon testing.
+`Method unstripping failed`, before they took effect. The 0.4.116 log
+pinpointed the stripped `GetComponentInChildren<GuitarNoteRenderer>` and
+`GeometryUtility.CalculateFrustumPlanes(Camera)` calls. Version 0.4.117
+replaces these with SpriteRenderer child enumeration and camera screen-point
+projection, APIs already used elsewhere in the mod. It needs a fresh runtime
+activation check before visual or PresentMon testing.
 The cache still uses managed setter hooks, the batching toggle does not build
 new geometry, and the HUD path keeps HUDCam for camera-space Canvas layers. Do
 not replace note-head state caching (already present), lower input polling, or
@@ -438,7 +441,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.116** on the private
+- Latest packaged build: SlopHero **0.4.117** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.113 (SHA-256
   `c15196a6f99e034e4033540dfd780a18849f25199d7257ebc876b87cbc3f333c`)
@@ -1964,3 +1967,17 @@ The 0.4.116 Release build completed with zero warnings/errors and the Core
 checks passed (127). `downloads/SlopHero-0.4.116-alpha.zip` contains only
 `Mods/SlopHero.dll`; its SHA-256 is
 `de2acd2363f650a67898387e722cef2598e0e5a53895e6e5dc1b049df3b494be`.
+
+### 0.4.117: replace the two runtime-identified stripped APIs
+
+The 0.4.116 log gave full stacks: all sustain options failed at
+`Component.GetComponentInChildren<GuitarNoteRenderer>(bool)`, and HUD merge
+failed at `GeometryUtility.CalculateFrustumPlanes(Camera)`. Version 0.4.117
+enumerates the active guitar player's SpriteRenderer children (the closed
+SpriteRenderer generic is already used by existing visuals) and performs HUD
+bounds culling through `Camera.WorldToScreenPoint`, already used in the HUD
+layout. The build still needs an in-game activation check; no FPS result is
+available. Release compilation completed with zero warnings/errors and all 127
+Core checks passed. `downloads/SlopHero-0.4.117-alpha.zip` contains only
+`Mods/SlopHero.dll`; its SHA-256 is
+`df018f19e5165a47acc29cb128d37a6e1a03f8945a9f59bde4fd4b7e4c6d2fa8`.
