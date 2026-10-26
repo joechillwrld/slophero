@@ -422,7 +422,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.112** on the private
+- Latest packaged build: SlopHero **0.4.113** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.108 (SHA-256
   `cd30bd2c138e790abc48da678e72bc4e896318ac4c47331d8dfe3ed86d943a2a`)
@@ -1837,7 +1837,7 @@ that the guitar-camera test leaves scoring/HUD active. Matched PresentMon A/B
 captures are still needed before treating either camera benchmark as evidence
 of improved FPS or frame times.
 
-## 2026-10-26: 0.4.111 camera-benchmark runtime check and 0.4.112 fix
+## 2026-10-26: 0.4.111 camera-benchmark runtime check and 0.4.113 fix
 
 The uploaded 0.4.111 `Latest.log` shows the HUD-camera benchmark activating
 and restoring as expected. It also records `guitarCameraBenchmark=True` while
@@ -1845,12 +1845,13 @@ it remained inactive. The other active setting was black-background mode: it
 had disabled `Background Cam` and transferred that camera's solid-color clear
 to `PlayerCamera`. The initial integration gate rejected the guitar test
 whenever that override was active, without a useful warning. Version 0.4.112
-removes that gate and temporarily transfers the same clear to HUDCam while
-PlayerCamera is disabled. It restores HUDCam's original clear flags/color when
-the camera test ends. The guitar test no longer requires the PlayerCamera far
-plane to equal 120, since far-clip settings do not matter while that camera is
-disabled. A matched in-game activation/restoration check is still needed; the
-user has not run PresentMon yet.
+added the HUD clear transfer, but a remaining Core gate still prevented the
+test from reaching it. Version 0.4.113 removes that final gate. During the test
+it transfers the same clear to HUDCam while PlayerCamera is disabled, then
+restores HUDCam's original clear flags/color. The guitar test no longer
+requires the PlayerCamera far plane to equal 120, since far-clip settings do
+not matter while that camera is disabled. A matched in-game activation and
+restoration check is still needed; the user has not run PresentMon yet.
 
 The same patch moves the larger boymoder artwork to the settings window's
 bottom-right edge and reduces the selected-page accent stripe from 3 to 2 UI

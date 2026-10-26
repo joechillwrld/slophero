@@ -1,17 +1,17 @@
-# SlopHero 0.4.112 alpha
+# SlopHero 0.4.113 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.112
-fixes the guitar-camera benchmark when black-background mode is enabled: the
-test temporarily moves its black screen clear to HUDCam, then restores the
-original HUD camera state. It no longer depends on the guitar camera's far
-plane. The boymoder art is larger and anchored at the bottom-right of the
-settings window, and the selected-page accent stripe is thinner. Version
-0.4.111 adds separate default-off HUD-camera and guitar-camera render benchmarks for
+build, compiled against its loader and generated assemblies. Version 0.4.113
+removes the remaining activation gate that blocked the guitar-camera benchmark
+with black-background mode enabled. During the test, it moves the black screen
+clear to HUDCam and restores HUDCam when the guitar camera returns. The test
+does not depend on the guitar camera far plane. Version 0.4.112 enlarged and
+bottom-anchored the boymoder art and thinned the selected-page accent stripe.
+Version 0.4.111 adds separate default-off HUD-camera and guitar-camera render benchmarks for
 offline solo play. The HUD test hides score and gameplay HUD; the guitar-camera
 test hides notes, highway, and 3D effects while scoring and the HUD continue.
 Only one camera test runs at a time, and both restore on pause, focus loss,
@@ -229,7 +229,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.112 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.112-alpha.zip)
+[Download SlopHero v0.4.113 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.113-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

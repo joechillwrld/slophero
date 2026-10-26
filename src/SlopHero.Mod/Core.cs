@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.112", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.113", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -586,7 +586,7 @@ public sealed partial class Core : MelonMod
             if (hudCameraBenchmark.ConsumeFailure() is string hudCameraFailure)
                 LoggerInstance.Warning($"HUD-camera benchmark stopped; original camera restored: {hudCameraFailure}");
             guitarCameraBenchmark.Update(guitarCameraBenchmarkRequested,
-                eligibleScopedExperiment && !hudCameraBenchmark.IsActive && !backgroundCamera.IsActive, game);
+                eligibleScopedExperiment && !hudCameraBenchmark.IsActive, game);
             if (guitarCameraBenchmark.ConsumeFailure() is string guitarCameraFailure)
                 LoggerInstance.Warning($"Guitar-camera benchmark stopped; original camera restored: {guitarCameraFailure}");
             bool limitPlayerFarClip = farClipRequested && eligibleScopedExperiment;
