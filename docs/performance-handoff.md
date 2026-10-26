@@ -421,7 +421,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.103** on the private
+- Latest packaged build: SlopHero **0.4.104** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.102 (SHA-256
   `dd91a809156a86dab321d7563aef1d07b6f8c9e8f498812394ad0e039cf9e0c6`)
@@ -1345,7 +1345,7 @@ default-off background-camera experiment is the bounded camera prototype.
 The Unity WPA render/cull weights still lack per-camera or per-renderer
 attribution, so they cannot justify a broader camera removal.
 
-The next local prototype adds per-camera CPU phase intervals to the optional
+Version 0.4.104 adds per-camera CPU phase intervals to the optional
 30-second timing capture using Unity's pre-cull, pre-render, and post-render
 callbacks. It registers callbacks only during capture and removes them on
 completion. The pre-cull/pre-render interval includes culling and any camera
@@ -1379,6 +1379,18 @@ They are not targets for lowering the user's 1000 Hz controller rate. The
 older online `Client_GameplayScene.Update` contains `GameObject.Find`, but
 only while waiting for the `GameManager` before the network song starts; it
 is not a per-frame lookup throughout active gameplay.
+
+## v0.4.104 package
+
+The release build succeeds against the supplied generated assemblies with
+zero warnings/errors, and all 114 Core checks pass. The ZIP contains only
+`Mods/SlopHero.dll`. The optional capture now reports per-camera pre-cull to
+pre-render and pre-render to post-render CPU averages. No FPS gain is claimed;
+those callback intervals are attribution data and have not yet been runtime
+validated on Windows.
+
+- ZIP SHA-256: `6d60c6a85b65510856a5e05e62b18fb5627ba426a679467d837c48273a615cf8`
+- DLL SHA-256: `ae1090753e77ed9919bd2fa1f4852742ae3fed37eda303a1e2fd6eba42965e7f`
 
 ## v0.4.103 package
 

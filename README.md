@@ -1,11 +1,15 @@
-# SlopHero 0.4.103 alpha
+# SlopHero 0.4.104 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: measured, reversible
 optimizations that preserve guitar timing and polling, online play, and existing
 mod features.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.103
+build, compiled against its loader and generated assemblies. Version 0.4.104
+adds camera phase attribution to the optional timing capture: per camera it
+reports CPU time from pre-cull to pre-render and from pre-render to post-render.
+These callback intervals help identify which camera is busy; they do not measure
+GPU presentation and add no callbacks outside an active capture. Version 0.4.103
 fixes optional visual discovery to use Unity's native Animator type and the
 current live component references. It also deactivates the two Star Power
 side-glow branches during eligible solo play when enabled, restoring them on
@@ -183,7 +187,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.103 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.103-alpha.zip)
+[Download SlopHero v0.4.104 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.104-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
@@ -815,7 +819,11 @@ vanilla effects.
 
 **F8 → Controls → Capture mod timings for 30 seconds** writes callback averages,
 maximums, call counts, observed update rate, Unity unscaled frame-time
-percentiles, and HUD positions to `Latest.log`. Start during a song, close F8,
+percentiles, per-camera render-phase averages, and HUD positions to `Latest.log`.
+For each camera, pre-cull to pre-render spans culling and intervening camera
+callbacks; pre-render to post-render spans rendering work and callbacks. These
+are CPU callback intervals, not isolated native culling cost or GPU presentation.
+Start during a song, close F8,
 and play the same passage. Keep chart, tempo, visual settings, and other mods
 constant; the capture records the HUD positions so placement comparisons can be
 checked directly. Timing capture ends automatically or with **Finish timing
