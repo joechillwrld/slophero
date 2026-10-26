@@ -1,9 +1,24 @@
-# Aggressive solo rendering candidates, 2026-10-26
+# Aggressive solo rendering prototypes, 2026-10-26
 
-Research against the supplied v1.1.0.6142 binary and assets; none of these four
-prototypes is implemented or measured. This supplements the existing camera
-benchmarks. It does not turn their two different visual configurations into a
-controlled A/B or prove that sustains dominate the guitar-camera cost.
+Research against the supplied v1.1.0.6142 binary and assets. Four independent
+default-off implementations now exist in v0.4.115. Their in-game behavior and
+performance are unmeasured. This supplements the existing camera benchmarks;
+it does not prove that sustains dominate guitar-camera cost.
+
+## v0.4.115 implementation status
+
+| Prototype | Runtime behavior | Main limitation to validate |
+| --- | --- | --- |
+| Repeated sustain writes | `SustainStaticWriteCachePrototype` hooks Unity's sprite/color setters, `MaterialPropertyBlock.SetFloat`, `Renderer.SetPropertyBlock`, and block clearing only while this toggle is active. It caches exact values for renderers using the mapped regular `CloneHero/Sustains` shader. | Hooks run at global Unity setters while active, then filter by renderer/block. That managed interception could cost more than the writes it skips. Position and changed values still run normally. This is broader than native callsite hooks and is a CPU experiment. |
+| Sustain batching flags | `SustainBatchingPrototype` changes the shared regular-body material's `DisableBatching` override tag to `False` and enables instancing, restoring both on scope exit. | This asks Unity to batch; it does not create combined mesh geometry or verify the shader has an instancing variant. Per-tail property blocks may still prevent batching, and the shader's vertex sizing can distort tails. |
+| Plain held tails | `PlainHeldSustainPrototype` sets `forceRenderingOff` only on sustain-glow SpriteRenderers under the local `GuitarNoteRenderer`; it restores their previous state on pause/scope exit. | Removes glow rendering only. The native held-tail helper and all whammy input/scoring stay live. |
+| HUD render merge | `HudCameraMergePrototype` draws visible camera-layer renderers on the guitar camera with HUDCam's view/projection, sorting keys, and 20 Hz state refresh. If camera-space Canvas content is present, it keeps HUDCam enabled with only Canvas layers and merges the remaining renderer layers. | Explicit draw order can differ; the command buffer rebuild adds CPU work and 20 Hz visibility updates can briefly lag. If no layers can be separated, it fails closed and leaves HUDCam alone. |
+
+All four switches default off and run only during eligible offline solo songs.
+The test path restores on pause, settings interaction, focus loss, transitions,
+online play, and scene changes. These switches are experiments, not established
+optimizations; compare raw PresentMon frame intervals and inspect note/HUD
+parity before retaining any of them.
 
 ## New exact-build evidence
 

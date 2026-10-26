@@ -1,11 +1,16 @@
-# SlopHero 0.4.114 alpha
+# SlopHero 0.4.115 alpha
 
-**Sloptifine** is the name for SlopHero's performance work: measured, reversible
-optimizations that preserve guitar timing and polling, online play, and existing
-mod features.
+**Sloptifine** is the name for SlopHero's performance work: reversible
+experiments judged by measurements. Gameplay timing, online play, and the
+1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.114
+build, compiled against its loader and generated assemblies. Version 0.4.115
+adds four independent default-off solo rendering prototypes: an exact-value
+sustain write cache, Unity batching flags for sustain bodies, optional removal
+of held-tail glow, and a command-buffer HUD camera merge that keeps camera-space
+Canvas layers on HUDCam. Their in-game behavior and frame-time impact remain
+unmeasured. The previous camera-cap release details follow. Version 0.4.114
 adds a configurable 40–120-unit guitar-camera far-clip cap (default 80) and
 temporarily suspends it during either camera-isolation benchmark, so those
 benchmarks compare with the stock 120-unit distance. The cap remains default-off,
@@ -234,7 +239,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.114 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.114-alpha.zip)
+[Download SlopHero v0.4.115 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.115-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

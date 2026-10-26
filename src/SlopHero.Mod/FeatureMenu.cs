@@ -41,6 +41,8 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> preserveNetworkTickRemainder = null!;
     private MelonPreferences_Entry<bool> disableHudCameraBenchmark = null!;
     private MelonPreferences_Entry<bool> disableGuitarCameraBenchmark = null!;
+    private MelonPreferences_Entry<bool> cacheStaticSustainWrites = null!, batchSustainBodies = null!;
+    private MelonPreferences_Entry<bool> hideHeldSustainGlow = null!, mergeHudCamera = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
     private readonly VisualOverrides visuals = new();
@@ -65,6 +67,10 @@ public sealed partial class Core
     private readonly PlayerCameraFarClipOverride playerCameraFarClip = new();
     private readonly HudCameraBenchmarkOverride hudCameraBenchmark = new();
     private readonly GuitarCameraBenchmarkOverride guitarCameraBenchmark = new();
+    private readonly SustainStaticWriteCachePrototype sustainWriteCache = new();
+    private readonly SustainBatchingPrototype sustainBatching = new();
+    private readonly PlainHeldSustainPrototype plainHeldSustains = new();
+    private readonly HudCameraMergePrototype hudCameraMerge = new();
     private readonly NetworkTickRemainderOverride networkTickRemainder = new();
     private readonly OptionalHudAnimationsOverride optionalHudAnimations = new();
     private readonly RuntimeTimings timings = new();
@@ -174,6 +180,10 @@ public sealed partial class Core
         farClipDistance = preferences.CreateEntry("PerformanceGuitarCameraFarClip", 80);
         disableHudCameraBenchmark = preferences.CreateEntry("PerformanceDisableHudCameraBenchmark", false);
         disableGuitarCameraBenchmark = preferences.CreateEntry("PerformanceDisableGuitarCameraBenchmark", false);
+        cacheStaticSustainWrites = preferences.CreateEntry("PerformanceCacheStaticSustainWrites", false);
+        batchSustainBodies = preferences.CreateEntry("PerformanceBatchSustainBodies", false);
+        hideHeldSustainGlow = preferences.CreateEntry("PerformanceHideHeldSustainGlow", false);
+        mergeHudCamera = preferences.CreateEntry("PerformanceMergeHudCamera", false);
         hidePbPopup = preferences.CreateEntry("PerformanceHidePbPopup", false);
         hideStarPowerSideGlows = preferences.CreateEntry("PerformanceHideStarPowerSideGlows", false);
         preserveNetworkTickRemainder = preferences.CreateEntry("PerformancePreserveNetworkTickRemainder", false);
@@ -241,7 +251,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.114", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.115", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
             if (GUI.Button(new Rect(frameX + menuWidth - 48, frameY + 13, 32, 32), "×", menuClickStyle))
@@ -300,7 +310,7 @@ public sealed partial class Core
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 6 => 1980, _ => 500 };
+        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 6 => 2420, _ => 500 };
         Rect viewport = new(frameX + sidebarWidth + 12, frameY + 132, 680, menuHeight - 146);
         Rect content = new(0, 0, 656, contentHeight);
         settingsScrollPosition = GUI.BeginScrollView(viewport, settingsScrollPosition, content);
@@ -568,6 +578,14 @@ public sealed partial class Core
         SectionHeader("Online networking experiment", x, networkY);
         Toggle(preserveNetworkTickRemainder, "Preserve fractional network tick time (online only)", x, networkY + 30);
         GUI.Label(new Rect(x + 4, networkY + 74, 610, 72), "Experimental; default off. Keeps the fractional remainder after a connected network update, but skips whole missed intervals to avoid catch-up bursts. Could change packet timing or worsen desync. Instrument polling is unchanged.");
+
+        float sustainY = networkY + 170;
+        SectionHeader("Sustain and HUD rendering prototypes", x, sustainY);
+        Toggle(cacheStaticSustainWrites, "Skip repeated sustain sprite, color, and length writes", x, sustainY + 30);
+        Toggle(batchSustainBodies, "Allow Unity batching for sustain bodies", x, sustainY + 70);
+        Toggle(hideHeldSustainGlow, "Hide held-sustain glow (plain tails)", x, sustainY + 110);
+        Toggle(mergeHudCamera, "Merge HUDCam renderers into the guitar camera", x, sustainY + 150);
+        GUI.Label(new Rect(x + 4, sustainY + 194, 610, 126), "All default off and limited to offline solo songs. The write cache skips exact duplicate values only; positions and changing tail data stay live. Batching can distort tail geometry. Plain tails remove only glow. HUD merge keeps HUDCam's orthographic projection; camera-space Canvas content stays on a narrowed HUDCam while other renderers move to the guitar camera. Sorting can differ.");
     }
 
     private void Toggle(MelonPreferences_Entry<bool> entry, string label, float x, float y)
@@ -1070,6 +1088,10 @@ public sealed partial class Core
             Int("PerformanceGuitarCameraFarClip", farClipDistance);
             Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
             Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
+            Bool("PerformanceCacheStaticSustainWrites", cacheStaticSustainWrites);
+            Bool("PerformanceBatchSustainBodies", batchSustainBodies);
+            Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
+            Bool("PerformanceMergeHudCamera", mergeHudCamera);
             Bool("PerformanceHidePbPopup", hidePbPopup);
             Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
             Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1130,6 +1152,10 @@ public sealed partial class Core
         Int("PerformanceGuitarCameraFarClip", farClipDistance, 40, 120);
         Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
         Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
+        Bool("PerformanceCacheStaticSustainWrites", cacheStaticSustainWrites);
+        Bool("PerformanceBatchSustainBodies", batchSustainBodies);
+        Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
+        Bool("PerformanceMergeHudCamera", mergeHudCamera);
         Bool("PerformanceHidePbPopup", hidePbPopup);
         Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
         Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1459,6 +1485,7 @@ public sealed partial class Core
         HandleOptionalHudResume(now);
         if (now < nextOverridePass) return;
         nextOverridePass = now + .05;
+        hudCameraMerge.RefreshProjection();
         // This shares the existing 20 Hz override cadence. A separate timer
         // polled every LateUpdate did no extra useful work.
         if (!hiddenLeaderboardError && (suspendHiddenLeaderboard.Value || hiddenLeaderboard.NeedsRestore))

@@ -78,11 +78,13 @@ remaining cost of eligible rendered-frame work.
 and its [exact-build evidence](sustain-rendering-evidence-2026-10-26.json).
 Current sustain shaders explicitly disable ordinary batching, while the
 regular-tail producer has unguarded per-tail setter/property-block sequences.
-Four separate proposals cover static sustain-output caching, batched regular
-tail geometry, an optional plain held-tail mode, and explicit HUD rendering
-without HUDCam's automatic pass. None is implemented or measured; consult the
-user before adding the riskier visual behavior. Do not replace note-head state
-caching (already present), lower input polling, or disable note updates.
+Four default-off prototypes cover repeated sustain-output write caching,
+Unity's existing sustain batching flags, plain held tails, and explicit HUD
+renderer submission. These are implemented in 0.4.115 but still need Windows
+visual and PresentMon validation. The cache uses managed setter hooks, the
+batching toggle does not build new geometry, and the HUD path keeps HUDCam for
+camera-space Canvas layers. Do not replace note-head state caching (already
+present), lower input polling, or disable note updates.
 
 1. **Separate the IL2CPP dispatcher from its callbacks.** The 31-second `Sloptifine-CPU.csv`
    puts roughly 9 seconds of *inclusive* weight at
@@ -433,7 +435,7 @@ behavior, 1000 Hz input polling, and existing SlopHero features.
 
 ## Build and evidence
 
-- Latest packaged build: SlopHero **0.4.114** on the private
+- Latest packaged build: SlopHero **0.4.115** on the private
   `slophero-v1.1-alpha` branch. The latest uploaded `Latest.log` is from
   0.4.113 (SHA-256
   `c15196a6f99e034e4033540dfd780a18849f25199d7257ebc876b87cbc3f333c`)
@@ -1901,3 +1903,33 @@ this also prevents the camera visibility change from tripping the strict
 camera-identity check. Lower caps can hide distant notes/effects and need a
 visual check on the user's charts. The captures do not measure the cap in
 isolation, so no gain is claimed.
+
+## 2026-10-26: 0.4.115 sustain and HUD rendering prototypes
+
+Four independent default-off toggles turn the latest exact-build mapping into
+testable code. The regular sustain write cache hooks Unity sprite/color setters
+and material-property-block calls only while active, filtering to renderers
+with the mapped `CloneHero/Sustains` shader. It skips identical sprite, color,
+and `_SustainLength` values, while keeping positions and changed values live.
+The Harmony crossings may exceed the setter work saved, so its CPU impact is
+uncertain. The batching option sets the shared regular sustain material's
+`DisableBatching` override and instancing flag; it does not yet construct
+combined geometry or prove that the shader can instance without visual damage.
+The plain-tail option hides only the mapped sustain-glow renderers with
+`forceRenderingOff`; base tails, whammy input, scoring, and polling continue.
+
+The HUD merge records visible renderers from HUDCam's layers into a command
+buffer on the guitar camera using HUDCam's projection. It rebuilds its draw list
+at the existing 20 Hz override cadence. If camera-space Canvas content exists,
+HUDCam remains enabled with its culling mask narrowed to the Canvas layers and
+the other renderer layers are drawn by the command buffer. Explicit renderer
+sorting and the brief state-refresh delay may look different. It fails open if
+the active camera setup cannot be separated safely. All four restore on pause,
+menus, focus loss, transitions, online play, and scene exit. None has Windows
+visual validation or a matched PresentMon result yet; do not treat them as
+proven performance gains.
+
+The 0.4.115 Release build completed with zero warnings/errors and the existing
+Core checks passed (127). `downloads/SlopHero-0.4.115-alpha.zip` contains only
+`Mods/SlopHero.dll`; its SHA-256 is
+`e3e731bd473952ccc92cd92afefb62f3e998f2fdbd7c676b62517a393214b639`.

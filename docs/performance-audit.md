@@ -2333,8 +2333,41 @@ held-tail helper at `0x1155460` also submits dynamic whammy data, so it cannot
 share a simple static-length skip. Existing particle switches do not remove
 those glow renderers.
 
-The [new implementation plan](aggressive-render-targets-2026-10-26.md) records
-four proposals, exact callsites, prototype boundaries, visual risks, and
-remaining unknowns. A fingerprint-checked read-only extraction tool and JSON
-evidence are included. This research adds no runtime patch or binary version
-and establishes no new FPS gain.
+The [implementation plan](aggressive-render-targets-2026-10-26.md) records
+exact callsites, prototype boundaries, visual risks, and remaining unknowns.
+A fingerprint-checked read-only extraction tool and JSON evidence are included.
+
+### v0.4.115 sustain and HUD rendering prototypes
+
+All four controls are independent and scoped to active offline solo songs.
+`PerformanceCacheStaticSustainWrites` hooks Unity sprite/color setters plus
+material-property-block calls only while active, filtering to renderers with
+the mapped `CloneHero/Sustains` shader. It skips exact repeat values for the
+sprite, color, and `_SustainLength` float while preserving positions and
+changed data. The managed hooks could cost more than the native setters they
+avoid.
+
+`PerformanceBatchSustainBodies` changes the shared regular sustain material's
+`DisableBatching` override to `False` and enables instancing. It tests Unity's
+existing batching path; it does not yet create a combined mesh. Shader vertex
+sizing and instancing support remain unresolved, so tail lengths or geometry
+may change. Open tails are outside this first experiment.
+
+`PerformanceHideHeldSustainGlow` sets `forceRenderingOff` on sustain-glow
+SpriteRenderers under the active `GuitarNoteRenderer`. It preserves the base
+tail, instrument polling, whammy input, and scoring, but removes the extra glow.
+The native held-tail helper continues to run, so this tests GPU work only.
+
+`PerformanceMergeHudCamera` records HUDCam-layer renderers in a command buffer
+on the guitar camera using HUDCam's orthographic matrices. Camera-space Canvas
+content stays on HUDCam; when present, the camera keeps only Canvas layers and
+the command buffer handles the other renderer layers. Sorting is explicit and
+the visibility list refreshes at 20 Hz. This can reorder elements, briefly
+show stale visibility, or cost more CPU than it saves. The prototype fails open
+if the active camera setup cannot be separated.
+
+The prototypes compile against supplied assemblies and default to off. They
+have no Windows visual validation or matched PresentMon result. An activation
+log is not a performance result; compare one option at a time using raw frame
+intervals and check note/HUD parity. The 0.4.115 Release build completed with
+zero warnings/errors and the existing Core checks passed (127).

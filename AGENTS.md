@@ -12,9 +12,10 @@ Use the existing binaries, symbols, source archive, and captures to pursue
 several independent leads before building. A diagnostic log or another
 capture request alone is not the performance work the user asked for.
 The newest aggressive candidates and exact callsite/shader evidence are in
-`docs/aggressive-render-targets-2026-10-26.md` and its linked JSON. These are
-unimplemented research proposals, not part of 0.4.114. Follow their boundaries
-and the user's next prototype choice; do not report their FPS gains as measured.
+`docs/aggressive-render-targets-2026-10-26.md` and its linked JSON. The four
+default-off prototypes are now implemented for 0.4.115; none has Windows
+runtime or FPS validation yet. Follow the documented boundaries and don't
+report gains as measured.
 The handoff indexes current mod code, older source, exact-game binaries,
 Unity symbols, logs, captures, and local raw uploads. `references/` and
 `/workspace/attachments` are not committed to Git; in a fresh environment,
