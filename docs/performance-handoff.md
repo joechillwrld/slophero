@@ -2131,3 +2131,12 @@ added.
 The 0.4.122 Release build has zero warnings/errors and all 127 Core checks
 pass. `downloads/SlopHero-0.4.122-alpha.zip` contains only `Mods/SlopHero.dll`;
 SHA-256: `b5163b2bc28523f61285b1babe229e9f225f9a93a1466c98a35c6ce24aea8d54`.
+
+The first 0.4.122 Windows log confirms interval 1 activates and restores.
+In one 30-second window it yielded 1,878.6 render callbacks/s and 1,881.8
+simulation Updates/s, versus 1,501.5 and 3,003.1/s at interval 2 in a later
+window. The interval-1 callback p99 was worse (<=1.38 vs <=0.97 ms), and HUD
+merge was active with different explicit-renderer populations in both runs.
+Neither window measures presented FPS. Geometry activated but never drew a
+batch; the alpha shader switch safely turned itself off after finding no
+eligible material. No code change is justified by this single mixed A/B.

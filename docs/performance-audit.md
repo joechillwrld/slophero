@@ -2405,6 +2405,20 @@ whole song. Activation counts and mod callback intervals are not FPS gains.
 
 ### v0.4.122 render scheduling prototype and culling review
 
+The first supplied 0.4.122 Windows log confirms the render-interval setter
+activated at `2 → 1` and restored `2` on song exit without an exception. Its
+30-second capture with interval 1 reported 1,878.6 scheduled render
+callbacks/s and 1,881.8 simulation Updates/s; a later capture with interval
+2 reported 1,501.5 render callbacks/s and 3,003.1 Updates/s. The interval-1
+capture had p99 render-callback spacing <=1.38 ms versus <=0.97 ms at interval
+2. Both runs also activated HUD-camera merge and the geometry prototype; the
+HUD merge reported 83 explicit renderers in the interval-1 run versus 12 in
+the interval-2 run. Geometry reported no first batch in either run. These
+windows establish that the prototype changed Unity scheduling, not an isolated
+presented-FPS gain. They show the intended render/update tradeoff and a less
+favorable callback tail, with game/input polling still above 1,000 Updates/s
+in this test. Use only the render-interval switch in a matched next A/B.
+
 The 0.4.120 runtime log reports `renderFrameInterval=2` alongside about
 2,900–3,100 simulation Updates/s and 1,460–1,560 scheduled render callbacks/s.
 The older source's Video Settings “Framerate” control writes
