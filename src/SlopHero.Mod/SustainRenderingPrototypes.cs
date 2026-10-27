@@ -335,10 +335,19 @@ internal sealed class PlainHeldSustainPrototype
         try
         {
             updateStage = "scan live guitar sprite renderers";
+            // The pool has hundreds of renderers but only a handful of
+            // materials. Resolve shader/name once per material while the
+            // opt-in plain-tail setting builds its renderer set.
+            var glowMaterials = new Dictionary<IntPtr, bool>();
             foreach (var renderer in SustainStaticWriteCachePrototype.FindGuitarSpriteRenderers(game))
             {
                 updateStage = "read guitar sprite material";
-                if (renderer == null || !IsGlow(renderer.sharedMaterial)) continue;
+                if (renderer == null) continue;
+                var material = renderer.sharedMaterial;
+                if (material == null) continue;
+                if (!glowMaterials.TryGetValue(material.Pointer, out bool isGlow))
+                    glowMaterials[material.Pointer] = isGlow = IsGlow(material);
+                if (!isGlow) continue;
                 IntPtr pointer = renderer.Pointer;
                 if (renderers.ContainsKey(pointer)) continue;
                 updateStage = "read glow renderer enabled state";

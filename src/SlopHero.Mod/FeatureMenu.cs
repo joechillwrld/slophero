@@ -495,7 +495,15 @@ public sealed partial class Core
             : $"Press a key or controller button for {capture}.");
         Number("Song speed step (%)", songSpeedStep.Value, x, y + 270, 1, 500,
             v => songSpeedStep.Value = SongSpeedControl.ClampStep((int)Math.Round(v)));
-        if (GUI.Button(new Rect(x, y + 314, 540, 36), timings.Active ? "Finish timing report" : "Capture mod timings for 30 seconds"))
+        bool modTimingClicked, cameraTimingClicked = false;
+        if (timings.Active)
+            modTimingClicked = GUI.Button(new Rect(x, y + 314, 540, 36), "Finish timing report");
+        else
+        {
+            modTimingClicked = GUI.Button(new Rect(x, y + 314, 265, 36), "Mod timing (30 seconds)");
+            cameraTimingClicked = GUI.Button(new Rect(x + 275, y + 314, 265, 36), "Camera timing (30 seconds)");
+        }
+        if (modTimingClicked || cameraTimingClicked)
         {
             if (timings.Active) timings.Finish();
             else if (gameplayInitialized)
@@ -507,7 +515,7 @@ public sealed partial class Core
                 LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret/starProgress)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}/{disableStarProgressParticles.Value}[starSuppressed={starProgressParticles.IsSuppressed}], pausedFretFadeScripts={performance.PausedFretFadeCount}, blackBackground={skipBackgroundCamera.Value}[active={backgroundCamera.IsActive}], hudCameraBenchmark={disableHudCameraBenchmark.Value}[active={hudCameraBenchmark.IsActive}], guitarCameraBenchmark={disableGuitarCameraBenchmark.Value}[active={guitarCameraBenchmark.IsActive}], guitarFarClip={limitPlayerCameraFarClip.Value}[active={playerCameraFarClip.IsActive}], hiddenLeaderboard={suspendHiddenLeaderboard.Value}[canvasSuspended={hiddenLeaderboard.CanvasSuspended}], freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI(discovery/session)={stopMidiInput.Value}/{disableMidiForSession.Value}, Discord={disableDiscordPresence.Value}, cheatScanner={pauseGameplayCheatScanner.Value}[state={cheatScanner.Status}], gameplayUiEvents={pauseGameplayUiProcessing.Value}[suspended={gameplayUiEvents.IsSuspended}], highwayPause={pauseHighwayAnimations.Value}[hook={highwayAnimations.IsInstalled},suppressed={highwayAnimations.IsSuppressed}], mouseUiSkip={skipGameplayMouseUi.Value}[hook={mouseUiGameplay.IsInstalled},suppressed={mouseUiGameplay.IsSuppressed}], legacyMouseEvents={skipLegacyMouseEvents.Value}[hook={legacyMouseEvents.IsInstalled},suppressed={legacyMouseEvents.IsSuppressed}], rewiredMouseSampler={pauseRewiredMousePolling.Value}[hook={rewiredMousePolling.IsInstalled},suppressed={rewiredMousePolling.IsSuppressed}], rewiredKeyboardSampler={pauseRewiredKeyboardPolling.Value}[hook={rewiredKeyboardPolling.IsInstalled},suppressed={rewiredKeyboardPolling.IsSuppressed}], hotkeyPoll120={limitSlopHeroShortcutPolling.Value}, whammyDirtyGate={throttleWhammyTexture.Value}[hook={whammyTextureThrottle.IsInstalled},passThrough={whammyTextureThrottle.IsSuppressed}], networkTickRemainder={preserveNetworkTickRemainder.Value}[hook={networkTickRemainder.IsInstalled}], nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                 LoggerInstance.Msg($"Sloptifine 3 visuals: PB={hidePbPopup.Value}[active={optionalHudAnimations.PbSuppressed}], side glows={hideStarPowerSideGlows.Value}[active={optionalHudAnimations.GlowSuppressed}].");
                 LogGameplaySnapshot();
-                timings.Start();
+                timings.Start(includeCameraTiming: cameraTimingClicked);
             }
             else Notice("Start a song before capturing mod timings.");
         }

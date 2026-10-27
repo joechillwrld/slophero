@@ -25,7 +25,7 @@ internal sealed class RuntimeTimings
         internal long CullCalls, RenderCalls;
     }
     public bool Active => deadline != 0;
-    public void Start()
+    public void Start(bool includeCameraTiming = false)
     {
         if (Active) Finish();
         Array.Clear(total); Array.Clear(maximum); Array.Clear(calls);
@@ -34,21 +34,24 @@ internal sealed class RuntimeTimings
         maxUpdateMs = 0; maxRenderMs = maxRepaintMs = 0;
         cameras.Clear();
         start = Stopwatch.GetTimestamp(); deadline = start + 30 * Stopwatch.Frequency;
-        try
+        if (includeCameraTiming)
         {
-            preCullCallback ??= DelegateSupport.ConvertDelegate<Camera.CameraCallback>(new Action<Camera>(OnCameraPreCull));
-            preRenderCallback ??= DelegateSupport.ConvertDelegate<Camera.CameraCallback>(new Action<Camera>(OnCameraPreRender));
-            postRenderCallback ??= DelegateSupport.ConvertDelegate<Camera.CameraCallback>(new Action<Camera>(OnCameraPostRender));
-            Camera.onPreCull += preCullCallback;
-            Camera.onPreRender += preRenderCallback;
-            Camera.onPostRender += postRenderCallback;
+            try
+            {
+                preCullCallback ??= DelegateSupport.ConvertDelegate<Camera.CameraCallback>(new Action<Camera>(OnCameraPreCull));
+                preRenderCallback ??= DelegateSupport.ConvertDelegate<Camera.CameraCallback>(new Action<Camera>(OnCameraPreRender));
+                postRenderCallback ??= DelegateSupport.ConvertDelegate<Camera.CameraCallback>(new Action<Camera>(OnCameraPostRender));
+                Camera.onPreCull += preCullCallback;
+                Camera.onPreRender += preRenderCallback;
+                Camera.onPostRender += postRenderCallback;
+            }
+            catch (Exception ex)
+            {
+                RemoveCameraCallbacks();
+                MelonLogger.Warning($"Camera timing could not start; ordinary mod timing remains available: {ex.Message}");
+            }
         }
-        catch (Exception ex)
-        {
-            RemoveCameraCallbacks();
-            MelonLogger.Warning($"Camera timing could not start; ordinary mod timing remains available: {ex.Message}");
-        }
-        MelonLogger.Msg("Mod timing capture started for 30 seconds. Keep playing the same chart/settings.");
+        MelonLogger.Msg($"Mod timing capture started for 30 seconds (camera callbacks={(includeCameraTiming ? "on" : "off")}). Keep playing the same chart/settings.");
     }
     private void RemoveCameraCallbacks()
     {

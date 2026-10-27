@@ -4,6 +4,42 @@ This is the current starting point for performance work. The detailed
 chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
+
+## Unshipped follow-up for the next build
+
+The source tree now has three changes **after** the published 0.4.123 ZIP;
+Luna can version, package, and publish them together after review:
+
+1. `VisualOverrides.Clear()` restores captured hidden renderer states and
+   custom sprite/TMP RGB colors before clearing its references. Mod unload
+   now calls that full cleanup instead of restoring only beatline and
+   fret-string scripts. This fixes a concrete state-ownership defect when
+   Gameplay objects survive a transition or the mod unloads mid-scene.
+2. `PlainHeldSustainPrototype` resolves shader/name only once per material
+   while discovering the 300 glow renderers in the opt-in plain-tail mode.
+   The previous code repeated the material-name work for each sprite. The
+   0.4.123 log showed the scan/activation on the first active song update
+   and 12,688–19,885 redundant disable writes per song; the exact share of
+   activation time saved by this cache is not yet measured. It keeps the
+   existing visual guard and restore path.
+3. The ordinary **Mod timing (30 seconds)** button no longer subscribes to
+   Unity's per-camera callbacks. A separate **Camera timing (30 seconds)**
+   button retains that attribution when explicitly needed. The four-run
+   render-interval comparison subscribed to three camera events per camera
+   per rendered frame, so its callback rates include instrumentation cost.
+   This improves future measurement fidelity, not ordinary gameplay FPS.
+
+Release build against `references/` succeeds with zero warnings/errors;
+all 127 Core checks pass. These changes are not in the 0.4.123 download.
+Keep the existing default-off render-every-update switch as an experiment:
+the latest log confirms a 29–30% rise in scheduled render callbacks but about
+35% fewer simulation Updates; there is no presented-FPS measurement for this
+build. The 15-to-14 Unity worker option showed no consistent advantage.
+Do not describe either as a proven FPS gain or silently enable them. Current
+Unity camera/cull samples remain shared engine work, and the older source's
+repeated non-held sustain-glow disable is only a lead for a carefully scoped
+current-build producer patch; do not replace the existing broad setter guard
+without visual and frame validation.
 The user has already supplied logs, assets, game binaries, WPA exports,
 PresentMon captures, and a matching UnityPlayer PDB. Read the existing
 evidence before requesting another capture.

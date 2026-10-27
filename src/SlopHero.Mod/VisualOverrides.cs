@@ -52,6 +52,29 @@ internal sealed class VisualOverrides
     {
         RestoreBeatRenderers();
         RestoreStringAttach();
+        // A scene transition can reuse Gameplay objects, and unloading the
+        // mod does not unload the scene. Release every visual state we own
+        // before discarding the references needed to restore it.
+        foreach (var state in hidden.Values)
+            try { if (state.Renderer != null && state.Renderer.enabled != state.Original) state.Renderer.enabled = state.Original; } catch { }
+        foreach (var state in colors.Values)
+            try
+            {
+                if (state.Renderer == null) continue;
+                var restored = state.Original;
+                restored.a = state.Renderer.color.a;
+                state.Renderer.color = restored;
+            }
+            catch { }
+        foreach (var state in texts.Values)
+            try
+            {
+                if (state.Text == null) continue;
+                var restored = state.Original;
+                restored.a = state.Text.color.a;
+                state.Text.color = restored;
+            }
+            catch { }
         colors.Clear(); hidden.Clear(); speeds.Clear(); practiceClockRate.Reset(); texts.Clear(); spriteChildren.Clear(); starFaceSprites.Clear(); stringRenderers.Clear(); noteRenderers.Clear(); visibility.Clear(); hiddenPlayers.Clear(); oldSides = oldStrings = oldBeats = oldScore = oldPractice = oldConstantSpeed = false; practiceClockSampling = false; nextPracticeClockSample = 0; nextScoreColorRefresh = nextPlayerPass = 0; fullSongSpeedSyncPending = true; songProgress = null; starProgresses = null;
     }
     private SpriteRenderer[] Sprites(GameObject go)
