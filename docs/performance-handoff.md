@@ -2156,3 +2156,27 @@ describe FPS improvement as measured until a matched capture exists.
 The 0.4.123 Release build has zero warnings/errors and all 127 Core checks
 pass. `downloads/SlopHero-0.4.123-alpha.zip` contains only `Mods/SlopHero.dll`;
 SHA-256: `d5beeed0ee16bee1c8942359e7cd2750ad03f46b8bdb0624410d155ea4b7d7a8`.
+
+### 0.4.123 Windows four-run follow-up
+
+The uploaded `Latest.log` from the 0.4.123 install contains four 30-second
+Gameplay timing windows. The retired HUD merge, sustain geometry batch,
+split-alpha switch, and global sustain write cache did not activate. The
+remaining render and worker experiments were tested in a two-by-two sequence:
+
+| Render interval | Unity worker limit | Scheduled render callbacks/s | Simulation Updates/s | Update p99 |
+| --- | ---: | ---: | ---: | ---: |
+| 2 (game default) | 14 | 1,602.1 | 3,204.2 | <=0.51 ms |
+| 2 (game default) | 15 | 1,623.6 | 3,247.3 | <=0.49 ms |
+| 1 (experiment) | 15 | 2,086.1 | 2,093.3 | <=0.68 ms |
+| 1 (experiment) | 14 | 2,105.7 | 2,110.5 | <=0.70 ms |
+
+Rendering every Update was applied and restored correctly. Across these runs,
+it raised the scheduled render callback rate by about 29-30% but reduced the
+simulation Update rate by about 35% and increased p99 Update spacing. The
+worker-limit pair has no consistent favorable direction. This log contains no
+presented-frame measurements, so it does not establish a presented-FPS gain.
+The first run had one 10.4 ms `Performance effects` call; later runs did not
+repeat it, so treat it as a possible first-use hitch, not a recurring cost.
+The log contains no SlopHero error or exception. Do not ship another worker
+limit or render-scheduling change based only on these callback counts.
