@@ -2403,6 +2403,29 @@ near-entry snapshots showed zero tracked with two UVScroll scripts present;
 those snapshots do not establish that the scripts stayed untracked for the
 whole song. Activation counts and mod callback intervals are not FPS gains.
 
+### v0.4.122 render scheduling prototype and culling review
+
+The 0.4.120 runtime log reports `renderFrameInterval=2` alongside about
+2,900–3,100 simulation Updates/s and 1,460–1,560 scheduled render callbacks/s.
+The older source's Video Settings “Framerate” control writes
+`Application.targetFrameRate`; it does not establish how the current build
+chose its render interval. The current Unity wrapper exposes an interval
+setter. A new separate default-off offline-solo test sets the interval from
+exactly 2 to 1 and restores 2 on pause, focus loss, restart, song or scene
+exit. It yields if the game changes the interval itself. More rendering can
+lower simulation and instrument-polling rates; no FPS result is claimed.
+
+The existing WPA `Camera::CustomCull` 4,654 ms row is inclusive, shared
+across cameras, and collapsed. `CullResults::GetOrCreateSharedRendererScene`
+includes 2,006 ms in render-node extraction, but the grid cannot attribute
+that cost to one camera or SpriteRenderer. The live scene has a necessary
+guitar camera plus HUDCam; removing HUDCam through explicit native draws was
+slower in the supplied callback tests. The 48 visible input-viewer sprites
+have a small mapped `InputViewer.Update` row and the game already offers a
+viewer visibility setting. These facts do not justify another blanket camera
+skip or duplicate viewer toggle. Focus subsequent culling changes on a
+specific renderer population with measured draw/cull cost.
+
 ### v0.4.121 response to the 0.4.120 runtime log
 
 The supplied 0.4.120 log has four 30-second mod timing captures. The two

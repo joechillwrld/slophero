@@ -45,7 +45,11 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.121. It resets saved opt-ins for HUD-camera
+The latest packaged build is 0.4.122. It adds a default-off offline-solo
+render-every-update test after the user's log showed renderFrameInterval=2;
+the effect on presented FPS, simulation, and input polling needs a Windows
+test. Native culling/camera rows remain shared engine work without a safe
+single call to skip. Version 0.4.121 resets saved opt-ins for HUD-camera
 merge, sustain geometry batching, and unused-alpha sampling after the
 0.4.120 log showed lower callback rates with HUD merge, no geometry batch,
 and no eligible alpha material. It also reduces geometry scan overhead when

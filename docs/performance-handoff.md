@@ -2110,3 +2110,24 @@ directional callback evidence, not measured presented FPS. See the audit.
 The 0.4.121 Release build has zero warnings/errors and all 127 Core checks
 pass. `downloads/SlopHero-0.4.121-alpha.zip` contains only `Mods/SlopHero.dll`;
 SHA-256: `0e3d16955156c355e5818585f56d61fb11570398452e893fc7581492fd3ae040`.
+
+### 0.4.122: render interval test and camera-cull limit
+
+The user approved a separate, default-off offline-solo prototype for
+`OnDemandRendering.renderFrameInterval=1`. The latest log has interval 2 and
+roughly two simulation Updates per scheduled render. The prototype accepts
+only an original interval of 2, yields to any later game change, and restores
+on pause, focus loss, restart, scene exit, or option-off. It does not change
+game input/scoring code, but extra render work can lower the effective
+simulation and instrument-polling rate. Compare presented frames and input
+feel with only this switch varied; activation logs alone prove no FPS gain.
+
+Rechecking the symbolized WPA tree and exact Gameplay scene did not expose a
+safe camera-cull call to skip. The custom-cull/render-node rows are inclusive
+and shared; the attempted HUD-camera draw merge was slower. The existing game
+viewer visibility setting covers the 48 live input-viewer sprites, whose
+Update row is small. No new viewer toggle or blanket Unity cull detour was
+added.
+The 0.4.122 Release build has zero warnings/errors and all 127 Core checks
+pass. `downloads/SlopHero-0.4.122-alpha.zip` contains only `Mods/SlopHero.dll`;
+SHA-256: `b5163b2bc28523f61285b1babe229e9f225f9a93a1466c98a35c6ce24aea8d54`.

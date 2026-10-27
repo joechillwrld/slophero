@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.121", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.122", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -118,6 +118,7 @@ public sealed partial class Core : MelonMod
         hudCameraBenchmark.Clear();
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
+        renderEveryUpdatePrototype.Clear();
         sustainWriteCache.Clear(HarmonyInstance);
         sustainGeometryBatch.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
@@ -230,6 +231,7 @@ public sealed partial class Core : MelonMod
         hudCameraBenchmark.Clear();
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
+        renderEveryUpdatePrototype.Clear();
         sustainWriteCache.Clear(HarmonyInstance);
         sustainGeometryBatch.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
@@ -388,6 +390,7 @@ public sealed partial class Core : MelonMod
             if (!Application.isFocused) plainHeldSustains.Clear(HarmonyInstance);
             if (!Application.isFocused) unusedSpriteAlpha.Clear();
             if (!Application.isFocused) playerCameraFarClip.Restore();
+            if (!Application.isFocused) renderEveryUpdatePrototype.Restore();
             if (!Application.isFocused) highwayAnimations.SetSuppressed(false);
             if (capture != null)
             {
@@ -500,6 +503,7 @@ public sealed partial class Core : MelonMod
             bool plainHeldSustainRequested = hideHeldSustainGlow.Value;
             bool unusedSpriteAlphaRequested = skipUnusedSpriteAlpha.Value;
             bool hudCameraMergeRequested = mergeHudCamera.Value;
+            bool renderEveryUpdateRequested = renderEveryUpdate.Value;
             bool workerLimitCandidate = workerLimitRequested && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0;
@@ -511,7 +515,7 @@ public sealed partial class Core : MelonMod
                 || guitarCameraBenchmarkRequested
                 || sustainWriteCacheRequested || sustainGeometryRequested || plainHeldSustainRequested
                 || unusedSpriteAlphaRequested
-                || hudCameraMergeRequested
+                || hudCameraMergeRequested || renderEveryUpdateRequested
                 || skipMouseUiRequested || skipLegacyMouseRequested
                 || throttleWhammyTexture.Value || disableHitParticles.Value || disableSustainParticles.Value
                 || disableFretEffects.Value || disableStarProgressParticles.Value || freezeComboSmokeScroll.Value
@@ -590,7 +594,8 @@ public sealed partial class Core : MelonMod
             bool scopedExperimentRequested = mouseSamplerRequested || keyboardSamplerRequested
                 || backgroundCameraRequested || farClipRequested || hudCameraBenchmarkRequested
                 || guitarCameraBenchmarkRequested || sustainWriteCacheRequested || sustainGeometryRequested
-                || plainHeldSustainRequested || unusedSpriteAlphaRequested || hudCameraMergeRequested;
+                || plainHeldSustainRequested || unusedSpriteAlphaRequested || hudCameraMergeRequested
+                || renderEveryUpdateRequested;
             bool eligibleScopedExperiment = scopedExperimentRequested && OfflineSoloSongScope.IsEligible(
                 requested: true, gameReady: ready, songPlaying: songPlaying,
                 paused: ready && game!.isPaused,
@@ -633,6 +638,7 @@ public sealed partial class Core : MelonMod
             bool eligibleRenderPrototype = eligibleScopedExperiment && activeSoloContext && isOfflineSolo
                 && !hudCameraBenchmarkRequested && !guitarCameraBenchmarkRequested
                 && !hudCameraBenchmark.IsActive && !guitarCameraBenchmark.IsActive;
+            renderEveryUpdatePrototype.Update(renderEveryUpdateRequested, eligibleRenderPrototype);
             sustainWriteCache.Update(HarmonyInstance, sustainWriteCacheRequested, eligibleRenderPrototype, game);
             unusedSpriteAlpha.Update(unusedSpriteAlphaRequested, eligibleRenderPrototype, game);
             if (unusedSpriteAlpha.GuardRejected && skipUnusedSpriteAlpha.Value)
@@ -752,6 +758,7 @@ public sealed partial class Core : MelonMod
             hudCameraBenchmark.Clear();
             guitarCameraBenchmark.Clear();
             playerCameraFarClip.Clear();
+            renderEveryUpdatePrototype.Clear();
             sustainWriteCache.Clear(HarmonyInstance);
             sustainGeometryBatch.Clear();
             plainHeldSustains.Clear(HarmonyInstance);
@@ -781,6 +788,7 @@ public sealed partial class Core : MelonMod
         hudCameraBenchmark.Restore();
         guitarCameraBenchmark.Restore();
         playerCameraFarClip.Restore();
+        renderEveryUpdatePrototype.Restore();
         sustainWriteCache.Clear(HarmonyInstance);
         sustainGeometryBatch.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
@@ -812,6 +820,7 @@ public sealed partial class Core : MelonMod
         hudCameraBenchmark.Restore();
         guitarCameraBenchmark.Restore();
         playerCameraFarClip.Restore();
+        renderEveryUpdatePrototype.Restore();
         sustainWriteCache.Clear(HarmonyInstance);
         sustainGeometryBatch.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
@@ -1189,6 +1198,7 @@ public sealed partial class Core : MelonMod
         hudCameraBenchmark.Clear();
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
+        renderEveryUpdatePrototype.Clear();
         sustainWriteCache.Clear(HarmonyInstance);
         sustainGeometryBatch.Clear();
         plainHeldSustains.Clear(HarmonyInstance);

@@ -43,6 +43,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> disableGuitarCameraBenchmark = null!;
     private MelonPreferences_Entry<bool> cacheStaticSustainWrites = null!, batchSustainGeometry = null!;
     private MelonPreferences_Entry<bool> hideHeldSustainGlow = null!, skipUnusedSpriteAlpha = null!, mergeHudCamera = null!;
+    private MelonPreferences_Entry<bool> renderEveryUpdate = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, settingsWindowOffsetX = null!, settingsWindowOffsetY = null!;
     private MelonPreferences_Entry<float> scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
@@ -72,6 +73,7 @@ public sealed partial class Core
     private readonly SustainGeometryBatchPrototype sustainGeometryBatch = new();
     private readonly PlainHeldSustainPrototype plainHeldSustains = new();
     private readonly UnusedSpriteAlphaPrototype unusedSpriteAlpha = new();
+    private readonly RenderEveryUpdatePrototype renderEveryUpdatePrototype = new();
     private readonly HudCameraMergePrototype hudCameraMerge = new();
     private readonly NetworkTickRemainderOverride networkTickRemainder = new();
     private readonly OptionalHudAnimationsOverride optionalHudAnimations = new();
@@ -203,6 +205,7 @@ public sealed partial class Core
         // Native internal calls have a different crash risk, so require a new
         // explicit opt-in instead of inheriting that old preference/profile.
         mergeHudCamera = preferences.CreateEntry("PerformanceMergeHudCameraNative", false);
+        renderEveryUpdate = preferences.CreateEntry("PerformanceRenderEveryUpdateSolo", false);
         // The supplied 0.4.120 log has two lower-rate 30-second runs with
         // this bridge active, no geometry batches, and no live alpha variant
         // to remove. Clear previously saved opt-ins once; users can still
@@ -286,7 +289,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.121", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.122", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -346,7 +349,7 @@ public sealed partial class Core
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 6 => 2420, _ => 500 };
+        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 6 => 2460, _ => 500 };
         Rect viewport = new(frameX + sidebarWidth + 12, frameY + 132, 680, menuHeight - 146);
         Rect content = new(0, 0, 656, contentHeight);
         settingsScrollPosition = GUI.BeginScrollView(viewport, settingsScrollPosition, content);
@@ -647,9 +650,10 @@ public sealed partial class Core
         Toggle(pauseRewiredMousePolling, "Pause Rewired mouse polling in solo songs", x, engineY + 390);
         Toggle(pauseRewiredKeyboardPolling, "Pause Rewired keyboard polling in solo songs", x, engineY + 430);
         Toggle(limitSlopHeroShortcutPolling, "Limit SlopHero hotkey checks to 120 Hz", x, engineY + 470);
-        GUI.Label(new Rect(x + 4, engineY + 516, 610, 96), "Experimental; default off. Keyboard-bound game controls pause while its sampler switch is on; controller/instrument polling is untouched. Hotkey sampling may add up to 8 ms to SlopHero shortcuts. UI-event pause also suspends transparent HUD handles and built-in navigation. TMP layout/rebuilds stay enabled. Whammy uploads return to vanilla outside active offline solo play. Drum MIDI shutdown requires a restart to restore.");
+        Toggle(renderEveryUpdate, "Render every Unity update in solo songs (FPS test)", x, engineY + 510);
+        GUI.Label(new Rect(x + 4, engineY + 556, 610, 96), "Experimental; default off. Rendering every update may raise presented FPS but can reduce simulation and instrument-polling rates under CPU load. The original interval returns on pause/exit. Keyboard sampler and hotkey options have separate input effects. UI-event pause suspends built-in navigation. Drum MIDI shutdown needs a restart to restore.");
 
-        float renderingY = y + 1420;
+        float renderingY = y + 1460;
         SectionHeader("3D rendering experiment", x, renderingY);
         Toggle(limitPlayerCameraFarClip, "Limit guitar-camera far clip in solo songs", x, renderingY + 30);
         Number("Guitar-camera far clip (units)", farClipDistance.Value, x, renderingY + 74, 40, 120,
@@ -1181,6 +1185,7 @@ public sealed partial class Core
             Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
             Bool("PerformanceSkipUnusedSpriteAlpha", skipUnusedSpriteAlpha);
             Bool("PerformanceMergeHudCameraNative", mergeHudCamera);
+            Bool("PerformanceRenderEveryUpdateSolo", renderEveryUpdate);
             Bool("PerformanceHidePbPopup", hidePbPopup);
             Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
             Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1246,6 +1251,7 @@ public sealed partial class Core
         Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
         Bool("PerformanceSkipUnusedSpriteAlpha", skipUnusedSpriteAlpha);
         Bool("PerformanceMergeHudCameraNative", mergeHudCamera);
+        Bool("PerformanceRenderEveryUpdateSolo", renderEveryUpdate);
         Bool("PerformanceHidePbPopup", hidePbPopup);
         Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
         Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
