@@ -1,11 +1,17 @@
-# SlopHero 0.4.120 alpha
+# SlopHero 0.4.121 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: reversible
 experiments judged by measurements. Gameplay timing, online play, and the
 1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.120
+build, compiled against its loader and generated assemblies. Version 0.4.121
+resets saved opt-ins for the HUD-camera merge, sustain geometry batch, and
+unused-alpha shader test after the latest log showed lower render-callback
+rates with HUD merge, no actual geometry batch, and no eligible shader material.
+It makes the geometry candidate scan cheaper and automatically turns off the
+shader test when its runtime guard finds nothing to change. These are
+directional findings, not measured presented-FPS gains. Version 0.4.120
 lets you drag the settings window by its header. It adds a separate default-off
 shader test that skips an unused split-alpha texture sample when current
 guitar sprites and materials pass runtime guards, and skips redundant glow
@@ -259,7 +265,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.120 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.120-alpha.zip)
+[Download SlopHero v0.4.121 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.121-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

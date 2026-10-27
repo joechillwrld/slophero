@@ -203,6 +203,19 @@ public sealed partial class Core
         // Native internal calls have a different crash risk, so require a new
         // explicit opt-in instead of inheriting that old preference/profile.
         mergeHudCamera = preferences.CreateEntry("PerformanceMergeHudCameraNative", false);
+        // The supplied 0.4.120 log has two lower-rate 30-second runs with
+        // this bridge active, no geometry batches, and no live alpha variant
+        // to remove. Clear previously saved opt-ins once; users can still
+        // explicitly re-enable individual experiments for an A/B.
+        var recovery121Applied = preferences.CreateEntry("PerformanceRecovery121Applied", false);
+        if (!recovery121Applied.Value)
+        {
+            mergeHudCamera.Value = false;
+            batchSustainGeometry.Value = false;
+            skipUnusedSpriteAlpha.Value = false;
+            recovery121Applied.Value = true;
+            preferences.SaveToFile();
+        }
         hidePbPopup = preferences.CreateEntry("PerformanceHidePbPopup", false);
         hideStarPowerSideGlows = preferences.CreateEntry("PerformanceHideStarPowerSideGlows", false);
         preserveNetworkTickRemainder = preferences.CreateEntry("PerformancePreserveNetworkTickRemainder", false);
@@ -273,7 +286,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.120", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.121", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -658,8 +671,8 @@ public sealed partial class Core
         SectionHeader("Sustain and HUD rendering prototypes", x, sustainY);
         Toggle(cacheStaticSustainWrites, "Skip repeated sustain sprite, color, and length writes", x, sustainY + 30);
         Toggle(batchSustainGeometry, "Batch dense regular sustain geometry (test)", x, sustainY + 70);
-        Toggle(mergeHudCamera, "Merge HUD camera (native prototype)", x, sustainY + 110);
-        GUI.Label(new Rect(x + 4, sustainY + 154, 610, 126), "All default off and limited to offline solo songs. The geometry batch replaces eight or more compatible upcoming tails in one draw and restores native renderers after the guitar camera renders; sort/UV parity needs a Windows test. The old material-flag experiment was removed because it could deform tails. HUD merge uses native Unity draw commands and needs visual validation.");
+        Toggle(mergeHudCamera, "Merge HUD camera (slower in recent tests)", x, sustainY + 110);
+        GUI.Label(new Rect(x + 4, sustainY + 154, 610, 126), "All default off and limited to offline solo songs. Geometry batching did not draw a batch in the recent log, so its candidate scan now runs at 20 Hz. HUD merge coincided with lower render-callback rates in two tests; saved opt-ins were reset for 0.4.121. These callback rates are not presented FPS.");
     }
 
     private void Toggle(MelonPreferences_Entry<bool> entry, string label, float x, float y)

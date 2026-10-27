@@ -2095,3 +2095,18 @@ Core checks pass. The shader, glow, geometry, and HUD render experiments still
 need separate Windows visual/performance tests.
 `downloads/SlopHero-0.4.120-alpha.zip` contains only `Mods/SlopHero.dll`;
 SHA-256: `25e334ea3eadeb1824c8666f440724be7261e35e598fd28c4e4ca434e676922b`.
+
+### 0.4.121: remove saved regression candidates
+
+The user's 0.4.120 log shows HUD-camera merge present in two 30-second runs
+with roughly 1,460/s scheduled-render callback rates and absent in two runs
+near 1,560/s. Geometry batching reported activation but no first batch; the
+unused-alpha guards found no eligible material on six song entries. Version
+0.4.121 resets previously saved opt-ins for those three tests once at upgrade,
+keeps the menu switches available for explicit retesting, moves geometry
+candidate sprite filtering into its 20 Hz scan, avoids an idle renderer setter,
+and auto-switches the alpha test off if its guard finds no work. This is
+directional callback evidence, not measured presented FPS. See the audit.
+The 0.4.121 Release build has zero warnings/errors and all 127 Core checks
+pass. `downloads/SlopHero-0.4.121-alpha.zip` contains only `Mods/SlopHero.dll`;
+SHA-256: `0e3d16955156c355e5818585f56d61fb11570398452e893fc7581492fd3ae040`.

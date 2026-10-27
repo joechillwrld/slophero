@@ -45,7 +45,13 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.120, with a draggable settings window and
+The latest packaged build is 0.4.121. It resets saved opt-ins for HUD-camera
+merge, sustain geometry batching, and unused-alpha sampling after the
+0.4.120 log showed lower callback rates with HUD merge, no geometry batch,
+and no eligible alpha material. It also reduces geometry scan overhead when
+manually re-enabled and disables the alpha switch if its guards find no work.
+These are directional callback findings, not presented-FPS measurements.
+Version 0.4.120 has a draggable settings window and
 a separate default-off split-alpha shader test. The 0.4.119 default-off
 regular sustain geometry batch still needs an in-game visual/performance check. The
 0.4.118 native HUD bridge still needs an activation check.

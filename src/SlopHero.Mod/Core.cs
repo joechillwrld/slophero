@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.120", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.121", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -635,6 +635,11 @@ public sealed partial class Core : MelonMod
                 && !hudCameraBenchmark.IsActive && !guitarCameraBenchmark.IsActive;
             sustainWriteCache.Update(HarmonyInstance, sustainWriteCacheRequested, eligibleRenderPrototype, game);
             unusedSpriteAlpha.Update(unusedSpriteAlphaRequested, eligibleRenderPrototype, game);
+            if (unusedSpriteAlpha.GuardRejected && skipUnusedSpriteAlpha.Value)
+            {
+                skipUnusedSpriteAlpha.Value = false;
+                preferencesDirty = true;
+            }
             sustainGeometryBatch.Update(sustainGeometryRequested, eligibleRenderPrototype, game);
             sustainGeometryBatch.SetSkipExternalAlphaSample(unusedSpriteAlpha.IsSustainActive);
             plainHeldSustains.Update(HarmonyInstance, plainHeldSustainRequested, eligibleRenderPrototype, game);

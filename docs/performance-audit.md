@@ -2403,6 +2403,25 @@ near-entry snapshots showed zero tracked with two UVScroll scripts present;
 those snapshots do not establish that the scripts stayed untracked for the
 whole song. Activation counts and mod callback intervals are not FPS gains.
 
+### v0.4.121 response to the 0.4.120 runtime log
+
+The supplied 0.4.120 log has four 30-second mod timing captures. The two
+with native HUD-camera merge active show scheduled-render callback rates of
+1,458.4 and 1,465.3/s; the two without it show 1,565.9 and 1,561.0/s.
+Different song segments and other conditions prevent a causal FPS claim, but
+the consistent lower rate makes this prototype a poor saved default. Geometry
+batching activated in three runs but never reported its first batch, so it
+added callback work without a confirmed draw reduction. The unused-alpha
+guard rejected every attempt; no shader variant was changed.
+
+Version 0.4.121 resets saved opt-ins for these three prototypes once at
+upgrade. A user can still re-enable them explicitly. The geometry prototype
+now scans candidate sprite names at 20 Hz and avoids an idle renderer setter
+each camera callback; new tails stay on their native renderers until the next
+scan. When the alpha guard finds no work, it turns its own switch off instead
+of retrying on every song. These corrections need a Windows playtest and a
+matched presented-frame capture to quantify impact.
+
 ### v0.4.120 split-alpha shader test, glow setter follow-up, settings drag
 
 The exact resource scan found four guitar sprite materials that compile an

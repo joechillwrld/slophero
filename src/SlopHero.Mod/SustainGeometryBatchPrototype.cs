@@ -154,8 +154,11 @@ internal sealed class SustainGeometryBatchPrototype
             stage = "refresh active sustain pool slots";
             activeCandidates.Clear();
             foreach (var source in sources)
-                if (source != null && source.gameObject.activeInHierarchy)
-                    activeCandidates.Add(source);
+            {
+                if (source == null || !source.gameObject.activeInHierarchy) continue;
+                var sprite = source.sprite;
+                if (sprite != null && IsUpcomingSprite(sprite.name)) activeCandidates.Add(source);
+            }
             nextCandidateScan = Time.unscaledTime + .05f;
         }
         if (activeCandidates.Count < MinimumTails) return;
@@ -196,7 +199,6 @@ internal sealed class SustainGeometryBatchPrototype
         if (suppressed.Count < MinimumTails || currentAtlas == null)
         {
             suppressed.Clear();
-            batchRenderer!.enabled = false;
             return;
         }
 
@@ -268,6 +270,7 @@ internal sealed class SustainGeometryBatchPrototype
 
     private void RestoreFrame()
     {
+        if (!inRender && suppressed.Count == 0) return;
         foreach (var source in suppressed)
         {
             try { if (source != null && !source.enabled) source.enabled = true; }

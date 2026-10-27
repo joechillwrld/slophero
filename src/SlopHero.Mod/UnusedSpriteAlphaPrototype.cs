@@ -20,13 +20,14 @@ internal sealed class UnusedSpriteAlphaPrototype
     private string stage = "initialize";
 
     internal bool IsSustainActive { get; private set; }
+    internal bool GuardRejected { get; private set; }
 
     internal void Update(bool requested, bool eligible, GameManager? game)
     {
         if (!requested || !eligible || game == null)
         {
             Restore();
-            if (!requested) failed = false;
+            if (!requested) { failed = false; GuardRejected = false; }
             return;
         }
         if (active || failed) return;
@@ -43,6 +44,7 @@ internal sealed class UnusedSpriteAlphaPrototype
     {
         Restore();
         failed = false;
+        GuardRejected = false;
     }
 
     private void Activate(GameManager game)
@@ -85,7 +87,12 @@ internal sealed class UnusedSpriteAlphaPrototype
             if (material.shader.name == "CloneHero/Sustains") IsSustainActive = true;
         }
         if (changed.Count == 0)
-            throw new InvalidOperationException("No mapped material passed the runtime alpha guards.");
+        {
+            GuardRejected = true;
+            failed = true;
+            MelonLogger.Msg("Sloptifine unused-alpha test found no material needing a shader change; disabling this switch.");
+            return;
+        }
         active = true;
         MelonLogger.Msg($"Sloptifine unused-alpha prototype selected no-ETC1 variants on {changed.Count} guarded guitar sprite material(s).");
     }
