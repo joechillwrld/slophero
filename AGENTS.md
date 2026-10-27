@@ -45,8 +45,9 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.118, a native HUD and sustain follow-up. It
-needs an in-game activation check, especially for the native HUD experiment.
+The latest packaged build is 0.4.119, with a separate default-off regular
+sustain geometry batch; it needs an in-game visual/performance check. The
+0.4.118 native HUD bridge still needs an activation check.
 The 0.4.114 camera cap
 and previous camera-test findings remain below. PresentMon captures are
 directional, not a matched A/B, and do not establish a FPS gain. Version

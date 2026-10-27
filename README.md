@@ -1,11 +1,18 @@
-# SlopHero 0.4.118 alpha
+# SlopHero 0.4.119 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: reversible
 experiments judged by measurements. Gameplay timing, online play, and the
 1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.118
+build, compiled against its loader and generated assemblies. Version 0.4.119
+removes the old material-flag batching switch that could deform sustains,
+resets its saved value, and thins the selected-page stripe. It adds a separate
+default-off geometry batch for dense upcoming regular guitar sustains and moves
+the existing glow-hiding option into the performance tab's Guitar graphics
+section. The batch keeps note logic, held tails, and glow on
+the game's path. Its in-game activation, visual parity, and FPS effect need a
+Windows test; enabling it uses one exact-build native Unity call. Version 0.4.118
 keeps held-sustain glow hidden when the game tries to re-enable its pooled
 renderers, moves the sustain-cache hook setup before song play, and uses the
 working scene-wide lookup to find combo-smoke scripts. Its default-off HUD
@@ -247,7 +254,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.118 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.118-alpha.zip)
+[Download SlopHero v0.4.119 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.119-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

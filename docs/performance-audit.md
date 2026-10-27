@@ -2402,3 +2402,20 @@ already proven by the snapshot, with a local hierarchy filter. Earlier
 near-entry snapshots showed zero tracked with two UVScroll scripts present;
 those snapshots do not establish that the scripts stayed untracked for the
 whole song. Activation counts and mod callback intervals are not FPS gains.
+
+### v0.4.119 regular sustain geometry prototype and visual fix
+
+The old material-flag batching option was on when the user reported malformed
+sustains. It overrides `DisableBatching` on a shader that deforms vertices per
+tail and has no instancing variant. Version 0.4.119 removes that behavior and
+resets the saved option to off. The selected-page stripe is thinner and the
+existing glow-hiding switch is easier to find under Guitar graphics.
+
+The exact current `CloneHero/Sustains` shader includes a compiled variant
+without external vertex sizing. Its sizing variant's Y formula can be applied
+to each sliced-sprite vertex before a dynamic mesh upload. The four current
+regular/open sustain body/glow shader passes all disable batching and lack
+instancing variants. A new, independent default-off experiment batches eight
+or more compatible upcoming regular tails into one mesh. Held/open tails and
+glow stay native. Windows visual behavior and FPS are unmeasured. See the
+[geometry mapping](sustain-geometry-batching-2026-10-26.md).

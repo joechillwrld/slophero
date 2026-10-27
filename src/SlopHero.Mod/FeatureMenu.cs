@@ -41,7 +41,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> preserveNetworkTickRemainder = null!;
     private MelonPreferences_Entry<bool> disableHudCameraBenchmark = null!;
     private MelonPreferences_Entry<bool> disableGuitarCameraBenchmark = null!;
-    private MelonPreferences_Entry<bool> cacheStaticSustainWrites = null!, batchSustainBodies = null!;
+    private MelonPreferences_Entry<bool> cacheStaticSustainWrites = null!, batchSustainGeometry = null!;
     private MelonPreferences_Entry<bool> hideHeldSustainGlow = null!, mergeHudCamera = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
@@ -68,7 +68,7 @@ public sealed partial class Core
     private readonly HudCameraBenchmarkOverride hudCameraBenchmark = new();
     private readonly GuitarCameraBenchmarkOverride guitarCameraBenchmark = new();
     private readonly SustainStaticWriteCachePrototype sustainWriteCache = new();
-    private readonly SustainBatchingPrototype sustainBatching = new();
+    private readonly SustainGeometryBatchPrototype sustainGeometryBatch = new();
     private readonly PlainHeldSustainPrototype plainHeldSustains = new();
     private readonly HudCameraMergePrototype hudCameraMerge = new();
     private readonly NetworkTickRemainderOverride networkTickRemainder = new();
@@ -181,7 +181,16 @@ public sealed partial class Core
         disableHudCameraBenchmark = preferences.CreateEntry("PerformanceDisableHudCameraBenchmark", false);
         disableGuitarCameraBenchmark = preferences.CreateEntry("PerformanceDisableGuitarCameraBenchmark", false);
         cacheStaticSustainWrites = preferences.CreateEntry("PerformanceCacheStaticSustainWrites", false);
-        batchSustainBodies = preferences.CreateEntry("PerformanceBatchSustainBodies", false);
+        // The shader has no instancing variant, and overriding its batching
+        // tag can warp the object's per-tail vertex sizing. Clear saved values
+        // from old builds; old profile keys are no longer imported.
+        var unsafeLegacyBatching = preferences.CreateEntry("PerformanceBatchSustainBodies", false);
+        if (unsafeLegacyBatching.Value)
+        {
+            unsafeLegacyBatching.Value = false;
+            preferences.SaveToFile();
+        }
+        batchSustainGeometry = preferences.CreateEntry("PerformanceBatchSustainGeometry", false);
         hideHeldSustainGlow = preferences.CreateEntry("PerformanceHideHeldSustainGlow", false);
         // The previous managed command-buffer prototype may be saved as on.
         // Native internal calls have a different crash risk, so require a new
@@ -254,7 +263,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.118", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.119", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
             if (GUI.Button(new Rect(frameX + menuWidth - 48, frameY + 13, 32, 32), "×", menuClickStyle))
@@ -290,7 +299,7 @@ public sealed partial class Core
                 if (selected)
                 {
                     GUI.backgroundColor = accent;
-                    GUI.Box(new Rect(rect.x, rect.y + 4, 2, rect.height - 8), "", menuFlatStyle);
+                    GUI.Box(new Rect(rect.x, rect.y + 8, 1, rect.height - 16), "", menuFlatStyle);
                 }
             }
 
@@ -529,17 +538,18 @@ public sealed partial class Core
 
     private void DrawPerformanceSettings(float x, float y)
     {
-        SectionHeader("Visual effects", x, y);
+        SectionHeader("Guitar graphics and effects", x, y);
         Toggle(disableHitParticles, "Skip note-hit particles", x, y + 30);
         Toggle(disableSustainParticles, "Skip sustain particles", x, y + 70);
-        Toggle(disableFretEffects, "Disable fret flames, sparks, and lightning", x, y + 110);
-        Toggle(disableStarProgressParticles, "Skip star-progress burst particles", x, y + 150);
-        Toggle(freezeComboSmokeScroll, "Pause combo-smoke animation (smoke stays visible)", x, y + 190);
-        Toggle(pauseHiddenBeatlineUpdates, "Skip beatline updates while hidden", x, y + 230);
-        Toggle(disableAprilFools, "Disable April Fools / NoteBomber chaos and Pong", x, y + 270);
-        GUI.Label(new Rect(x + 4, y + 314, 610, 42), "Particle, hidden-beatline, and combo-smoke suppression runs only in active offline solo play. It restores automatically on pause, transitions, or online play.");
+        Toggle(hideHeldSustainGlow, "Hide held-sustain glow (plain tails)", x, y + 110);
+        Toggle(disableFretEffects, "Disable fret flames, sparks, and lightning", x, y + 150);
+        Toggle(disableStarProgressParticles, "Skip star-progress burst particles", x, y + 190);
+        Toggle(freezeComboSmokeScroll, "Pause combo-smoke animation (smoke stays visible)", x, y + 230);
+        Toggle(pauseHiddenBeatlineUpdates, "Skip beatline updates while hidden", x, y + 270);
+        Toggle(disableAprilFools, "Disable April Fools / NoteBomber chaos and Pong", x, y + 310);
+        GUI.Label(new Rect(x + 4, y + 354, 610, 42), "These visual switches restore on pause, transitions, or online play. Plain tails keep their base sustain body and hide only pooled glow renderers.");
 
-        float servicesY = y + 370;
+        float servicesY = y + 410;
         SectionHeader("Services and HUD", x, servicesY);
         Toggle(suspendHiddenLeaderboard, "Pause offline leaderboard and spectator UI", x, servicesY + 30);
         Toggle(stopMidiInput, "Pause drum MIDI device discovery", x, servicesY + 70);
@@ -548,7 +558,7 @@ public sealed partial class Core
         Toggle(skipBackgroundCamera, "Skip background camera and hidden video in solo songs", x, servicesY + 190);
         GUI.Label(new Rect(x + 4, servicesY + 236, 610, 56), "Experimental; default off. Removes the background render pass and pauses its video decoder while hidden during offline solo songs; both restore on pause or online play.");
 
-        float engineY = y + 690;
+        float engineY = y + 730;
         SectionHeader("Engine and scheduler experiments", x, engineY);
         Toggle(skipGameplayMouseUi, "Skip mouse UI raycasts during gameplay", x, engineY + 30);
         Toggle(skipLegacyMouseEvents, "Skip legacy camera mouse events during gameplay", x, engineY + 70);
@@ -564,7 +574,7 @@ public sealed partial class Core
         Toggle(limitSlopHeroShortcutPolling, "Limit SlopHero hotkey checks to 120 Hz", x, engineY + 470);
         GUI.Label(new Rect(x + 4, engineY + 516, 610, 96), "Experimental; default off. Keyboard-bound game controls pause while its sampler switch is on; controller/instrument polling is untouched. Hotkey sampling may add up to 8 ms to SlopHero shortcuts. UI-event pause also suspends transparent HUD handles and built-in navigation. TMP layout/rebuilds stay enabled. Whammy uploads return to vanilla outside active offline solo play. Drum MIDI shutdown requires a restart to restore.");
 
-        float renderingY = y + 1340;
+        float renderingY = y + 1380;
         SectionHeader("3D rendering experiment", x, renderingY);
         Toggle(limitPlayerCameraFarClip, "Limit guitar-camera far clip in solo songs", x, renderingY + 30);
         Number("Guitar-camera far clip (units)", farClipDistance.Value, x, renderingY + 74, 40, 120,
@@ -585,10 +595,9 @@ public sealed partial class Core
         float sustainY = networkY + 170;
         SectionHeader("Sustain and HUD rendering prototypes", x, sustainY);
         Toggle(cacheStaticSustainWrites, "Skip repeated sustain sprite, color, and length writes", x, sustainY + 30);
-        Toggle(batchSustainBodies, "Allow Unity batching for sustain bodies", x, sustainY + 70);
-        Toggle(hideHeldSustainGlow, "Hide held-sustain glow (plain tails)", x, sustainY + 110);
-        Toggle(mergeHudCamera, "Merge HUD camera (native prototype)", x, sustainY + 150);
-        GUI.Label(new Rect(x + 4, sustainY + 194, 610, 126), "All default off and limited to offline solo songs. The write cache skips exact duplicate values only; positions and changing tail data stay live. Batching can distort tail geometry. Plain tails keep pooled glow renderers hidden even when the game tries to enable them. HUD merge uses native Unity draw commands; it can crash the game if the exact-build native signature differs, and sorting can differ.");
+        Toggle(batchSustainGeometry, "Batch dense regular sustain geometry into one mesh", x, sustainY + 70);
+        Toggle(mergeHudCamera, "Merge HUD camera (native prototype)", x, sustainY + 110);
+        GUI.Label(new Rect(x + 4, sustainY + 154, 610, 126), "All default off and limited to offline solo songs. The geometry batch replaces eight or more compatible upcoming tails in one draw and restores native renderers after the guitar camera renders; sort/UV parity needs a Windows test. The old material-flag experiment was removed because it could deform tails. HUD merge uses native Unity draw commands and needs visual validation.");
     }
 
     private void Toggle(MelonPreferences_Entry<bool> entry, string label, float x, float y)
@@ -1092,7 +1101,7 @@ public sealed partial class Core
             Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
             Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
             Bool("PerformanceCacheStaticSustainWrites", cacheStaticSustainWrites);
-            Bool("PerformanceBatchSustainBodies", batchSustainBodies);
+            Bool("PerformanceBatchSustainGeometry", batchSustainGeometry);
             Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
             Bool("PerformanceMergeHudCameraNative", mergeHudCamera);
             Bool("PerformanceHidePbPopup", hidePbPopup);
@@ -1156,7 +1165,7 @@ public sealed partial class Core
         Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
         Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
         Bool("PerformanceCacheStaticSustainWrites", cacheStaticSustainWrites);
-        Bool("PerformanceBatchSustainBodies", batchSustainBodies);
+        Bool("PerformanceBatchSustainGeometry", batchSustainGeometry);
         Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
         Bool("PerformanceMergeHudCameraNative", mergeHudCamera);
         Bool("PerformanceHidePbPopup", hidePbPopup);

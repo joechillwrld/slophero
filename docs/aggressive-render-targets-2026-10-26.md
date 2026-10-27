@@ -41,10 +41,11 @@ PresentMon frame intervals.
   This identifies a constraint on ordinary batching, **not a measured draw-call
   count**, and does not prove the shipped shader has usable instancing variants.
 - The regular body shader exposes `ExternalVertexSizing`, `_SustainLength`,
-  `_TextureScaleOffset`, and `_FadeParams`. This may provide a route for meshes
-  with actual tail lengths. The meaning and compiled vertex behavior of
-  `ExternalVertexSizing` still need verification; the available UnityPy shader
-  export contains properties/state but no recovered vertex program.
+  `_TextureScaleOffset`, and `_FadeParams`. Its exact shipped OpenGLCore shader
+  blob contains readable compiled GLSL, and the D3D11 program table includes
+  variants with and without `EXTERNALVERTEXSIZING_ON`. See
+  [the geometry mapping](sustain-geometry-batching-2026-10-26.md) for the
+  deformation formula, atlas geometry, and opt-in mesh implementation.
 - Current closed-generic upcoming-sustain helper **RVA 0x1156710** performs
   unguarded Unity setter calls on its regular-tail branch: enable body at
   `0x1156987`, disable glow at `0x11569BF`, assign sprite at `0x1156AFE`,
@@ -105,9 +106,10 @@ emits, and restore them when the experiment ends.
 
 Preserve premultiplied blending, track fade, SP/missed/tap styling, atlas UVs,
 lefty flip, and the game's ordering relative to note heads. The shipped shader's
-`ExternalVertexSizing` property is an investigation route, not a verified
-shortcut. If it cannot support the batch, a matching compiled custom shader
-asset is required; setting `Material.enableInstancing=true` alone is insufficient.
+The exact shader's no-`EXTERNALVERTEXSIZING_ON` variant supports a batch when
+the original deformation is baked into mesh vertices. The four current sustain
+shader passes have **no instancing variant**, so setting
+`Material.enableInstancing=true` alone is insufficient.
 Do not simply remove the DisableBatching tag: the old shader deforms geometry
 in object space, and the current shader has not been proven safe for automatic
 world-space batching.

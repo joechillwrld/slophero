@@ -73,6 +73,15 @@ remaining cost of eligible rendered-frame work.
 
 ## Still open: evidence to turn into code
 
+**Geometry batching follow-up (2026-10-26):** the shipped regular sustain
+shader's no-external-sizing variant allows a real combined mesh after its
+per-tail length deformation is baked into vertices. The default-off offline
+solo prototype now does this only for dense upcoming regular tails, while
+preserving the glow and held-tail paths. Its Unity calls compile but need a
+Windows activation/visual test and matched frame comparison. Open bodies and
+glows also disable ordinary batching; note heads and input-viewer materials
+generally do not. See [the mapping and ranked follow-ons](sustain-geometry-batching-2026-10-26.md).
+
 **New aggressive rendering proposals (2026-10-26):** read
 [the sustain/HUD implementation plan](aggressive-render-targets-2026-10-26.md)
 and its [exact-build evidence](sustain-rendering-evidence-2026-10-26.json).
@@ -2027,11 +2036,40 @@ guitar camera while leaving HUDCam drew 1,936.77 presents/s, and disabling
 HUDCam while leaving the guitar camera drew 1,860 presents/s, with different
 far-clip settings and different moments in the session. It suggests larger
 guitar-render work than HUD work on this machine, but neither number is a
-controlled estimate for the new toggles. A true sustain geometry batch could
-reduce renderer submission more than material flags alone; that remains the
-next high-impact rendering investigation after these prototypes are validated.
+controlled estimate for the new toggles. The separate 0.4.119 regular-tail
+geometry prototype addresses submission directly, but its own CPU cost and
+presented-frame effect are still unknown.
 
 The 0.4.118 Release build completed with zero warnings/errors and 127 Core
 checks passed. `downloads/SlopHero-0.4.118-alpha.zip` contains only
 `Mods/SlopHero.dll`; SHA-256:
 `6300161b6becd32ed57cb78505dca6c590909164a66ac4bface5ec1b1a82776b`.
+
+### 0.4.119: warped-tail fix and optional geometry batch
+
+The old `PerformanceBatchSustainBodies` material-flag experiment is removed:
+it did not produce instanced draws and could deform the object-space sustain
+vertices. The build resets saved values to off and ignores that key in old
+profiles. The selected-page stripe is one pixel wide, and the existing
+plain-tail glow switch now appears under Guitar graphics in the performance
+tab.
+
+The new, separately default-off `PerformanceBatchSustainGeometry` creates a
+dynamic mesh for at least eight compatible upcoming regular tails. It applies
+the exact shader length formula to each sliced-sprite vertex, keeping held
+tails, open tails, and glow on the game's native renderers. The 250-slot pool
+is searched for active objects at 20 Hz; newly active tails stay native until
+the next scan. Source renderers are suppressed only during the guitar camera
+render and restored immediately after. It uses the current Unity player's
+native `MaterialPropertyBlock::GetFloatImpl` internal call because the managed
+wrapper is stripped. This code compiles but has no Windows visual or
+presented-FPS validation; enabling it carries a native-signature crash risk.
+The [geometry mapping](sustain-geometry-batching-2026-10-26.md) ranks open
+tails and glows as further batching candidates. Note heads and input-viewer
+materials already permit ordinary batching and need a draw-call capture
+before a custom rewrite.
+
+The 0.4.119 Release build completed with zero warnings/errors and all 127
+Core checks passed. `downloads/SlopHero-0.4.119-alpha.zip` contains only
+`Mods/SlopHero.dll`; SHA-256:
+`a86765a31f3df005fdaf19b5814ea3e55ab7eab609a6a2a97d18658b3a91ffca`.
