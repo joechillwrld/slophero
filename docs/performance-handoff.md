@@ -5,6 +5,32 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
+## 0.4.126 prototype and camera/culling follow-up
+
+A separate default-off native sustain switch intercepts one regular upcoming
+tail property-block call and invalidates its per-renderer length cache at the
+other five property-block callsites in the exact native sustain helpers. It
+only enables during eligible offline solo guitar songs and bypasses on pause,
+focus loss, or online entry. The shipped binary still needs a Windows visual
+test and matched PresentMon comparison; no FPS benefit is established. The
+static verifier checks exact DLL identity/callsites and emulates first write,
+repeat skip, length changes, invalidation, and hash collisions. See the
+[full mapping and camera findings](native-sustain-camera-followup-2026-10-27.md).
+
+The camera/cull follow-up confirms the 4.65-second `Camera::CustomCull` WPA
+node is shared and collapsed, so it cannot identify a removable camera or
+renderer. The exact current cameras already have occlusion culling disabled;
+regular guitar's far plane is 120 units. Gameplay's two serialized camera
+objects have no attached MonoBehaviours, while the regular PlayerCamera prefab
+has two whose runtime activity is unresolved. Existing camera-isolation runs
+are directional but not a matched benefit estimate. Renderer-count reduction
+on guitar layer 9 remains more plausible than a global native cull bypass.
+
+Release build against `references/` succeeds with zero warnings/errors;
+all 127 Core checks and the exact-DLL native verifier pass. The ZIP contains
+only `Mods/SlopHero.dll`. `downloads/SlopHero-0.4.126-alpha.zip` SHA-256:
+`f56c2c22ba230aece64b383d299b5fc6fc35b7c0b8bb735736d429cb55c526dd`.
+
 ## 0.4.125 package
 
 The render-every-update experiment is retired and its old preference/profile

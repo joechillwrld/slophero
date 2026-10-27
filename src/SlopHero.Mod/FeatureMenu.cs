@@ -42,6 +42,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> disableHudCameraBenchmark = null!;
     private MelonPreferences_Entry<bool> disableGuitarCameraBenchmark = null!;
     private MelonPreferences_Entry<bool> hideHeldSustainGlow = null!;
+    private MelonPreferences_Entry<bool> cacheRegularSustainWrites = null!;
     private MelonPreferences_Entry<bool> rainbowNotes = null!, rainbowFlames = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, settingsWindowOffsetX = null!, settingsWindowOffsetY = null!;
@@ -69,6 +70,7 @@ public sealed partial class Core
     private readonly HudCameraBenchmarkOverride hudCameraBenchmark = new();
     private readonly GuitarCameraBenchmarkOverride guitarCameraBenchmark = new();
     private readonly PlainHeldSustainPrototype plainHeldSustains = new();
+    private readonly NativeRegularSustainCache nativeSustainCache = new();
     private readonly RainbowHighway rainbowHighway = new();
     private readonly NetworkTickRemainderOverride networkTickRemainder = new();
     private readonly OptionalHudAnimationsOverride optionalHudAnimations = new();
@@ -193,6 +195,7 @@ public sealed partial class Core
             preferences.SaveToFile();
         }
         hideHeldSustainGlow = preferences.CreateEntry("PerformanceHideHeldSustainGlow", false);
+        cacheRegularSustainWrites = preferences.CreateEntry("PerformanceCacheRegularSustainNative", false);
         // Render-every-update consumed enough CPU to reduce simulation Updates
         // by roughly 35% in the user's four-run comparison. Retire any saved
         // value, including values written by older profiles.
@@ -295,7 +298,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.125", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.126", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -671,7 +674,8 @@ public sealed partial class Core
         Toggle(pauseRewiredMousePolling, "Pause Rewired mouse polling in solo songs", x, engineY + 390);
         Toggle(pauseRewiredKeyboardPolling, "Pause Rewired keyboard polling in solo songs", x, engineY + 430);
         Toggle(limitSlopHeroShortcutPolling, "Limit SlopHero hotkey checks to 120 Hz", x, engineY + 470);
-        GUI.Label(new Rect(x + 4, engineY + 510, 610, 96), "Keyboard sampler and hotkey options have separate input effects. UI-event pause suspends built-in navigation. Drum MIDI shutdown needs a restart to restore.");
+        Toggle(cacheRegularSustainWrites, "Cache repeat regular-sustain native writes (experimental)", x, engineY + 510);
+        GUI.Label(new Rect(x + 4, engineY + 556, 610, 96), "Exact game build only; default off. Patches six sustain callsites: repeat regular-tail property-block writes can skip, and other tail writes invalidate that renderer. Disable if tails look wrong. Keyboard and hotkey options have separate input effects.");
 
         float renderingY = y + 1420;
         SectionHeader("3D rendering experiment", x, renderingY);
@@ -1195,6 +1199,7 @@ public sealed partial class Core
             Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
             Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
             Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
+            Bool("PerformanceCacheRegularSustainNative", cacheRegularSustainWrites);
             Bool("PerformanceHidePbPopup", hidePbPopup);
             Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
             Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1257,6 +1262,7 @@ public sealed partial class Core
         Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
         Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
         Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
+        Bool("PerformanceCacheRegularSustainNative", cacheRegularSustainWrites);
         Bool("PerformanceHidePbPopup", hidePbPopup);
         Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
         Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);

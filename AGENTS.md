@@ -45,7 +45,13 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.125. It retires render-every-update after the
+The latest packaged build is 0.4.126. It adds a separate default-off native
+regular-sustain length-write cache at six exact GameAssembly callsites. It
+passes static callsite and x64-stub emulation plus the standard build/checks,
+but needs a Windows visual and frame-time test. The camera/culling follow-up
+confirms Unity's large cull stack is shared across cameras, and occlusion
+culling is already disabled. See
+`docs/native-sustain-camera-followup-2026-10-27.md`. Version 0.4.125 retires render-every-update after the
 four-run log showed a large simulation-rate loss, fixes the selected-page
 stripe with a literal texture draw, and adds default-off rainbow notes and
 flames using cached sprites at 20 Hz. Rainbow visuals need a Windows check;
