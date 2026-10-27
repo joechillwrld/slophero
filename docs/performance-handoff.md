@@ -5,6 +5,41 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
+## 0.4.128 rainbow/menu fixes and performance screen
+
+The v0.4.127 `Latest.log` shows rainbow notes tracking only the active note
+slots seen at first discovery; the user saw color only after the strike line.
+The new default-off rainbow note path discovers newly active slots at 5 Hz and
+intercepts the game's SpriteRenderer color setter for tracked notes, preserving
+the game's alpha and restoring the latest game color when disabled. The flame
+material uses additive blending at intensity 1; its rainbow RGB now uses
+lower brightness to avoid washing out to white. ClonZones also replaces note
+and flame textures in this run, so Windows visual parity remains unverified.
+
+The selected menu stripe now uses a `GUI.skin.label`-derived, borderless
+white-background style inside a one-pixel `GUI.Box`, rather than the sliced box
+skin that expanded its displayed width. The section marker uses the same
+style at two pixels. The game's stripped `GUI.DrawTexture` stays unused.
+
+The optional plain-held-glow prefix is prepared inactive at Gameplay
+initialization, and its 300-renderer population is cached before song play or
+while paused when available. The existing active-song path remains the
+fallback. This moves possible setup work out of the first active update but
+has no measured hitch or FPS result. A separate default-off Canvas song HUD
+reuses the tested retained-text implementation and falls back to IMGUI for
+dragging or errors; it may save the repeated song-text repaint path, while its
+extra Canvas could offset that gain. The existing particle switches now keep
+each target emitter's own Renderer disabled between one-second stop checks,
+restoring the previous enabled state when the switch ends. This prevents
+brief visual flashes but does not prove that particle simulation stops
+immediately after every game reactivation. The eight ranked leads, exact callsites,
+and evidence limits are in the [new screen](performance-screen-2026-10-27.md).
+The Release build has zero warnings/errors, all 127 Core checks pass, and the
+exact-build native sustain verifier passes. The ZIP contains only
+`Mods/SlopHero.dll`. `downloads/SlopHero-0.4.128-alpha.zip` SHA-256:
+`87e283593e002c27eac4c50bb69c51b9c81f84c412d665a6bedc6bfcc32e847d`.
+Windows visual behavior and presented-frame results still need the user's test.
+
 ## 0.4.127 settings-menu repair
 
 The supplied 0.4.126 `Latest.log` records one SlopHero error when opening

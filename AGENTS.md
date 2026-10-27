@@ -45,7 +45,16 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.127. It fixes a settings-menu exception caused
+The latest packaged build is 0.4.128. It uses a borderless one-pixel style for
+the selected menu stripe; rainbow notes now follow the game's color writes
+and discover active pool slots during songs, while the additive flame tint
+is dimmed to retain hue. The default-off plain-held-glow experiment prepares
+its inactive hook at Gameplay initialization and warms renderer membership
+before song play when available. A separate default-off Canvas song HUD
+prototype and persistent target particle-renderer suppression cover two more
+measured/screened paths. The eight ranked performance leads are in
+`docs/performance-screen-2026-10-27.md`. Visual behavior and presented-FPS
+impact still need Windows validation. Version 0.4.127 fixes a settings-menu exception caused
 by `GUI.DrawTexture`, which is stripped in this game build, by drawing the
 thin selected-page stripe through the supported flat `GUI.Box` path. The
 0.4.126 log has one menu exception and no native sustain-cache activation.

@@ -23,7 +23,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> customizeFpsColor = null!;
     private MelonPreferences_Entry<bool> disableHitParticles = null!, disableSustainParticles = null!, disableFretEffects = null!;
     private MelonPreferences_Entry<bool> disableStarProgressParticles = null!;
-    private MelonPreferences_Entry<bool> stopMidiInput = null!, disableMidiForSession = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!, useCanvasCounterHud = null!, freezeComboSmokeScroll = null!;
+    private MelonPreferences_Entry<bool> stopMidiInput = null!, disableMidiForSession = null!, disableDiscordPresence = null!, suspendHiddenLeaderboard = null!, useCanvasCounterHud = null!, useCanvasSongHud = null!, freezeComboSmokeScroll = null!;
     private MelonPreferences_Entry<bool> skipGameplayMouseUi = null!;
     private MelonPreferences_Entry<bool> skipLegacyMouseEvents = null!;
     private MelonPreferences_Entry<bool> throttleWhammyTexture = null!;
@@ -81,7 +81,7 @@ public sealed partial class Core
     private Color editPreview = Color.white;
     private GUIStyle? colorPreviewStyle;
     private GUIStyle? menuNavStyle, menuHeaderStyle, menuPageTitleStyle, menuSubtitleStyle;
-    private GUIStyle? menuFlatStyle, menuClickStyle, menuActionStyle, menuToggleLabelStyle, menuToggleCheckStyle, menuArtworkStyle, sectionHeaderStyle;
+    private GUIStyle? menuFlatStyle, menuAccentLineStyle, menuClickStyle, menuActionStyle, menuToggleLabelStyle, menuToggleCheckStyle, menuArtworkStyle, sectionHeaderStyle;
     private GUIStyle? menuPopupHeaderStyle, menuPopupTextStyle, menuPopupValueStyle, menuPopupButtonStyle;
     private Texture2D? menuArtworkTexture;
     private bool menuArtworkLoadAttempted;
@@ -168,6 +168,7 @@ public sealed partial class Core
         disableDiscordPresence = preferences.CreateEntry("PerformanceDisableDiscordPresence", false);
         suspendHiddenLeaderboard = preferences.CreateEntry("PerformanceSuspendHiddenLeaderboard", false);
         useCanvasCounterHud = preferences.CreateEntry("PerformanceCanvasCounterHud", false);
+        useCanvasSongHud = preferences.CreateEntry("PerformanceCanvasSongHud", false);
         freezeComboSmokeScroll = preferences.CreateEntry("PerformanceFreezeComboSmokeScroll", false);
         skipGameplayMouseUi = preferences.CreateEntry("PerformanceSkipGameplayMouseUi", false);
         skipLegacyMouseEvents = preferences.CreateEntry("PerformanceSkipLegacyMouseEvents", false);
@@ -283,6 +284,14 @@ public sealed partial class Core
                 menuFlatStyle.normal.background = menuFlatStyle.hover.background =
                     menuFlatStyle.active.background = menuFlatStyle.focused.background = Texture2D.whiteTexture;
             }
+            if (menuAccentLineStyle == null)
+            {
+                // The box skin has a sliced border that expands tiny Rects.
+                // The label skin has no border, and GUI.Box is unstripped.
+                menuAccentLineStyle = new GUIStyle(GUI.skin.label);
+                menuAccentLineStyle.normal.background = menuAccentLineStyle.hover.background =
+                    menuAccentLineStyle.active.background = menuAccentLineStyle.focused.background = Texture2D.whiteTexture;
+            }
             GUI.color = Color.white;
             GUI.backgroundColor = new Color(.035f, .04f, .055f, 1);
             GUI.Box(new Rect(frameX, frameY, menuWidth, menuHeight), "", menuFlatStyle);
@@ -298,7 +307,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.127", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.128", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -339,7 +348,7 @@ public sealed partial class Core
                     // game build and would close the entire settings menu.
                     Color saved = GUI.backgroundColor;
                     GUI.backgroundColor = accent;
-                    GUI.Box(new Rect(rect.x, rect.y + 9, 1, rect.height - 18), "", menuFlatStyle);
+                    GUI.Box(new Rect(rect.x, rect.y + 9, 1, rect.height - 18), "", menuAccentLineStyle);
                     GUI.backgroundColor = saved;
                 }
             }
@@ -363,7 +372,7 @@ public sealed partial class Core
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 4 => 640, 6 => 2100, _ => 500 };
+        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 4 => 640, 6 => 2160, _ => 500 };
         Rect viewport = new(frameX + sidebarWidth + 12, frameY + 132, 680, menuHeight - 146);
         Rect content = new(0, 0, 656, contentHeight);
         settingsScrollPosition = GUI.BeginScrollView(viewport, settingsScrollPosition, content);
@@ -530,7 +539,7 @@ public sealed partial class Core
                     || scoreHudScale.Value != 1 || inputViewerScale.Value != 1 || starPowerHudScale.Value != 1
                     || practiceHudScale.Value != 1 || fpsHudScale.Value != 1;
                 SongSpeedControl.TryRead(out int speedSetting);
-                LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret/starProgress)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}/{disableStarProgressParticles.Value}[starSuppressed={starProgressParticles.IsSuppressed}], pausedFretFadeScripts={performance.PausedFretFadeCount}, blackBackground={skipBackgroundCamera.Value}[active={backgroundCamera.IsActive}], hudCameraBenchmark={disableHudCameraBenchmark.Value}[active={hudCameraBenchmark.IsActive}], guitarCameraBenchmark={disableGuitarCameraBenchmark.Value}[active={guitarCameraBenchmark.IsActive}], guitarFarClip={limitPlayerCameraFarClip.Value}[active={playerCameraFarClip.IsActive}], hiddenLeaderboard={suspendHiddenLeaderboard.Value}[canvasSuspended={hiddenLeaderboard.CanvasSuspended}], freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI(discovery/session)={stopMidiInput.Value}/{disableMidiForSession.Value}, Discord={disableDiscordPresence.Value}, cheatScanner={pauseGameplayCheatScanner.Value}[state={cheatScanner.Status}], gameplayUiEvents={pauseGameplayUiProcessing.Value}[suspended={gameplayUiEvents.IsSuspended}], highwayPause={pauseHighwayAnimations.Value}[hook={highwayAnimations.IsInstalled},suppressed={highwayAnimations.IsSuppressed}], mouseUiSkip={skipGameplayMouseUi.Value}[hook={mouseUiGameplay.IsInstalled},suppressed={mouseUiGameplay.IsSuppressed}], legacyMouseEvents={skipLegacyMouseEvents.Value}[hook={legacyMouseEvents.IsInstalled},suppressed={legacyMouseEvents.IsSuppressed}], rewiredMouseSampler={pauseRewiredMousePolling.Value}[hook={rewiredMousePolling.IsInstalled},suppressed={rewiredMousePolling.IsSuppressed}], rewiredKeyboardSampler={pauseRewiredKeyboardPolling.Value}[hook={rewiredKeyboardPolling.IsInstalled},suppressed={rewiredKeyboardPolling.IsSuppressed}], hotkeyPoll120={limitSlopHeroShortcutPolling.Value}, whammyDirtyGate={throttleWhammyTexture.Value}[hook={whammyTextureThrottle.IsInstalled},passThrough={whammyTextureThrottle.IsSuppressed}], networkTickRemainder={preserveNetworkTickRemainder.Value}[hook={networkTickRemainder.IsInstalled}], nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
+                LoggerInstance.Msg($"Timing settings: counters={showHud.Value}[miss={showMisses.Value},hit={showHit.Value},ghost={showGhosts.Value},streak={showBest.Value}]@{hudX.Value},{hudY.Value}, songHud={showSong.Value}[title={showTitle.Value},artist={showArtist.Value},charter={showCharter.Value},speed={showSpeed.Value}]@{songX.Value},{songY.Value}, canvasCounterHud={useCanvasCounterHud.Value}, canvasSongHud={useCanvasSongHud.Value}, nativeOffsets(practice/FPS)={practiceHudX.Value:0.##},{practiceHudY.Value:0.##}/{fpsHudX.Value:0.##},{fpsHudY.Value:0.##}, FCcolors={tintFc.Value}, scoreColors={tintScore.Value}, constantSpeed={lockSpeed.Value}, hideSides={hideSides.Value}, hideStrings={hideStrings.Value}, hideBeatlines={hideBeats.Value}, pauseHiddenBeatlineUpdates={pauseHiddenBeatlineUpdates.Value}, disableAprilFools={disableAprilFools.Value}, perfEffects(hit/sustain/fret/starProgress)={disableHitParticles.Value}/{disableSustainParticles.Value}/{disableFretEffects.Value}/{disableStarProgressParticles.Value}[starSuppressed={starProgressParticles.IsSuppressed}], pausedFretFadeScripts={performance.PausedFretFadeCount}, blackBackground={skipBackgroundCamera.Value}[active={backgroundCamera.IsActive}], hudCameraBenchmark={disableHudCameraBenchmark.Value}[active={hudCameraBenchmark.IsActive}], guitarCameraBenchmark={disableGuitarCameraBenchmark.Value}[active={guitarCameraBenchmark.IsActive}], guitarFarClip={limitPlayerCameraFarClip.Value}[active={playerCameraFarClip.IsActive}], hiddenLeaderboard={suspendHiddenLeaderboard.Value}[canvasSuspended={hiddenLeaderboard.CanvasSuspended}], freezeComboSmokeScroll={freezeComboSmokeScroll.Value}, comboSmokeTracked/paused={comboSmokeScroll.TrackedCount}/{comboSmokeScroll.PausedCount}, MIDI(discovery/session)={stopMidiInput.Value}/{disableMidiForSession.Value}, Discord={disableDiscordPresence.Value}, cheatScanner={pauseGameplayCheatScanner.Value}[state={cheatScanner.Status}], gameplayUiEvents={pauseGameplayUiProcessing.Value}[suspended={gameplayUiEvents.IsSuspended}], highwayPause={pauseHighwayAnimations.Value}[hook={highwayAnimations.IsInstalled},suppressed={highwayAnimations.IsSuppressed}], mouseUiSkip={skipGameplayMouseUi.Value}[hook={mouseUiGameplay.IsInstalled},suppressed={mouseUiGameplay.IsSuppressed}], legacyMouseEvents={skipLegacyMouseEvents.Value}[hook={legacyMouseEvents.IsInstalled},suppressed={legacyMouseEvents.IsSuppressed}], rewiredMouseSampler={pauseRewiredMousePolling.Value}[hook={rewiredMousePolling.IsInstalled},suppressed={rewiredMousePolling.IsSuppressed}], rewiredKeyboardSampler={pauseRewiredKeyboardPolling.Value}[hook={rewiredKeyboardPolling.IsInstalled},suppressed={rewiredKeyboardPolling.IsSuppressed}], hotkeyPoll120={limitSlopHeroShortcutPolling.Value}, whammyDirtyGate={throttleWhammyTexture.Value}[hook={whammyTextureThrottle.IsInstalled},passThrough={whammyTextureThrottle.IsSuppressed}], networkTickRemainder={preserveNetworkTickRemainder.Value}[hook={networkTickRemainder.IsInstalled}], nativeHudTweaks={nativeHudTweaks}, fpsColor={customizeFpsColor.Value}, scales(scorebox/input/SP/practice/FPS)={scoreHudScale.Value:0.##}/{inputViewerScale.Value:0.##}/{starPowerHudScale.Value:0.##}/{practiceHudScale.Value:0.##}/{fpsHudScale.Value:0.##}, renderFrameInterval={OnDemandRendering.renderFrameInterval}, configuredSpeed={(speedSetting > 0 ? speedSetting + "%" : "unknown")}.");
                 LoggerInstance.Msg($"Sloptifine 3 visuals: PB={hidePbPopup.Value}[active={optionalHudAnimations.PbSuppressed}], side glows={hideStarPowerSideGlows.Value}[active={optionalHudAnimations.GlowSuppressed}].");
                 LogGameplaySnapshot();
                 timings.Start(includeCameraTiming: cameraTimingClicked);
@@ -658,10 +667,11 @@ public sealed partial class Core
         Toggle(stopMidiInput, "Pause drum MIDI device discovery", x, servicesY + 70);
         Toggle(disableDiscordPresence, "Disable Discord Rich Presence (restart to restore)", x, servicesY + 110);
         Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, servicesY + 150);
-        Toggle(skipBackgroundCamera, "Skip background camera and hidden video in solo songs", x, servicesY + 190);
-        GUI.Label(new Rect(x + 4, servicesY + 236, 610, 56), "Experimental; default off. Removes the background render pass and pauses its video decoder while hidden during offline solo songs; both restore on pause or online play.");
+        Toggle(useCanvasSongHud, "Use experimental Canvas renderer for the song HUD", x, servicesY + 190);
+        Toggle(skipBackgroundCamera, "Skip background camera and hidden video in solo songs", x, servicesY + 230);
+        GUI.Label(new Rect(x + 4, servicesY + 276, 610, 56), "Experimental; default off. The song Canvas avoids per-frame IMGUI text drawing; its frame benefit is unmeasured. Background mode hides its render pass and pauses video while hidden in solo songs.");
 
-        float engineY = y + 730;
+        float engineY = y + 770;
         SectionHeader("Engine and scheduler experiments", x, engineY);
         Toggle(skipGameplayMouseUi, "Skip mouse UI raycasts during gameplay", x, engineY + 30);
         Toggle(skipLegacyMouseEvents, "Skip legacy camera mouse events during gameplay", x, engineY + 70);
@@ -678,7 +688,7 @@ public sealed partial class Core
         Toggle(cacheRegularSustainWrites, "Cache repeat regular-sustain native writes (experimental)", x, engineY + 510);
         GUI.Label(new Rect(x + 4, engineY + 556, 610, 96), "Exact game build only; default off. Patches six sustain callsites: repeat regular-tail property-block writes can skip, and other tail writes invalidate that renderer. Disable if tails look wrong. Keyboard and hotkey options have separate input effects.");
 
-        float renderingY = y + 1420;
+        float renderingY = y + 1460;
         SectionHeader("3D rendering experiment", x, renderingY);
         Toggle(limitPlayerCameraFarClip, "Limit guitar-camera far clip in solo songs", x, renderingY + 30);
         Number("Guitar-camera far clip (units)", farClipDistance.Value, x, renderingY + 74, 40, 120,
@@ -742,6 +752,11 @@ public sealed partial class Core
                     counterCanvas.Hide();
                     statsText = "";
                 }
+                if (ReferenceEquals(entry, showSong) && !entry.Value)
+                {
+                    songCanvas.Hide();
+                    songText = "";
+                }
             }
         }
         finally { GUI.backgroundColor = previousBackground; }
@@ -755,7 +770,7 @@ public sealed partial class Core
         try
         {
             GUI.backgroundColor = MenuAccentColor();
-            GUI.Box(new Rect(x, y + 5, 3, 14), "", menuFlatStyle);
+            GUI.Box(new Rect(x, y + 5, 2, 14), "", menuAccentLineStyle);
             GUI.Label(new Rect(x + 10, y, 622, 24), text, sectionHeaderStyle);
         }
         finally { GUI.backgroundColor = previous; }
@@ -1182,6 +1197,7 @@ public sealed partial class Core
             Bool("PerformanceDisableStarProgressParticles", disableStarProgressParticles);
             Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
             Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
+            Bool("PerformanceCanvasSongHud", useCanvasSongHud);
             Bool("PerformanceFreezeComboSmokeScroll", freezeComboSmokeScroll);
             Bool("PerformanceSkipGameplayMouseUi", skipGameplayMouseUi);
             Bool("PerformanceSkipLegacyMouseEvents", skipLegacyMouseEvents);
@@ -1246,6 +1262,7 @@ public sealed partial class Core
         Bool("PerformanceDisableStarProgressParticles", disableStarProgressParticles);
         Bool("PerformanceDisableDiscordPresence", disableDiscordPresence); Bool("PerformanceSuspendHiddenLeaderboard", suspendHiddenLeaderboard);
         Bool("PerformanceCanvasCounterHud", useCanvasCounterHud);
+        Bool("PerformanceCanvasSongHud", useCanvasSongHud);
         Bool("PerformanceSkipGameplayMouseUi", skipGameplayMouseUi);
         Bool("PerformanceSkipLegacyMouseEvents", skipLegacyMouseEvents);
         Bool("PerformanceThrottleWhammyTexture", throttleWhammyTexture);
@@ -1627,6 +1644,26 @@ public sealed partial class Core
                     LoggerInstance.Warning($"Canvas counter HUD failed; using the original renderer: {error}");
             }
             finally { timings.End(7, canvasTiming); }
+        }
+        if (useCanvasSongHud.Value || songCanvas.HasObjects)
+        {
+            try
+            {
+                Color color;
+                try { color = ParseColor(songColor.Value); }
+                catch (FormatException) { color = Color.white; }
+                string? error = songCanvas.Refresh(useCanvasSongHud.Value,
+                    showSong.Value && !settingsOpen && !moveHud && resizeTarget < 0,
+                    songText, songX.Value, songY.Value, songFont.Value, color, songOpacity.Value);
+                if (error != null)
+                    LoggerInstance.Warning($"Canvas song HUD failed; using the original renderer: {error}");
+            }
+            catch (Exception ex)
+            {
+                songCanvas.Clear();
+                useCanvasSongHud.Value = false;
+                LoggerInstance.Warning($"Canvas song HUD stopped; using the original renderer: {ex.Message}");
+            }
         }
 
         bool nativeHudRequested = nativeMoveTarget != 0 || resizeTarget >= 2 || practiceHudX.Value != 0 || practiceHudY.Value != 0

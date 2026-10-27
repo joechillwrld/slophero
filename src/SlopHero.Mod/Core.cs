@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.127", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.128", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -21,6 +21,7 @@ public sealed partial class Core : MelonMod
     private readonly ChartStats statsReader = new();
     private readonly NativeHudLayout nativeHud = new();
     private readonly CounterCanvasHud counterCanvas = new();
+    private readonly CounterCanvasHud songCanvas = new(songMode: true);
     private SettingsProfiles? settingsProfiles;
     private string[] profileNames = Array.Empty<string>();
     private int profileIndex;
@@ -135,6 +136,7 @@ public sealed partial class Core : MelonMod
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
         counterCanvas.Clear();
+        songCanvas.Clear();
         cheatScanner.Clear(HarmonyInstance);
         gameplayUiEventError = false;
         lastCheatScannerSetting = null;
@@ -204,6 +206,8 @@ public sealed partial class Core : MelonMod
             gameplayInitialized = true;
             if (compatible) legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
             if (compatible) nativeSustainCache.Prepare(cacheRegularSustainWrites.Value);
+            if (compatible) plainHeldSustains.Prepare(HarmonyInstance, hideHeldSustainGlow.Value);
+            if (compatible) rainbowHighway.Prepare(HarmonyInstance, rainbowNotes.Value);
             if (compatible) rewiredMousePolling.Prepare(HarmonyInstance, pauseRewiredMousePolling.Value);
             if (compatible) rewiredKeyboardPolling.Prepare(HarmonyInstance, pauseRewiredKeyboardPolling.Value);
             if (compatible && staticTmpScaleDuringSong.Value)
@@ -238,6 +242,7 @@ public sealed partial class Core : MelonMod
         staticTmpScaleError = false;
         SongSpeedControl.ResetMenuCache();
         counterCanvas.Clear();
+        songCanvas.Clear();
         cheatScanner.Clear(HarmonyInstance);
         gameplayUiEventError = false;
         lastCheatScannerSetting = null;
@@ -469,6 +474,11 @@ public sealed partial class Core : MelonMod
             var game = gameplay && gameplayInitialized ? GameManager.field_Private_Static_GameManager_0 : null;
             bool ready = game != null && game.songLoaded && game.playersInit && game.globalVariables != null;
             bool songPlaying = ready && game!.isSongPlaying;
+            if (ready && Application.isFocused && (!songPlaying || game!.isPaused || settingsOpen) && !transition)
+            {
+                plainHeldSustains.Prepare(HarmonyInstance, hideHeldSustainGlow.Value);
+                plainHeldSustains.Warm(hideHeldSustainGlow.Value, game, now);
+            }
             practiceModeActive = ready && game!.globalVariables!.isPracticeEnabled;
             bool shortcutCandidate = ready && !transition && !settingsOpen && !moveHud
                 && resizeTarget < 0 && Application.isFocused && !game!.isPaused
@@ -620,7 +630,7 @@ public sealed partial class Core : MelonMod
             plainHeldSustains.Update(HarmonyInstance, plainHeldSustainRequested, eligibleRenderPrototype, game);
             nativeSustainCache.Update(nativeSustainRequested, eligibleRenderPrototype);
             if (rainbowNotes.Value || rainbowFlames.Value || rainbowHighway.HasOverrides)
-                rainbowHighway.Update(rainbowNotes.Value, rainbowFlames.Value && !disableFretEffects.Value,
+                rainbowHighway.Update(HarmonyInstance, rainbowNotes.Value, rainbowFlames.Value && !disableFretEffects.Value,
                     ready ? game : null, now);
             if (ready) CompletePracticeTransition(game!);
             bool allow = shortcutCandidate && isOfflineSolo;
@@ -890,12 +900,13 @@ public sealed partial class Core : MelonMod
 
     public override void OnGUI()
     {
-        // With the retained Canvas counter visible, normal solo play has no
-        // IMGUI content. MelonLoader still calls OnGUI for every event, so
+        // With both visible HUDs retained, normal solo play has no IMGUI
+        // content. MelonLoader still calls OnGUI for every event, so
         // avoid entering Unity's GUI event API on this common path. Editing,
         // song info, notices, and opt-in timing captures keep the full path.
-        if (!timings.Active && compatible && gameplay && counterCanvas.Visible
-            && showHud.Value && !string.IsNullOrEmpty(statsText) && !showSong.Value
+        if (!timings.Active && compatible && gameplay
+            && (!showHud.Value || string.IsNullOrEmpty(statsText) || counterCanvas.Visible)
+            && (!showSong.Value || string.IsNullOrEmpty(songText) || songCanvas.Visible)
             && !settingsOpen && !moveHud && resizeTarget < 0 && nativeMoveTarget == 0
             && noticeUntil <= 0) return;
         if (timings.Active && Event.current.type == EventType.Repaint)
@@ -906,9 +917,11 @@ public sealed partial class Core : MelonMod
         if (!settingsOpen && !moveHud && !resizeEditing && Event.current.type != EventType.Repaint) return;
         if (counterCanvas.Visible && (!showHud.Value || settingsOpen || moveHud || resizeEditing
             || !gameplay || string.IsNullOrEmpty(statsText))) counterCanvas.Hide();
+        if (songCanvas.Visible && (!showSong.Value || settingsOpen || moveHud || resizeEditing
+            || !gameplay || string.IsNullOrEmpty(songText))) songCanvas.Hide();
         bool noticeVisible = !compatible || (noticeUntil > 0 && clock.Elapsed.TotalSeconds < noticeUntil);
         bool counterHudVisible = !counterCanvas.Visible && showHud.Value && gameplay && !string.IsNullOrEmpty(statsText);
-        bool songHudVisible = showSong.Value && gameplay && !string.IsNullOrEmpty(songText);
+        bool songHudVisible = !songCanvas.Visible && showSong.Value && gameplay && !string.IsNullOrEmpty(songText);
         if (!settingsOpen && !moveHud && !resizeEditing && !noticeVisible && !counterHudVisible && !songHudVisible) return;
         long timingStart = timings.Begin();
         Color previousColor = GUI.color;
@@ -943,7 +956,7 @@ public sealed partial class Core : MelonMod
                     }
                 }
             }
-            if (!(moveHud && (moveSong || nativeMoveTarget != 0)) && ((showSong.Value && gameplay && !string.IsNullOrEmpty(songText)) || resizeTarget == 1)) DrawSongHudSafely();
+            if (!(moveHud && (moveSong || nativeMoveTarget != 0)) && ((!songCanvas.Visible && showSong.Value && gameplay && !string.IsNullOrEmpty(songText)) || resizeTarget == 1)) DrawSongHudSafely();
             if (resizeEditing) DrawResizeHandles();
             if (noticeVisible)
                 GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44), status);
@@ -1177,6 +1190,7 @@ public sealed partial class Core : MelonMod
         starProgressParticles.Clear();
         comboSmokeScroll.Clear();
         counterCanvas.Clear();
+        songCanvas.Clear();
         cheatScanner.Clear(HarmonyInstance);
         optionalServices.Restore();
         settingsOpen = moveHud = hudDragging = false;

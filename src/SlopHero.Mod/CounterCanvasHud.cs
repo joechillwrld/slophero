@@ -6,11 +6,13 @@ using UnityEngine.UI;
 namespace SlopHero.Mod;
 
 /// <summary>
-/// Optional retained counter HUD. The existing IMGUI renderer remains the
+/// Optional retained counter or song HUD. The existing IMGUI renderer remains the
 /// fallback if this game's stripped Unity UI wrappers reject construction.
 /// </summary>
 internal sealed class CounterCanvasHud
 {
+    private readonly bool songMode;
+    internal CounterCanvasHud(bool songMode = false) => this.songMode = songMode;
     private GameObject? root;
     private RectTransform? panelRect;
     private Image? background;
@@ -59,10 +61,25 @@ internal sealed class CounterCanvasHud
                 && cachedRefreshTextColor == textColor && cachedRefreshBackgroundColor == panelColor)
                 return null;
 
-            int width = Math.Max(240, size * 12 + 24);
+            int width = songMode ? Math.Min(520, screenWidth) : Math.Max(240, size * 12 + 24);
             int lines = 1;
-            for (int i = 0; i < text.Length; i++) if (text[i] == '\n') lines++;
-            int height = (int)(size * 1.25f) * lines + 20;
+            if (songMode)
+            {
+                int charsPerLine = Math.Max(8, (int)((width - 24) / (size * .6f)));
+                int currentLineLength = 0;
+                lines = 0;
+                for (int i = 0; i <= text.Length; i++)
+                {
+                    if (i == text.Length || text[i] == '\n')
+                    {
+                        lines += Math.Max(1, (currentLineLength + charsPerLine - 1) / charsPerLine);
+                        currentLineLength = 0;
+                    }
+                    else currentLineLength++;
+                }
+            }
+            else for (int i = 0; i < text.Length; i++) if (text[i] == '\n') lines++;
+            int height = (int)(size * (songMode ? 1.35f : 1.25f)) * lines + 20;
             var position = HudLayout.ClampPosition(x, y, width, height, screenWidth, screenHeight);
             if (shownX != position.X || shownY != position.Y || shownWidth != width || shownHeight != height)
             {
@@ -140,13 +157,13 @@ internal sealed class CounterCanvasHud
 
     private void Create()
     {
-        root = new GameObject("SlopHero Counter Canvas");
+        root = new GameObject(songMode ? "SlopHero Song Canvas" : "SlopHero Counter Canvas");
         root.SetActive(false);
         root.AddComponent<RectTransform>();
         var canvas = root.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.overrideSorting = true;
-        canvas.sortingOrder = 32000;
+        canvas.sortingOrder = songMode ? 32001 : 32000;
 
         var panel = new GameObject("Counter background");
         panel.SetActive(false);
@@ -172,7 +189,7 @@ internal sealed class CounterCanvasHud
         label = textObject.AddComponent<TextMeshProUGUI>();
         label.raycastTarget = false;
         label.alignment = TextAlignmentOptions.TopLeft;
-        label.enableWordWrapping = false;
+        label.enableWordWrapping = songMode;
         panel.SetActive(true);
     }
 }

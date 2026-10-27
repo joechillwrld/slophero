@@ -16,6 +16,8 @@ internal sealed class PerformanceOverrides
     private static readonly string[] FretColors = { "Orange", "Blue", "Yellow", "Red", "Green" };
     private static readonly string[] FretLightningObjects = { "lightning_white", "lightning" };
     private readonly record struct ParticleEffect(ParticleSystem Component, bool IsHit, bool IsSustain);
+    private readonly record struct ParticleState(ParticleSystem Component, GameObject Object, bool Active,
+        Renderer? Renderer, bool RendererEnabled);
     private sealed class NeckEffects
     {
         public NeckEffects(ParticleEffect[] particles, Animator[] animators, CustomFadeProperties[] fretFades)
@@ -30,7 +32,7 @@ internal sealed class PerformanceOverrides
         public CustomFadeProperties[] FretFades { get; }
     }
 
-    private readonly Dictionary<IntPtr, (ParticleSystem Component, GameObject Object, bool Active)> particles = new();
+    private readonly Dictionary<IntPtr, ParticleState> particles = new();
     private readonly Dictionary<IntPtr, (Animator Component, bool Enabled)> animators = new();
     private readonly Dictionary<IntPtr, (CustomFadeProperties Component, bool Enabled)> fretFades = new();
     private readonly Dictionary<IntPtr, (Renderer Component, bool Enabled)> renderers = new();
@@ -191,9 +193,28 @@ internal sealed class PerformanceOverrides
     private void Disable(ParticleSystem system)
     {
         if (!particles.ContainsKey(system.Pointer))
-            particles.Add(system.Pointer, (system, system.gameObject, system.gameObject.activeSelf));
+        {
+            Renderer? ownRenderer = null;
+            try
+            {
+                // GetComponentsInChildren<Renderer>(true) is supported in this
+                // game. Select only this emitter's renderer, never a child FX.
+                IntPtr objectPointer = system.gameObject.Pointer;
+                ownRenderer = system.GetComponentsInChildren<Renderer>(true)
+                    .FirstOrDefault(r => r != null && r.gameObject.Pointer == objectPointer);
+            }
+            catch { /* The particle stop/deactivation path still works. */ }
+            bool enabled = false;
+            try { if (ownRenderer != null) enabled = ownRenderer.enabled; } catch { ownRenderer = null; }
+            particles.Add(system.Pointer, new ParticleState(system, system.gameObject,
+                system.gameObject.activeSelf, ownRenderer, enabled));
+        }
         try
         {
+            // The game can re-activate a pooled emitter between one-second
+            // checks. Its renderer stays disabled until this option restores.
+            var renderer = particles[system.Pointer].Renderer;
+            if (renderer != null && renderer.enabled) renderer.enabled = false;
             // Pools may reactivate an effect after a hit. Suppress it then,
             // without restarting and deactivating an already-idle object on
             // every one-second discovery pass.
@@ -234,6 +255,7 @@ internal sealed class PerformanceOverrides
     {
         if (!particles.Remove(system.Pointer, out var state)) return;
         try { state.Object.SetActive(state.Active); } catch { }
+        try { if (state.Renderer != null) state.Renderer.enabled = state.RendererEnabled; } catch { }
     }
 
     private void Restore(Animator animator)
@@ -260,7 +282,10 @@ internal sealed class PerformanceOverrides
     private void Restore()
     {
         foreach (var state in particles.Values)
+        {
             try { state.Object.SetActive(state.Active); } catch { }
+            try { if (state.Renderer != null) state.Renderer.enabled = state.RendererEnabled; } catch { }
+        }
         foreach (var state in animators.Values)
             try { state.Component.enabled = state.Enabled; } catch { }
         foreach (var state in fretFades.Values)
