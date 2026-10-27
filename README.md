@@ -1,17 +1,21 @@
-# SlopHero 0.4.123 alpha
+# SlopHero 0.4.124 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: reversible
 experiments judged by measurements. Gameplay timing, online play, and the
 1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.123
-retires four experiments that added hooks or camera work without a measured benefit:
-the HUD-camera merge, sustain geometry batch, unused split-alpha shader switch,
-and global sustain setter cache. Old saved and profile values cannot reactivate
-them. It also resets saved render-every-update, Unity worker-limit, and TMP
-scale experiments once so this build starts from a cleaner baseline; those
-three can still be enabled explicitly. Other visual/gameplay features remain.
+build, compiled against its loader and generated assemblies. Version 0.4.124
+restores visual overrides when the mod unloads, speeds discovery for the
+optional plain-tail glow setting by checking each unique material once, and
+separates regular mod timings from higher-overhead camera timings. These
+changes improve cleanup and measurement fidelity; no FPS gain is measured.
+The prior 0.4.123 release retired four experiments that added hooks or camera
+work without a measured benefit: the HUD-camera merge, sustain geometry batch,
+unused split-alpha shader switch, and global sustain setter cache. Old saved
+and profile values cannot reactivate them. It also reset saved render-every-update,
+Unity worker-limit, and TMP-scale experiments once; those remain opt-in.
+Other visual/gameplay features remain.
 Version 0.4.122
 adds a separate default-off offline-solo render-interval experiment. It asks
 Unity to render every simulation update instead of every second update, then
@@ -277,7 +281,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.123 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.123-alpha.zip)
+[Download SlopHero v0.4.124 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.124-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

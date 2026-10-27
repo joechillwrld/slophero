@@ -45,14 +45,13 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.123. It retires the native HUD merge,
+The latest packaged build is 0.4.124. It adds full visual-state cleanup,
+cached plain-tail glow material discovery, and a separate camera-timing button
+so ordinary timing captures avoid per-camera callback overhead. These changes
+improve cleanup and measurement fidelity; no FPS gain is measured. The prior
+0.4.123 release retires the native HUD merge,
 sustain geometry batch, unused-alpha shader test, and global sustain write
 cache from runtime and profile imports after poor/no effect in Windows logs.
-There are unshipped source changes after 0.4.123: full visual-state cleanup,
-cached plain-tail glow material discovery, and a separate camera-timing button
-so ordinary timing captures avoid per-camera callback overhead. Read the
-**Unshipped follow-up for the next build** section of the handoff before
-versioning or packaging. Do not claim a measured FPS gain for this batch.
 It also resets saved render-every-update, worker-limit, and TMP-scale opt-ins
 once to establish a cleaner baseline. The 0.4.122 build adds a default-off offline-solo
 render-every-update test after the user's log showed renderFrameInterval=2;

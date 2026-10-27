@@ -5,10 +5,7 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
-## Unshipped follow-up for the next build
-
-The source tree now has three changes **after** the published 0.4.123 ZIP;
-Luna can version, package, and publish them together after review:
+## 0.4.124 package
 
 1. `VisualOverrides.Clear()` restores captured hidden renderer states and
    custom sprite/TMP RGB colors before clearing its references. Mod unload
@@ -30,7 +27,11 @@ Luna can version, package, and publish them together after review:
    This improves future measurement fidelity, not ordinary gameplay FPS.
 
 Release build against `references/` succeeds with zero warnings/errors;
-all 127 Core checks pass. These changes are not in the 0.4.123 download.
+all 127 Core checks pass. The ZIP contains only `Mods/SlopHero.dll`.
+`downloads/SlopHero-0.4.124-alpha.zip` SHA-256:
+`48e7ee66b1bd5578cb6e57e59de469dc18f65f617c6c3ac557ac0d5692bc6808`.
+The packaged DLL SHA-256 is
+`78804db579bd95df14a1d110daede61e4d72685c190dc536309a4768ed51585a`.
 Keep the existing default-off render-every-update switch as an experiment:
 the latest log confirms a 29–30% rise in scheduled render callbacks but about
 35% fewer simulation Updates; there is no presented-FPS measurement for this
