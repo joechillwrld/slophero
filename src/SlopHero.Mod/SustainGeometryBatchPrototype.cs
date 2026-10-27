@@ -33,6 +33,8 @@ internal sealed class SustainGeometryBatchPrototype
     private int lengthProperty;
     private float nextCandidateScan;
     private bool active, failed, inRender, loggedFirstBatch;
+    private bool skipExternalAlphaSample;
+    private bool originalExternalAlphaKeyword;
     private string stage = "initialize";
 
     internal void Update(bool requested, bool eligible, GameManager? game)
@@ -87,6 +89,8 @@ internal sealed class SustainGeometryBatchPrototype
             || sourceMaterial.shader.name != "CloneHero/Sustains")
             throw new InvalidOperationException("Mapped sustain material is missing.");
         batchMaterial = new Material(sourceMaterial) { name = "Sloptifine regular sustain geometry batch" };
+        originalExternalAlphaKeyword = Array.IndexOf(batchMaterial.shaderKeywords, "ETC1_EXTERNAL_ALPHA") >= 0;
+        skipExternalAlphaSample = !originalExternalAlphaKeyword;
         // The exact shipped shader has a variant without external sizing.
         // Predeform each vertex so one draw can hold different tail lengths.
         batchMaterial.SetFloat("ExternalVertexSizing", 0);
@@ -124,6 +128,19 @@ internal sealed class SustainGeometryBatchPrototype
         if (!active || camera == null || camera != playerCamera || inRender) return;
         try { BuildFrame(); }
         catch (Exception ex) { Fail(ex); }
+    }
+
+    internal void SetSkipExternalAlphaSample(bool skip)
+    {
+        // If the guarded alpha switch ran before this mesh material was
+        // cloned, its source keyword was already off. The switch only marks
+        // this shader active after removing a previously enabled keyword.
+        if (skip) originalExternalAlphaKeyword = true;
+        if (!originalExternalAlphaKeyword) return;
+        if (batchMaterial == null || skip == skipExternalAlphaSample) return;
+        if (skip) batchMaterial.DisableKeyword("ETC1_EXTERNAL_ALPHA");
+        else batchMaterial.EnableKeyword("ETC1_EXTERNAL_ALPHA");
+        skipExternalAlphaSample = skip;
     }
 
     private void BuildFrame()
@@ -284,6 +301,8 @@ internal sealed class SustainGeometryBatchPrototype
         activeCandidates.Clear();
         nextCandidateScan = 0;
         loggedFirstBatch = false;
+        skipExternalAlphaSample = false;
+        originalExternalAlphaKeyword = false;
     }
 }
 

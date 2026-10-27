@@ -2403,6 +2403,21 @@ near-entry snapshots showed zero tracked with two UVScroll scripts present;
 those snapshots do not establish that the scripts stayed untracked for the
 whole song. Activation counts and mod callback intervals are not FPS gains.
 
+### v0.4.120 split-alpha shader test, glow setter follow-up, settings drag
+
+The exact resource scan found four guitar sprite materials that compile an
+extra split-alpha texture sample with `ETC1_EXTERNAL_ALPHA`, although the
+material alpha switch is zero and all 705 supplied resource sprites have no
+separate alpha texture. A separate default-off offline-solo prototype checks
+the four mapped material names/shaders, live sprites, alpha switch, and keyword
+before selecting the no-ETC1 variant; it restores the keyword on scope exit.
+See [the exact mapping](unused-alpha-sampling-2026-10-26.md). It has no measured
+GPU or presented-FPS result and has not been validated in the Windows game.
+The plain held-tail glow hook also skips redundant disable writes while that
+switch is active. The mod settings window can be dragged by its header; the
+saved position is bounded to the display. Release compilation and 127 Core
+checks pass.
+
 ### v0.4.119 regular sustain geometry prototype and visual fix
 
 The old material-flag batching option was on when the user reported malformed

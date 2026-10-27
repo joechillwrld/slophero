@@ -317,6 +317,7 @@ internal sealed class PlainHeldSustainPrototype
     private MethodInfo? enabledSetter;
     private bool hookInstalled;
     private long blockedReenables;
+    private long blockedRedundantDisables;
     private bool failed;
     private string updateStage = "initialize";
 
@@ -374,8 +375,12 @@ internal sealed class PlainHeldSustainPrototype
     private static bool BeforeSetEnabled(Renderer __instance, bool value)
     {
         var owner = active;
-        if (owner == null || !value || !owner.renderers.ContainsKey(__instance.Pointer)) return true;
-        owner.blockedReenables++;
+        if (owner == null || !owner.renderers.ContainsKey(__instance.Pointer)) return true;
+        // Every tracked glow renderer was disabled before installing this
+        // prefix. While plain tails are selected, neither another enable nor
+        // a repeat disable needs to cross into Unity's renderer state setter.
+        if (value) owner.blockedReenables++;
+        else owner.blockedRedundantDisables++;
         return false;
     }
 
@@ -398,9 +403,10 @@ internal sealed class PlainHeldSustainPrototype
         }
         hookInstalled = false;
         enabledSetter = null;
-        if (renderers.Count != 0 && blockedReenables != 0)
-            MelonLogger.Msg($"Sloptifine plain-held-sustain prototype blocked {blockedReenables} glow re-enable write(s) during this song.");
+        if (renderers.Count != 0 && (blockedReenables != 0 || blockedRedundantDisables != 0))
+            MelonLogger.Msg($"Sloptifine plain-held-sustain prototype blocked {blockedReenables} glow enable and {blockedRedundantDisables} redundant disable write(s) during this song.");
         blockedReenables = 0;
+        blockedRedundantDisables = 0;
         foreach (var (renderer, wasEnabled) in renderers.Values)
         {
             try

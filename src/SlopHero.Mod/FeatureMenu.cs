@@ -42,9 +42,10 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> disableHudCameraBenchmark = null!;
     private MelonPreferences_Entry<bool> disableGuitarCameraBenchmark = null!;
     private MelonPreferences_Entry<bool> cacheStaticSustainWrites = null!, batchSustainGeometry = null!;
-    private MelonPreferences_Entry<bool> hideHeldSustainGlow = null!, mergeHudCamera = null!;
+    private MelonPreferences_Entry<bool> hideHeldSustainGlow = null!, skipUnusedSpriteAlpha = null!, mergeHudCamera = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
-    private MelonPreferences_Entry<float> settingsMenuScale = null!, scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
+    private MelonPreferences_Entry<float> settingsMenuScale = null!, settingsWindowOffsetX = null!, settingsWindowOffsetY = null!;
+    private MelonPreferences_Entry<float> scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
     private readonly VisualOverrides visuals = new();
     private readonly RingColors rings = new();
     private readonly PerformanceOverrides performance = new();
@@ -70,6 +71,7 @@ public sealed partial class Core
     private readonly SustainStaticWriteCachePrototype sustainWriteCache = new();
     private readonly SustainGeometryBatchPrototype sustainGeometryBatch = new();
     private readonly PlainHeldSustainPrototype plainHeldSustains = new();
+    private readonly UnusedSpriteAlphaPrototype unusedSpriteAlpha = new();
     private readonly HudCameraMergePrototype hudCameraMerge = new();
     private readonly NetworkTickRemainderOverride networkTickRemainder = new();
     private readonly OptionalHudAnimationsOverride optionalHudAnimations = new();
@@ -85,6 +87,8 @@ public sealed partial class Core
     private Texture2D? menuArtworkTexture;
     private bool menuArtworkLoadAttempted;
     private int settingsPage;
+    private bool settingsWindowDragging;
+    private Vector2 settingsWindowDragMouse, settingsWindowDragOrigin;
     private Vector2 settingsScrollPosition;
     private bool profileDropdownOpen;
     private int profileListStart;
@@ -130,6 +134,8 @@ public sealed partial class Core
         customizeFpsColor = preferences.CreateEntry("CustomizeFpsColor", false);
         fpsTextColor = preferences.CreateEntry("FpsTextColor", "FFFFFF");
         settingsMenuScale = preferences.CreateEntry("SettingsMenuScale", 1.12f);
+        settingsWindowOffsetX = preferences.CreateEntry("SettingsWindowOffsetX", 0f);
+        settingsWindowOffsetY = preferences.CreateEntry("SettingsWindowOffsetY", 0f);
         scoreHudScale = preferences.CreateEntry("ScoreHudScale", 1f);
         inputViewerScale = preferences.CreateEntry("InputViewerScale", 1f);
         starPowerHudScale = preferences.CreateEntry("StarPowerHudScale", 1f);
@@ -192,6 +198,7 @@ public sealed partial class Core
         }
         batchSustainGeometry = preferences.CreateEntry("PerformanceBatchSustainGeometry", false);
         hideHeldSustainGlow = preferences.CreateEntry("PerformanceHideHeldSustainGlow", false);
+        skipUnusedSpriteAlpha = preferences.CreateEntry("PerformanceSkipUnusedSpriteAlpha", false);
         // The previous managed command-buffer prototype may be saved as on.
         // Native internal calls have a different crash risk, so require a new
         // explicit opt-in instead of inheriting that old preference/profile.
@@ -235,10 +242,13 @@ public sealed partial class Core
 
     private void DrawScaledSettingsPage(float scale)
     {
-        // Keep the centered window and reshape it around the user's dark,
-        // compact sidebar-and-panel mockup.
+        // Store the offset in physical pixels, then divide by the GUI scale
+        // so the visible window follows the mouse at any menu size.
         const float menuWidth = 1200, menuHeight = 740, sidebarWidth = 184;
-        float frameX = (Screen.width - menuWidth) / 2f, frameY = (Screen.height - menuHeight) / 2f;
+        ClampSettingsWindowOffset(scale, menuWidth, menuHeight);
+        float frameX = (Screen.width - menuWidth) / 2f + settingsWindowOffsetX.Value / scale;
+        float frameY = (Screen.height - menuHeight) / 2f + settingsWindowOffsetY.Value / scale;
+        HandleSettingsWindowDrag(scale, menuWidth, menuHeight, ref frameX, ref frameY);
         Color previousColor = GUI.color, previousBackground = GUI.backgroundColor;
         try
         {
@@ -263,7 +273,8 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.119", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.120", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
             if (GUI.Button(new Rect(frameX + menuWidth - 48, frameY + 13, 32, 32), "×", menuClickStyle))
@@ -350,6 +361,56 @@ public sealed partial class Core
             GUI.EndScrollView();
         }
         if (editApply != null) DrawValueEditor();
+    }
+
+    private void ClampSettingsWindowOffset(float scale, float width, float height)
+    {
+        float maxX = Math.Max(0, (Screen.width - width * scale) * .5f - 10);
+        float maxY = Math.Max(0, (Screen.height - height * scale) * .5f - 10);
+        float x = float.IsFinite(settingsWindowOffsetX.Value)
+            ? Math.Clamp(settingsWindowOffsetX.Value, -maxX, maxX) : 0;
+        float y = float.IsFinite(settingsWindowOffsetY.Value)
+            ? Math.Clamp(settingsWindowOffsetY.Value, -maxY, maxY) : 0;
+        if (x == settingsWindowOffsetX.Value && y == settingsWindowOffsetY.Value) return;
+        settingsWindowOffsetX.Value = x;
+        settingsWindowOffsetY.Value = y;
+        preferencesDirty = true;
+    }
+
+    private void HandleSettingsWindowDrag(float scale, float width, float height, ref float frameX, ref float frameY)
+    {
+        var e = Event.current;
+        if (!Input.GetMouseButton(0) && e.rawType != EventType.MouseUp && e.type != EventType.MouseDown)
+            settingsWindowDragging = false;
+        // Undo the menu's scale for hit testing. Track movement in physical
+        // screen pixels so a dragged header follows the mouse at any scale.
+        Vector3 localMouse = GUI.matrix.inverse.MultiplyPoint3x4(
+            new Vector3(e.mousePosition.x, e.mousePosition.y, 0));
+        var header = new Rect(frameX, frameY, width - 62, 58);
+        Vector2 screenMouse = new(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
+        if (e.type == EventType.MouseDown && e.button == 0 && header.Contains(localMouse))
+        {
+            settingsWindowDragging = true;
+            settingsWindowDragMouse = screenMouse;
+            settingsWindowDragOrigin = new Vector2(settingsWindowOffsetX.Value, settingsWindowOffsetY.Value);
+            e.Use();
+        }
+        if (settingsWindowDragging && e.type == EventType.MouseDrag)
+        {
+            Vector2 delta = screenMouse - settingsWindowDragMouse;
+            settingsWindowOffsetX.Value = settingsWindowDragOrigin.x + delta.x;
+            settingsWindowOffsetY.Value = settingsWindowDragOrigin.y + delta.y;
+            ClampSettingsWindowOffset(scale, width, height);
+            frameX = (Screen.width - width) * .5f + settingsWindowOffsetX.Value / scale;
+            frameY = (Screen.height - height) * .5f + settingsWindowOffsetY.Value / scale;
+            preferencesDirty = true;
+            e.Use();
+        }
+        if (settingsWindowDragging && e.rawType == EventType.MouseUp)
+        {
+            settingsWindowDragging = false;
+            SavePreferences();
+        }
     }
 
     private void DrawMenuArtwork(Rect rect)
@@ -542,14 +603,15 @@ public sealed partial class Core
         Toggle(disableHitParticles, "Skip note-hit particles", x, y + 30);
         Toggle(disableSustainParticles, "Skip sustain particles", x, y + 70);
         Toggle(hideHeldSustainGlow, "Hide held-sustain glow (plain tails)", x, y + 110);
-        Toggle(disableFretEffects, "Disable fret flames, sparks, and lightning", x, y + 150);
-        Toggle(disableStarProgressParticles, "Skip star-progress burst particles", x, y + 190);
-        Toggle(freezeComboSmokeScroll, "Pause combo-smoke animation (smoke stays visible)", x, y + 230);
-        Toggle(pauseHiddenBeatlineUpdates, "Skip beatline updates while hidden", x, y + 270);
-        Toggle(disableAprilFools, "Disable April Fools / NoteBomber chaos and Pong", x, y + 310);
-        GUI.Label(new Rect(x + 4, y + 354, 610, 42), "These visual switches restore on pause, transitions, or online play. Plain tails keep their base sustain body and hide only pooled glow renderers.");
+        Toggle(skipUnusedSpriteAlpha, "Skip unused split-alpha sampling (GPU test)", x, y + 150);
+        Toggle(disableFretEffects, "Disable fret flames, sparks, and lightning", x, y + 190);
+        Toggle(disableStarProgressParticles, "Skip star-progress burst particles", x, y + 230);
+        Toggle(freezeComboSmokeScroll, "Pause combo-smoke animation (smoke stays visible)", x, y + 270);
+        Toggle(pauseHiddenBeatlineUpdates, "Skip beatline updates while hidden", x, y + 310);
+        Toggle(disableAprilFools, "Disable April Fools / NoteBomber chaos and Pong", x, y + 350);
+        GUI.Label(new Rect(x + 4, y + 394, 610, 42), "These visual switches restore on pause, transitions, or online play. Plain tails keep their base sustain body. The GPU test changes a shader keyword only for materials whose current sprites have no split-alpha texture.");
 
-        float servicesY = y + 410;
+        float servicesY = y + 450;
         SectionHeader("Services and HUD", x, servicesY);
         Toggle(suspendHiddenLeaderboard, "Pause offline leaderboard and spectator UI", x, servicesY + 30);
         Toggle(stopMidiInput, "Pause drum MIDI device discovery", x, servicesY + 70);
@@ -558,7 +620,7 @@ public sealed partial class Core
         Toggle(skipBackgroundCamera, "Skip background camera and hidden video in solo songs", x, servicesY + 190);
         GUI.Label(new Rect(x + 4, servicesY + 236, 610, 56), "Experimental; default off. Removes the background render pass and pauses its video decoder while hidden during offline solo songs; both restore on pause or online play.");
 
-        float engineY = y + 730;
+        float engineY = y + 770;
         SectionHeader("Engine and scheduler experiments", x, engineY);
         Toggle(skipGameplayMouseUi, "Skip mouse UI raycasts during gameplay", x, engineY + 30);
         Toggle(skipLegacyMouseEvents, "Skip legacy camera mouse events during gameplay", x, engineY + 70);
@@ -574,7 +636,7 @@ public sealed partial class Core
         Toggle(limitSlopHeroShortcutPolling, "Limit SlopHero hotkey checks to 120 Hz", x, engineY + 470);
         GUI.Label(new Rect(x + 4, engineY + 516, 610, 96), "Experimental; default off. Keyboard-bound game controls pause while its sampler switch is on; controller/instrument polling is untouched. Hotkey sampling may add up to 8 ms to SlopHero shortcuts. UI-event pause also suspends transparent HUD handles and built-in navigation. TMP layout/rebuilds stay enabled. Whammy uploads return to vanilla outside active offline solo play. Drum MIDI shutdown requires a restart to restore.");
 
-        float renderingY = y + 1380;
+        float renderingY = y + 1420;
         SectionHeader("3D rendering experiment", x, renderingY);
         Toggle(limitPlayerCameraFarClip, "Limit guitar-camera far clip in solo songs", x, renderingY + 30);
         Number("Guitar-camera far clip (units)", farClipDistance.Value, x, renderingY + 74, 40, 120,
@@ -595,7 +657,7 @@ public sealed partial class Core
         float sustainY = networkY + 170;
         SectionHeader("Sustain and HUD rendering prototypes", x, sustainY);
         Toggle(cacheStaticSustainWrites, "Skip repeated sustain sprite, color, and length writes", x, sustainY + 30);
-        Toggle(batchSustainGeometry, "Batch dense regular sustain geometry into one mesh", x, sustainY + 70);
+        Toggle(batchSustainGeometry, "Batch dense regular sustain geometry (test)", x, sustainY + 70);
         Toggle(mergeHudCamera, "Merge HUD camera (native prototype)", x, sustainY + 110);
         GUI.Label(new Rect(x + 4, sustainY + 154, 610, 126), "All default off and limited to offline solo songs. The geometry batch replaces eight or more compatible upcoming tails in one draw and restores native renderers after the guitar camera renders; sort/UV parity needs a Windows test. The old material-flag experiment was removed because it could deform tails. HUD merge uses native Unity draw commands and needs visual validation.");
     }
@@ -1074,7 +1136,8 @@ public sealed partial class Core
             Bool("ShowSongHud", showSong); Bool("ShowSongTitle", showTitle); Bool("ShowArtist", showArtist); Bool("ShowCharter", showCharter); Bool("ShowChartSpeed", showSpeed);
             Int("SongHudX", songX); Int("SongHudY", songY); Int("SongFontSize", songFont); Float("SongBackgroundOpacity", songOpacity);
             Float("PracticeHudOffsetX", practiceHudX); Float("PracticeHudOffsetY", practiceHudY); Float("FpsHudOffsetX", fpsHudX); Float("FpsHudOffsetY", fpsHudY);
-            Float("SettingsMenuScale", settingsMenuScale); Float("ScoreHudScale", scoreHudScale); Float("InputViewerScale", inputViewerScale); Float("StarPowerHudScale", starPowerHudScale); Float("PracticeHudScale", practiceHudScale); Float("FpsHudScale", fpsHudScale);
+            Float("SettingsMenuScale", settingsMenuScale); Float("SettingsWindowOffsetX", settingsWindowOffsetX); Float("SettingsWindowOffsetY", settingsWindowOffsetY);
+            Float("ScoreHudScale", scoreHudScale); Float("InputViewerScale", inputViewerScale); Float("StarPowerHudScale", starPowerHudScale); Float("PracticeHudScale", practiceHudScale); Float("FpsHudScale", fpsHudScale);
             Bool("HideHighwaySides", hideSides); Bool("HideFretStrings", hideStrings); Bool("HideBeatlines", hideBeats); Bool("ConstantPracticeNoteSpeed", lockSpeed);
             Bool("PerformancePauseHiddenBeatlineUpdates", pauseHiddenBeatlineUpdates);
             Bool("DisableAprilFoolsContent", disableAprilFools);
@@ -1103,6 +1166,7 @@ public sealed partial class Core
             Bool("PerformanceCacheStaticSustainWrites", cacheStaticSustainWrites);
             Bool("PerformanceBatchSustainGeometry", batchSustainGeometry);
             Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
+            Bool("PerformanceSkipUnusedSpriteAlpha", skipUnusedSpriteAlpha);
             Bool("PerformanceMergeHudCameraNative", mergeHudCamera);
             Bool("PerformanceHidePbPopup", hidePbPopup);
             Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
@@ -1167,6 +1231,7 @@ public sealed partial class Core
         Bool("PerformanceCacheStaticSustainWrites", cacheStaticSustainWrites);
         Bool("PerformanceBatchSustainGeometry", batchSustainGeometry);
         Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
+        Bool("PerformanceSkipUnusedSpriteAlpha", skipUnusedSpriteAlpha);
         Bool("PerformanceMergeHudCameraNative", mergeHudCamera);
         Bool("PerformanceHidePbPopup", hidePbPopup);
         Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
@@ -1176,7 +1241,9 @@ public sealed partial class Core
         else
             Bool("PerformanceFreezeLyricsBackgroundScroll", freezeComboSmokeScroll);
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
-        Float("SettingsMenuScale", settingsMenuScale, .85f, 1.4f); Float("ScoreHudScale", scoreHudScale, .5f, 2.5f); Float("InputViewerScale", inputViewerScale, .5f, 2.5f); Float("StarPowerHudScale", starPowerHudScale, .5f, 2.5f); Float("PracticeHudScale", practiceHudScale, .5f, 2.5f); Float("FpsHudScale", fpsHudScale, .5f, 2.5f);
+        Float("SettingsMenuScale", settingsMenuScale, .85f, 1.4f);
+        Float("SettingsWindowOffsetX", settingsWindowOffsetX, -4096, 4096); Float("SettingsWindowOffsetY", settingsWindowOffsetY, -4096, 4096);
+        Float("ScoreHudScale", scoreHudScale, .5f, 2.5f); Float("InputViewerScale", inputViewerScale, .5f, 2.5f); Float("StarPowerHudScale", starPowerHudScale, .5f, 2.5f); Float("PracticeHudScale", practiceHudScale, .5f, 2.5f); Float("FpsHudScale", fpsHudScale, .5f, 2.5f);
         if (!values.ContainsKey("ScoreHudScale"))
         {
             if (values.ContainsKey("StarProgressHudScale")) Float("StarProgressHudScale", scoreHudScale, .5f, 2.5f);

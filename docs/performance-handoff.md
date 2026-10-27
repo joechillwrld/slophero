@@ -2073,3 +2073,25 @@ The 0.4.119 Release build completed with zero warnings/errors and all 127
 Core checks passed. `downloads/SlopHero-0.4.119-alpha.zip` contains only
 `Mods/SlopHero.dll`; SHA-256:
 `a86765a31f3df005fdaf19b5814ea3e55ab7eab609a6a2a97d18658b3a91ffca`.
+
+### 0.4.120: alpha shader and hidden-glow CPU follow-up
+
+The [current split-alpha shader mapping](unused-alpha-sampling-2026-10-26.md)
+identifies four guitar materials that enable an ETC1 variant with an extra
+alpha sample while their saved alpha switch is zero. All 705 supplied resource
+sprites have no split-alpha texture. A separate default-off prototype now
+guards the live material and sprite state before selecting the no-ETC1
+variant; it restores the keyword on scope exit. It is compiled and packaged
+but not yet tested on Windows. Its gain and the impact of dynamic mod sprites
+remain unknown.
+
+With the plain-tail glow setting active, the existing `Renderer.enabled`
+prefix already blocks game re-enables. It now also skips repeated disable
+writes for the same tracked renderers, avoiding native setter calls while
+keeping them hidden. This CPU change is also unmeasured. The settings window
+can now be dragged by its header; physical-pixel offsets are saved and clamped
+to the current display. The Release build has zero warnings/errors and all 127
+Core checks pass. The shader, glow, geometry, and HUD render experiments still
+need separate Windows visual/performance tests.
+`downloads/SlopHero-0.4.120-alpha.zip` contains only `Mods/SlopHero.dll`;
+SHA-256: `25e334ea3eadeb1824c8666f440724be7261e35e598fd28c4e4ca434e676922b`.
