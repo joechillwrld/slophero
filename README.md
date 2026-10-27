@@ -1,11 +1,14 @@
-# SlopHero 0.4.126 alpha
+# SlopHero 0.4.127 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: reversible
 experiments judged by measurements. Gameplay timing, online play, and the
 1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.126
+build, compiled against its loader and generated assemblies. Version 0.4.127
+fixes the settings menu closing on open by drawing its selection stripe with
+the supported flat `GUI.Box` path. The 0.4.126 stripe used a Unity method
+stripped from this game build. Version 0.4.126
 adds a default-off native cache for repeated regular sustain-length property
 block submissions during offline solo guitar songs. The exact-build patch
 checks six game callsites and restores the original path outside eligible
@@ -297,7 +300,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.126 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.126-alpha.zip)
+[Download SlopHero v0.4.127 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.127-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

@@ -298,7 +298,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.126", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.127", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -334,12 +334,13 @@ public sealed partial class Core
                 }
                 if (selected)
                 {
-                    // A GUI.Box uses the skin's sliced border and can look
-                    // much wider than its Rect. Draw a literal narrow stripe.
-                    Color saved = GUI.color;
-                    GUI.color = accent;
-                    GUI.DrawTexture(new Rect(rect.x, rect.y + 9, 1.5f, rect.height - 18), Texture2D.whiteTexture);
-                    GUI.color = saved;
+                    // This flat style uses a white texture and stays inside
+                    // the one-pixel Rect. GUI.DrawTexture is stripped in this
+                    // game build and would close the entire settings menu.
+                    Color saved = GUI.backgroundColor;
+                    GUI.backgroundColor = accent;
+                    GUI.Box(new Rect(rect.x, rect.y + 9, 1, rect.height - 18), "", menuFlatStyle);
+                    GUI.backgroundColor = saved;
                 }
             }
 

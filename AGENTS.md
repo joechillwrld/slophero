@@ -45,7 +45,11 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.126. It adds a separate default-off native
+The latest packaged build is 0.4.127. It fixes a settings-menu exception caused
+by `GUI.DrawTexture`, which is stripped in this game build, by drawing the
+thin selected-page stripe through the supported flat `GUI.Box` path. The
+0.4.126 log has one menu exception and no native sustain-cache activation.
+Version 0.4.126 adds a separate default-off native
 regular-sustain length-write cache at six exact GameAssembly callsites. It
 passes static callsite and x64-stub emulation plus the standard build/checks,
 but needs a Windows visual and frame-time test. The camera/culling follow-up

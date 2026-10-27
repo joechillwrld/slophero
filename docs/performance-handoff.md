@@ -5,6 +5,20 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
+## 0.4.127 settings-menu repair
+
+The supplied 0.4.126 `Latest.log` records one SlopHero error when opening
+settings: `System.NotSupportedException: Method unstripping failed` in
+`DrawScaledSettingsPage`. Version 0.4.125 introduced `GUI.DrawTexture` for the
+selected-page stripe despite an existing note that this game's IL2CPP build
+strips that method. Version 0.4.127 uses the already-supported flat `GUI.Box`
+path in a one-pixel rectangle. No native regular-sustain cache activation was
+recorded in this log, so it cannot validate that experiment. The Release
+build succeeds with zero warnings/errors, all 127 Core checks pass, and the
+ZIP contains only `Mods/SlopHero.dll`. Windows menu opening still needs a
+runtime check. `downloads/SlopHero-0.4.127-alpha.zip` SHA-256:
+`62b257bc128e045b22008c4fec8ff178df01815e0586a465ac162aa7847c65ca`.
+
 ## 0.4.126 prototype and camera/culling follow-up
 
 A separate default-off native sustain switch intercepts one regular upcoming
