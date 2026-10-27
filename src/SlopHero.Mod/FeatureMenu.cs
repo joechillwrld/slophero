@@ -42,7 +42,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> disableHudCameraBenchmark = null!;
     private MelonPreferences_Entry<bool> disableGuitarCameraBenchmark = null!;
     private MelonPreferences_Entry<bool> hideHeldSustainGlow = null!;
-    private MelonPreferences_Entry<bool> renderEveryUpdate = null!;
+    private MelonPreferences_Entry<bool> rainbowNotes = null!, rainbowFlames = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, settingsWindowOffsetX = null!, settingsWindowOffsetY = null!;
     private MelonPreferences_Entry<float> scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
@@ -69,7 +69,7 @@ public sealed partial class Core
     private readonly HudCameraBenchmarkOverride hudCameraBenchmark = new();
     private readonly GuitarCameraBenchmarkOverride guitarCameraBenchmark = new();
     private readonly PlainHeldSustainPrototype plainHeldSustains = new();
-    private readonly RenderEveryUpdatePrototype renderEveryUpdatePrototype = new();
+    private readonly RainbowHighway rainbowHighway = new();
     private readonly NetworkTickRemainderOverride networkTickRemainder = new();
     private readonly OptionalHudAnimationsOverride optionalHudAnimations = new();
     private readonly RuntimeTimings timings = new();
@@ -193,7 +193,17 @@ public sealed partial class Core
             preferences.SaveToFile();
         }
         hideHeldSustainGlow = preferences.CreateEntry("PerformanceHideHeldSustainGlow", false);
-        renderEveryUpdate = preferences.CreateEntry("PerformanceRenderEveryUpdateSolo", false);
+        // Render-every-update consumed enough CPU to reduce simulation Updates
+        // by roughly 35% in the user's four-run comparison. Retire any saved
+        // value, including values written by older profiles.
+        var retiredRenderInterval = preferences.CreateEntry("PerformanceRenderEveryUpdateSolo", false);
+        if (retiredRenderInterval.Value)
+        {
+            retiredRenderInterval.Value = false;
+            preferences.SaveToFile();
+        }
+        rainbowNotes = preferences.CreateEntry("RainbowNotes", false);
+        rainbowFlames = preferences.CreateEntry("RainbowFlames", false);
         // Retire experiments that added global setter/camera work, never drew
         // a batch, or found no eligible material in the user's Windows runs.
         // Ignore their old profile keys below so imports cannot revive them.
@@ -208,7 +218,7 @@ public sealed partial class Core
             retiredWriteCache.Value = retiredGeometry.Value = retiredAlpha.Value = retiredHudMerge.Value = false;
             if (!recovery123Applied.Value)
             {
-                renderEveryUpdate.Value = false;
+                retiredRenderInterval.Value = false;
                 reduceUnityJobWorkers.Value = false;
                 staticTmpScaleDuringSong.Value = false;
             }
@@ -285,7 +295,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.124", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.125", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -321,8 +331,12 @@ public sealed partial class Core
                 }
                 if (selected)
                 {
-                    GUI.backgroundColor = accent;
-                    GUI.Box(new Rect(rect.x, rect.y + 8, 1, rect.height - 16), "", menuFlatStyle);
+                    // A GUI.Box uses the skin's sliced border and can look
+                    // much wider than its Rect. Draw a literal narrow stripe.
+                    Color saved = GUI.color;
+                    GUI.color = accent;
+                    GUI.DrawTexture(new Rect(rect.x, rect.y + 9, 1.5f, rect.height - 18), Texture2D.whiteTexture);
+                    GUI.color = saved;
                 }
             }
 
@@ -345,7 +359,7 @@ public sealed partial class Core
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 6 => 2100, _ => 500 };
+        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 4 => 640, 6 => 2100, _ => 500 };
         Rect viewport = new(frameX + sidebarWidth + 12, frameY + 132, 680, menuHeight - 146);
         Rect content = new(0, 0, 656, contentHeight);
         settingsScrollPosition = GUI.BeginScrollView(viewport, settingsScrollPosition, content);
@@ -615,6 +629,10 @@ public sealed partial class Core
         Hex(scoreColor, "Score / accuracy text", x, y + 272);
         Hex(songProgressColor, "Song progress bar", x, y + 312);
         Hex(menuAccentHex, "Menu accent", x, y + 352);
+        SectionHeader("Highway colors", x, y + 430);
+        Toggle(rainbowNotes, "Rainbow notes", x, y + 460);
+        Toggle(rainbowFlames, "Rainbow fret flames", x, y + 500);
+        GUI.Label(new Rect(x + 4, y + 545, 610, 56), "Optional color animation for the local guitar. The game's normal note and flame colors return when disabled. The flame option needs fret effects enabled.");
     }
 
     private void DrawPerformanceSettings(float x, float y)
@@ -653,8 +671,7 @@ public sealed partial class Core
         Toggle(pauseRewiredMousePolling, "Pause Rewired mouse polling in solo songs", x, engineY + 390);
         Toggle(pauseRewiredKeyboardPolling, "Pause Rewired keyboard polling in solo songs", x, engineY + 430);
         Toggle(limitSlopHeroShortcutPolling, "Limit SlopHero hotkey checks to 120 Hz", x, engineY + 470);
-        Toggle(renderEveryUpdate, "Render every Unity update in solo songs (FPS test)", x, engineY + 510);
-        GUI.Label(new Rect(x + 4, engineY + 556, 610, 96), "Experimental; default off. Rendering every update may raise presented FPS but can reduce simulation and instrument-polling rates under CPU load. The original interval returns on pause/exit. Keyboard sampler and hotkey options have separate input effects. UI-event pause suspends built-in navigation. Drum MIDI shutdown needs a restart to restore.");
+        GUI.Label(new Rect(x + 4, engineY + 510, 610, 96), "Keyboard sampler and hotkey options have separate input effects. UI-event pause suspends built-in navigation. Drum MIDI shutdown needs a restart to restore.");
 
         float renderingY = y + 1420;
         SectionHeader("3D rendering experiment", x, renderingY);
@@ -1178,12 +1195,12 @@ public sealed partial class Core
             Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
             Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
             Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
-            Bool("PerformanceRenderEveryUpdateSolo", renderEveryUpdate);
             Bool("PerformanceHidePbPopup", hidePbPopup);
             Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
             Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
         }
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
+        Bool("RainbowNotes", rainbowNotes); Bool("RainbowFlames", rainbowFlames);
         Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
         Text("ProgressColor", progressColor); Text("ScoreTextColor", scoreColor); Text("SongProgressColor", songProgressColor); Text("FpsTextColor", fpsTextColor);
         Text("MenuAccentColor", menuAccentHex);
@@ -1240,7 +1257,6 @@ public sealed partial class Core
         Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
         Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
         Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
-        Bool("PerformanceRenderEveryUpdateSolo", renderEveryUpdate);
         Bool("PerformanceHidePbPopup", hidePbPopup);
         Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
         Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1249,6 +1265,7 @@ public sealed partial class Core
         else
             Bool("PerformanceFreezeLyricsBackgroundScroll", freezeComboSmokeScroll);
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
+        Bool("RainbowNotes", rainbowNotes); Bool("RainbowFlames", rainbowFlames);
         Float("SettingsMenuScale", settingsMenuScale, .85f, 1.4f);
         Float("SettingsWindowOffsetX", settingsWindowOffsetX, -4096, 4096); Float("SettingsWindowOffsetY", settingsWindowOffsetY, -4096, 4096);
         Float("ScoreHudScale", scoreHudScale, .5f, 2.5f); Float("InputViewerScale", inputViewerScale, .5f, 2.5f); Float("StarPowerHudScale", starPowerHudScale, .5f, 2.5f); Float("PracticeHudScale", practiceHudScale, .5f, 2.5f); Float("FpsHudScale", fpsHudScale, .5f, 2.5f);

@@ -1,11 +1,20 @@
-# SlopHero 0.4.124 alpha
+# SlopHero 0.4.125 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: reversible
 experiments judged by measurements. Gameplay timing, online play, and the
 1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.124
+build, compiled against its loader and generated assemblies. Version 0.4.125
+retires the render-every-update experiment after a four-run comparison showed
+about 35% fewer simulation Updates while it was enabled. It fixes the settings
+selection stripe by drawing a literal narrow line and adds separate, default-off
+rainbow note and fret-flame colors. The colors use cached Gameplay sprites and
+refresh at 20 Hz; their visual behavior still needs a Windows check. The
+current note-state method already avoids redundant sprite/color writes, and
+the older sampled trace shows only about 33 ms there and 10 ms in the open
+flame updater over 31 seconds. No new note/flame performance patch or FPS gain
+is claimed. Version 0.4.124
 restores visual overrides when the mod unloads, speeds discovery for the
 optional plain-tail glow setting by checking each unique material once, and
 separates regular mod timings from higher-overhead camera timings. These
@@ -14,14 +23,13 @@ The prior 0.4.123 release retired four experiments that added hooks or camera
 work without a measured benefit: the HUD-camera merge, sustain geometry batch,
 unused split-alpha shader switch, and global sustain setter cache. Old saved
 and profile values cannot reactivate them. It also reset saved render-every-update,
-Unity worker-limit, and TMP-scale experiments once; those remain opt-in.
+Unity worker-limit, and TMP-scale experiments once. The render option was
+removed in 0.4.125; the other two remain opt-in.
 Other visual/gameplay features remain.
 Version 0.4.122
-adds a separate default-off offline-solo render-interval experiment. It asks
-Unity to render every simulation update instead of every second update, then
-restores the game's original interval on pause or exit. Presented FPS might
-rise, but extra render work may reduce simulation and input-polling rates;
-Windows validation is pending. Version 0.4.121
+added the now-retired offline-solo render-interval experiment. It asked Unity
+to render every simulation update instead of every second update. The later
+four-run log showed a substantial simulation-rate loss. Version 0.4.121
 resets saved opt-ins for the HUD-camera merge, sustain geometry batch, and
 unused-alpha shader test after the latest log showed lower render-callback
 rates with HUD merge, no actual geometry batch, and no eligible shader material.
@@ -281,7 +289,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.124 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.124-alpha.zip)
+[Download SlopHero v0.4.125 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.125-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

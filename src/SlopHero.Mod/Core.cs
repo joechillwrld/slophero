@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.124", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.125", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -118,7 +118,7 @@ public sealed partial class Core : MelonMod
         hudCameraBenchmark.Clear();
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
-        renderEveryUpdatePrototype.Clear();
+        rainbowHighway.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
         optionalHudAnimations.Clear();
         optionalHudGame = null;
@@ -226,7 +226,7 @@ public sealed partial class Core : MelonMod
         hudCameraBenchmark.Clear();
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
-        renderEveryUpdatePrototype.Clear();
+        rainbowHighway.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
         optionalHudAnimations.Clear();
         optionalHudGame = null;
@@ -373,7 +373,6 @@ public sealed partial class Core : MelonMod
             if (!Application.isFocused) guitarCameraBenchmark.Restore();
             if (!Application.isFocused) plainHeldSustains.Clear(HarmonyInstance);
             if (!Application.isFocused) playerCameraFarClip.Restore();
-            if (!Application.isFocused) renderEveryUpdatePrototype.Restore();
             if (!Application.isFocused) highwayAnimations.SetSuppressed(false);
             if (capture != null)
             {
@@ -482,7 +481,6 @@ public sealed partial class Core : MelonMod
             bool hudCameraBenchmarkRequested = disableHudCameraBenchmark.Value;
             bool guitarCameraBenchmarkRequested = disableGuitarCameraBenchmark.Value;
             bool plainHeldSustainRequested = hideHeldSustainGlow.Value;
-            bool renderEveryUpdateRequested = renderEveryUpdate.Value;
             bool workerLimitCandidate = workerLimitRequested && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0;
@@ -492,7 +490,7 @@ public sealed partial class Core : MelonMod
                 || workerLimitRequested || mouseSamplerRequested || keyboardSamplerRequested
                 || backgroundCameraRequested || farClipRequested || hudCameraBenchmarkRequested
                 || guitarCameraBenchmarkRequested
-                || plainHeldSustainRequested || renderEveryUpdateRequested
+                || plainHeldSustainRequested
                 || skipMouseUiRequested || skipLegacyMouseRequested
                 || throttleWhammyTexture.Value || disableHitParticles.Value || disableSustainParticles.Value
                 || disableFretEffects.Value || disableStarProgressParticles.Value || freezeComboSmokeScroll.Value
@@ -570,7 +568,7 @@ public sealed partial class Core : MelonMod
             // the IL2CPP game properties once, and only when one is requested.
             bool scopedExperimentRequested = mouseSamplerRequested || keyboardSamplerRequested
                 || backgroundCameraRequested || farClipRequested || hudCameraBenchmarkRequested
-                || guitarCameraBenchmarkRequested || plainHeldSustainRequested || renderEveryUpdateRequested;
+                || guitarCameraBenchmarkRequested || plainHeldSustainRequested;
             bool eligibleScopedExperiment = scopedExperimentRequested && OfflineSoloSongScope.IsEligible(
                 requested: true, gameReady: ready, songPlaying: songPlaying,
                 paused: ready && game!.isPaused,
@@ -613,8 +611,10 @@ public sealed partial class Core : MelonMod
             bool eligibleRenderPrototype = eligibleScopedExperiment && activeSoloContext && isOfflineSolo
                 && !hudCameraBenchmarkRequested && !guitarCameraBenchmarkRequested
                 && !hudCameraBenchmark.IsActive && !guitarCameraBenchmark.IsActive;
-            renderEveryUpdatePrototype.Update(renderEveryUpdateRequested, eligibleRenderPrototype);
             plainHeldSustains.Update(HarmonyInstance, plainHeldSustainRequested, eligibleRenderPrototype, game);
+            if (rainbowNotes.Value || rainbowFlames.Value || rainbowHighway.HasOverrides)
+                rainbowHighway.Update(rainbowNotes.Value, rainbowFlames.Value && !disableFretEffects.Value,
+                    ready ? game : null, now);
             if (ready) CompletePracticeTransition(game!);
             bool allow = shortcutCandidate && isOfflineSolo;
             if (restartHold.Update(allow && restartPressed, allow, now, Duration))
@@ -721,7 +721,7 @@ public sealed partial class Core : MelonMod
             hudCameraBenchmark.Clear();
             guitarCameraBenchmark.Clear();
             playerCameraFarClip.Clear();
-            renderEveryUpdatePrototype.Clear();
+            rainbowHighway.Clear();
             plainHeldSustains.Clear(HarmonyInstance);
             whammyTextureThrottle.Clear(HarmonyInstance);
             unityJobWorkerLimit.Clear();
@@ -747,7 +747,7 @@ public sealed partial class Core : MelonMod
         hudCameraBenchmark.Restore();
         guitarCameraBenchmark.Restore();
         playerCameraFarClip.Restore();
-        renderEveryUpdatePrototype.Restore();
+        rainbowHighway.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
@@ -775,7 +775,7 @@ public sealed partial class Core : MelonMod
         hudCameraBenchmark.Restore();
         guitarCameraBenchmark.Restore();
         playerCameraFarClip.Restore();
-        renderEveryUpdatePrototype.Restore();
+        rainbowHighway.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
@@ -1149,7 +1149,7 @@ public sealed partial class Core : MelonMod
         hudCameraBenchmark.Clear();
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
-        renderEveryUpdatePrototype.Clear();
+        rainbowHighway.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
         networkTickRemainder.Clear(HarmonyInstance);
         optionalHudAnimations.Clear();

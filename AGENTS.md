@@ -45,7 +45,14 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.124. It adds full visual-state cleanup,
+The latest packaged build is 0.4.125. It retires render-every-update after the
+four-run log showed a large simulation-rate loss, fixes the selected-page
+stripe with a literal texture draw, and adds default-off rainbow notes and
+flames using cached sprites at 20 Hz. Rainbow visuals need a Windows check;
+they are customization, not a performance gain. The exact note-state method
+already caches static sprite/color output; the old sampled trace gives that
+method 33 ms and OpenHitAnimator.Update 10 ms over 31 seconds. Do not add a
+second blanket color/write cache there. Version 0.4.124 adds full visual-state cleanup,
 cached plain-tail glow material discovery, and a separate camera-timing button
 so ordinary timing captures avoid per-camera callback overhead. These changes
 improve cleanup and measurement fidelity; no FPS gain is measured. The prior

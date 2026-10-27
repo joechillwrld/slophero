@@ -5,6 +5,31 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
+## 0.4.125 package
+
+The render-every-update experiment is retired and its old preference/profile
+key cannot reactivate it. In the 0.4.123 four-run log it raised scheduled
+render callbacks by 29–30% while lowering simulation Updates by about 35%; the
+extra drawing consumed CPU time that would otherwise support simulation.
+Presented FPS was not measured. The menu's selected-page marker now uses a
+literal narrow texture instead of a skinned box that could expand its border.
+Separate default-off rainbow note and fret-flame settings reuse cached current
+Gameplay objects, update at 20 Hz, and restore their captured colors and flame
+source colors when disabled. Their Windows visual behavior and cost need a test.
+
+The exact current `GuitarNoteContainer` state apply method at RVA `0x353210`
+already compares sprites, colors, order, and active flags before writing. The
+supplied 31-second method sample attributes about 33 ms to it and 10 ms to
+`OpenHitAnimator.Update`, versus 261 ms for the whole guitar renderer Update
+and much more inclusive Unity camera work. A second note-color setter cache
+or flame-Update gate is unlikely to move FPS and could add hook overhead. The
+larger open lead is narrow producer-side sustain output or camera/culling
+attribution, using the existing evidence below. No new FPS gain is claimed.
+Release build against `references/` succeeds with zero warnings/errors and
+all 127 Core checks pass. The ZIP contains only `Mods/SlopHero.dll`.
+`downloads/SlopHero-0.4.125-alpha.zip` SHA-256:
+`102cf2b7e942cbdc18aff92ccddd417d82cbe70210ba360e617d471cc35f4e51`.
+
 ## 0.4.124 package
 
 1. `VisualOverrides.Clear()` restores captured hidden renderer states and
@@ -32,7 +57,8 @@ all 127 Core checks pass. The ZIP contains only `Mods/SlopHero.dll`.
 `48e7ee66b1bd5578cb6e57e59de469dc18f65f617c6c3ac557ac0d5692bc6808`.
 The packaged DLL SHA-256 is
 `78804db579bd95df14a1d110daede61e4d72685c190dc536309a4768ed51585a`.
-Keep the existing default-off render-every-update switch as an experiment:
+The then-existing default-off render-every-update switch was an experiment
+retired in 0.4.125:
 the latest log confirms a 29–30% rise in scheduled render callbacks but about
 35% fewer simulation Updates; there is no presented-FPS measurement for this
 build. The 15-to-14 Unity worker option showed no consistent advantage.
