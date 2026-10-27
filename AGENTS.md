@@ -45,7 +45,11 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.122. It adds a default-off offline-solo
+The latest packaged build is 0.4.123. It retires the native HUD merge,
+sustain geometry batch, unused-alpha shader test, and global sustain write
+cache from runtime and profile imports after poor/no effect in Windows logs.
+It also resets saved render-every-update, worker-limit, and TMP-scale opt-ins
+once to establish a cleaner baseline. The 0.4.122 build adds a default-off offline-solo
 render-every-update test after the user's log showed renderFrameInterval=2;
 the effect on presented FPS, simulation, and input polling needs a Windows
 test. Native culling/camera rows remain shared engine work without a safe

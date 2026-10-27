@@ -2140,3 +2140,19 @@ merge was active with different explicit-renderer populations in both runs.
 Neither window measures presented FPS. Geometry activated but never drew a
 batch; the alpha shader switch safely turned itself off after finding no
 eligible material. No code change is justified by this single mixed A/B.
+
+### 0.4.123: retire dead-end hooks and stop profile reactivation
+
+The 0.4.122 log shows HUD merge and geometry batching were re-enabled after
+0.4.121's one-time reset. Version 0.4.123 removes both, the no-op alpha shader
+test, and the broad global sustain write cache from runtime and profile
+imports. Their old saved preferences are cleared on startup. The cache had no
+measured net gain and installed hooks on shared Unity setters, so removing it
+also eliminates that interception from ordinary gameplay. The plain held-tail
+glow switch remains independent and available. Saved render-every-update,
+Unity worker-limit, and TMP-scale experiments reset off once, but remain
+separately opt-in. This makes the next playtest a cleaner baseline; do not
+describe FPS improvement as measured until a matched capture exists.
+The 0.4.123 Release build has zero warnings/errors and all 127 Core checks
+pass. `downloads/SlopHero-0.4.123-alpha.zip` contains only `Mods/SlopHero.dll`;
+SHA-256: `d5beeed0ee16bee1c8942359e7cd2750ad03f46b8bdb0624410d155ea4b7d7a8`.

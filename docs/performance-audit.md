@@ -2403,6 +2403,26 @@ near-entry snapshots showed zero tracked with two UVScroll scripts present;
 those snapshots do not establish that the scripts stayed untracked for the
 whole song. Activation counts and mod callback intervals are not FPS gains.
 
+### v0.4.123 retire ineffective render hooks and restore a clean baseline
+
+The user's 0.4.122 log still activated HUD-camera merge and sustain geometry
+batching. The native HUD bridge had previously coincided with lower render
+callback rates; geometry has never logged its first drawn batch; the guarded
+split-alpha shader option found no eligible material. The broad sustain write
+cache installs Harmony prefixes on global Unity sprite/property-block setters,
+but no measured net saving justifies that ongoing interception. Version
+0.4.123 removes all four from runtime and profile import, and clears their
+saved values during preference initialization. The prototype source remains
+in the repository for future research but is not instantiated by the mod.
+
+Version 0.4.123 also resets saved render-every-update, Unity worker-limit,
+and TMP-scale options once. These three remain explicit default-off tests;
+render-every-update raised render callback rate but reduced simulation rate
+and worsened callback p99 in a mixed capture, worker limiting had no reliable
+gain, and TMP scale changed zero labels. The user's other visual settings and
+plain held-sustain glow option remain available. This is a recovery build;
+presented-FPS impact needs a clean in-game comparison.
+
 ### v0.4.122 render scheduling prototype and culling review
 
 The first supplied 0.4.122 Windows log confirms the render-interval setter
