@@ -1,20 +1,20 @@
-# SlopHero 0.4.129 alpha
+# SlopHero 0.4.130 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: reversible
 experiments judged by measurements. Gameplay timing, online play, and the
 1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.129
-keeps the rainbow hue cycle slower, discovers note-pool additions once per
-second, and reapplies flame tint after the game's Animator update. Its
-default-off input-viewer switch hides only the passive guitar-display branch
-during offline solo play. The optional held-sustain glow filter now intercepts
-seven exact game callsites instead of a global renderer setter, and the counter
-HUD uses a cached Segoe UI font when the OS provides it. These experiments and
-visual changes still need Windows validation; no FPS gain is claimed. See the
-[current performance screen](docs/performance-screen-2026-10-28.md) for the
-evidence and limits. Version 0.4.128
+build, compiled against its loader and generated assemblies. Version 0.4.130
+fixes the rainbow-note rediscovery failure and keeps the five guitar flame
+animators active when rainbow flames are selected, even if other fret effects
+are suppressed. It backs off note-pool rescans after discovery and skips tint
+writes to inactive pooled notes. Version 0.4.129 added the default-off input
+viewer and exact-callsite held-glow experiments, plus a cached counter font.
+Windows visuals and performance still need validation; no FPS gain is claimed.
+See the [current performance screen](docs/performance-screen-2026-10-28.md)
+and [latest test findings](docs/performance-followup-2026-10-27.md).
+Version 0.4.128
 fixes the settings menu closing on open by drawing its selection stripe with
 the supported flat `GUI.Box` path. The 0.4.126 stripe used a Unity method
 stripped from this game build. Version 0.4.126
@@ -309,7 +309,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.129 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.129-alpha.zip)
+[Download SlopHero v0.4.130 alpha](https://raw.githubusercontent.com/joechillwrld/slophero/slophero-v1.1-alpha/downloads/SlopHero-0.4.130-alpha.zip)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

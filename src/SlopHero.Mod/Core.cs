@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.129", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.130", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -635,7 +635,7 @@ public sealed partial class Core : MelonMod
             plainHeldSustains.Update(HarmonyInstance, plainHeldSustainRequested, eligibleRenderPrototype, game);
             nativeSustainCache.Update(nativeSustainRequested, eligibleRenderPrototype);
             if (rainbowNotes.Value || rainbowFlames.Value || rainbowHighway.HasOverrides)
-                rainbowHighway.Update(HarmonyInstance, rainbowNotes.Value, rainbowFlames.Value && !disableFretEffects.Value,
+                rainbowHighway.Update(HarmonyInstance, rainbowNotes.Value, rainbowFlames.Value,
                     ready ? game : null, now);
             if (ready) CompletePracticeTransition(game!);
             bool allow = shortcutCandidate && isOfflineSolo;

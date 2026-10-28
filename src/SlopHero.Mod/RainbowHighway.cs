@@ -3,7 +3,6 @@ using HarmonyLib;
 using Il2Cpp;
 using MelonLoader;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using FlameAnimator = Il2Cpp.Animator;
 
 namespace SlopHero.Mod;
@@ -90,12 +89,14 @@ internal sealed class RainbowHighway
 
         if (colorNotes && !notesFailed && now >= nextNotesDiscovery)
         {
-            // Search the local guitar pool at 1 Hz, including inactive note
-            // containers. Note renderers can be created after the first scan;
-            // keep admitting new pooled slots without the old 5 Hz scene-wide
-            // active-object search.
+            // Discover promptly, then back off once the complete pooled guitar
+            // hierarchy has been found. No per-second scene-wide scan is needed.
             nextNotesDiscovery = now + 1.0;
-            try { DiscoverNotes(game); }
+            try
+            {
+                DiscoverNotes(game);
+                if (notesDiscovered) nextNotesDiscovery = now + 5.0;
+            }
             catch (Exception ex)
             {
                 RestoreNotes();
@@ -126,7 +127,8 @@ internal sealed class RainbowHighway
             {
                 applyingOwnColor = true;
                 foreach (var state in notes.Values)
-                    if (state.Renderer != null && state.Renderer.enabled && state.Renderer.sprite != null)
+                    if (state.Renderer != null && state.Renderer.gameObject.activeInHierarchy
+                        && state.Renderer.enabled && state.Renderer.sprite != null)
                         SetRgb(state.Renderer, notePalette[state.Phase]);
             }
             catch (Exception ex)
@@ -241,30 +243,11 @@ internal sealed class RainbowHighway
         foreach (var player in game.playerObjects)
         {
             if (player == null || player.TryCast<GuitarPlayer>() == null) continue;
-            try
+            // Search only the guitar's hierarchy; this includes inactive
+            // pooled notes without allocating a scene-wide object list.
+            foreach (var container in player.GetComponentsInChildren<GuitarNoteContainer>(true))
             {
-                // Search only the guitar's hierarchy; this includes inactive
-                // pooled notes without allocating a scene-wide object list.
-                foreach (var container in player.GetComponentsInChildren<GuitarNoteContainer>(true))
-                {
-                    if (container == null) continue;
-                    int phase = containerIndex++ % notePalette.Length;
-                    added += Remember(container.Head, phase);
-                    added += Remember(container.Body, phase);
-                    added += Remember(container.Anim, phase);
-                    added += Remember(container.Open_HOPO, phase);
-                }
-            }
-            catch { /* A stripped generic specialization falls back below. */ }
-        }
-
-        if (added == 0)
-        {
-            var gameplayScene = SceneManager.GetActiveScene();
-            foreach (var container in Resources.FindObjectsOfTypeAll<GuitarNoteContainer>())
-            {
-                if (container == null || !container.gameObject.scene.IsValid()
-                    || container.gameObject.scene != gameplayScene) continue;
+                if (container == null) continue;
                 int phase = containerIndex++ % notePalette.Length;
                 added += Remember(container.Head, phase);
                 added += Remember(container.Body, phase);
@@ -272,6 +255,10 @@ internal sealed class RainbowHighway
                 added += Remember(container.Open_HOPO, phase);
             }
         }
+
+        // Do not fall back to Resources.FindObjectsOfTypeAll<T>. That generic
+        // Unity entry point is stripped in this game build; on the second
+        // one-second pass it throws even though the local guitar scan worked.
         if (added != 0)
         {
             notesDiscovered = true;

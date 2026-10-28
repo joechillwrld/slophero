@@ -5,6 +5,33 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
+## 0.4.130 rainbow repair and latest Windows evidence
+
+The 0.4.129 log caught two integration failures. Rainbow notes found 2,000
+pooled sprites, then its next scan called the stripped
+`Resources.FindObjectsOfTypeAll<GuitarNoteContainer>()` fallback and disabled
+the option. The local guitar-tree scan remains; the failing global fallback is
+removed, inactive sprites are skipped during tint passes, and rediscovery backs
+off after the first pool scan. The same log had fret-effect suppression enabled
+while rainbow flames were selected. Version 0.4.130 keeps only the five guitar
+flame animators and renderers active for rainbow flames; sparks and lightning
+remain suppressed. The menu text explains this precedence.
+
+The three latest PresentMon captures show 1,706–1,733 application presents/s,
+with 0.55–0.56 ms mean CPU busy and 0.23–0.24 ms mean GPU busy per present.
+They do not establish monitor refresh or a gain. The first run lacks the held-
+glow activation message; the latter two have it. Version 0.4.129 did not log
+the input-viewer suppression state, and each run had other optimizations active
+with different song sections, so they cannot isolate either toggle. Version
+0.4.130 logs rainbow and input-viewer state and reports when that viewer is
+hidden/restored. Full measurements and limits are in
+[performance-followup-2026-10-27.md](performance-followup-2026-10-27.md).
+
+Release build: zero warnings/errors; 128 Core checks pass; both exact-build
+native sustain verifiers pass. No FPS gain is claimed. The ZIP contains only
+`Mods/SlopHero.dll`; `downloads/SlopHero-0.4.130-alpha.zip` SHA-256:
+`6351ef66e05f2015fc45adf58b893a18e5e899c24c471c4e9d3aa8f2fdc1b591`.
+
 ## 0.4.129 gameplay candidate
 
 The current worktree replaces the optional global `Renderer.enabled` Harmony

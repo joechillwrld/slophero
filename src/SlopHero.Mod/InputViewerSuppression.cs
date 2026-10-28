@@ -43,7 +43,10 @@ internal sealed class InputViewerSuppression
             }
 
             if (originalActive && root != null && root.activeSelf)
+            {
                 root.SetActive(false);
+                MelonLogger.Msg("Sloptifine hid the passive guitar input viewer during offline solo play.");
+            }
         }
         catch (Exception ex)
         {
@@ -55,12 +58,15 @@ internal sealed class InputViewerSuppression
 
     internal void Restore()
     {
+        bool wasSuppressed = IsSuppressed;
         try
         {
             if (captured && root != null && root.activeSelf != originalActive)
                 root.SetActive(originalActive);
         }
         catch { }
+        if (wasSuppressed)
+            MelonLogger.Msg("Sloptifine restored the guitar input viewer.");
         root = null;
         captured = false;
     }
