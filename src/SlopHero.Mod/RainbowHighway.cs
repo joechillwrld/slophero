@@ -3,47 +3,66 @@ using HarmonyLib;
 using Il2Cpp;
 using MelonLoader;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using FlameAnimator = Il2Cpp.Animator;
 
 namespace SlopHero.Mod;
 
-/// <summary>Optional guitar colors; the extra setter hook exists only while rainbow notes are on.</summary>
+/// <summary>Optional guitar colors; the setter hook exists only while a rainbow option is on.</summary>
 internal sealed class RainbowHighway
 {
-    private sealed class NoteState
+    private sealed class SpriteState
     {
         internal readonly SpriteRenderer Renderer;
         internal readonly int Phase;
         internal Color Original;
-        internal NoteState(SpriteRenderer renderer, int phase)
+        internal SpriteState(SpriteRenderer renderer, int phase)
         { Renderer = renderer; Phase = phase; Original = renderer.color; }
     }
 
-    private readonly record struct FlameState(FlameAnimator Animator, SpriteRenderer Renderer,
-        Color Original, Color Default, Color Alternate, int Phase);
+    private sealed class FlameState
+    {
+        internal readonly FlameAnimator Animator;
+        internal readonly SpriteRenderer Renderer;
+        internal readonly Color Default, Alternate, OriginalRenderer;
+        internal readonly int Phase;
+        internal FlameState(FlameAnimator animator, SpriteRenderer renderer, Color defaultColor,
+            Color alternateColor, Color originalRenderer, int phase)
+        { Animator = animator; Renderer = renderer; Default = defaultColor; Alternate = alternateColor; OriginalRenderer = originalRenderer; Phase = phase; }
+    }
 
     private static RainbowHighway? active;
-    private readonly Dictionary<IntPtr, NoteState> notes = new();
+    private readonly Dictionary<IntPtr, SpriteState> notes = new();
+    private readonly Dictionary<IntPtr, FlameState> flamesByAnimator = new();
     private readonly List<FlameState> flames = new();
     private readonly Color[] notePalette = new Color[12];
-    private MethodInfo? noteColorSetter;
-    private HarmonyLib.Harmony? noteHarmony;
-    private bool noteHookInstalled, applyingOwnColor, notesDiscovered;
+    private readonly Color[] flamePalette = new Color[5];
+    private MethodInfo? noteColorSetter, flameAnimatorUpdate;
+    private HarmonyLib.Harmony? noteHarmony, flameHarmony;
+    private bool noteHookInstalled, flameUpdateHookInstalled;
+    private bool noteHookFailed, flameHookFailed, applyingOwnColor, notesDiscovered;
     private bool notesFailed, flamesFailed;
-    private double nextPass, nextDiscovery;
+    private double nextPass, nextNotesDiscovery, nextFlamesDiscovery;
 
-    internal bool HasOverrides => notes.Count != 0 || flames.Count != 0 || noteHookInstalled;
+    internal bool HasOverrides => notes.Count != 0 || flames.Count != 0
+        || noteHookInstalled || flameUpdateHookInstalled;
 
-    internal void Prepare(HarmonyLib.Harmony harmony, bool requested)
+    internal void Prepare(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames)
     {
-        if (!requested || notesFailed || noteHookInstalled) return;
-        try { InstallNoteHook(harmony); }
+        if (colorNotes && notes.Count != 0 && !noteHookFailed && !noteHookInstalled)
+            try { InstallNoteColorHook(harmony); }
         catch (Exception ex)
         {
-            RestoreNotes();
-            notesFailed = true;
-            MelonLogger.Warning($"Rainbow notes could not hook the game color output: {ex.Message}");
+            noteHookFailed = true;
+            MelonLogger.Warning($"Rainbow note color hook could not install; periodic tinting will remain as fallback: {ex.Message}");
         }
+        if (colorFlames && flames.Count != 0 && !flameHookFailed && !flameUpdateHookInstalled)
+            try { InstallFlameUpdateHook(harmony); }
+            catch (Exception ex)
+            {
+                flameHookFailed = true;
+                MelonLogger.Warning($"Rainbow flame update hook could not install; periodic tinting will remain as fallback: {ex.Message}");
+            }
     }
 
     internal void Update(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames, GameManager? game, double now)
@@ -53,42 +72,58 @@ internal sealed class RainbowHighway
         if (!colorNotes && !colorFlames) return;
         if (game == null) { Clear(); return; }
 
-        float cycle = (float)(now * .24 % 1.0);
-        if (colorNotes && !notesFailed)
-            for (int i = 0; i < notePalette.Length; i++)
-                notePalette[i] = Rainbow(cycle + i / (float)notePalette.Length, 1f);
-
-        if (colorNotes) Prepare(harmony, requested: true);
-        if (now >= nextDiscovery)
+        bool animate = now >= nextPass;
+        float cycle = 0;
+        if (animate)
         {
-            nextDiscovery = now + .2;
+            nextPass = now + .05;
+            // Slower hue drift makes the note colors less frantic while
+            // retaining a smooth 20 Hz palette update.
+            cycle = (float)(now * .12 % 1.0);
             if (colorNotes && !notesFailed)
-                try { DiscoverNotes(game); }
-                catch (Exception ex)
-                {
-                    RestoreNotes();
-                    notesFailed = true;
-                    MelonLogger.Warning($"Rainbow note discovery stopped: {ex.Message}");
-                }
-            if (colorFlames && !flamesFailed && flames.Count == 0)
-                try { DiscoverFlames(game); }
-                catch (Exception ex)
-                {
-                    RestoreFlames();
-                    flamesFailed = true;
-                    MelonLogger.Warning($"Rainbow flame discovery stopped: {ex.Message}");
-                }
+                for (int i = 0; i < notePalette.Length; i++)
+                    notePalette[i] = Rainbow(cycle + i / (float)notePalette.Length, 1f);
+            if (colorFlames && !flamesFailed)
+                for (int i = 0; i < flamePalette.Length; i++)
+                    flamePalette[i] = Rainbow(cycle + i / (float)flamePalette.Length, .4f);
         }
-        if (now < nextPass) return;
-        nextPass = now + .05;
+
+        if (colorNotes && !notesFailed && now >= nextNotesDiscovery)
+        {
+            // Search the local guitar pool at 1 Hz, including inactive note
+            // containers. Note renderers can be created after the first scan;
+            // keep admitting new pooled slots without the old 5 Hz scene-wide
+            // active-object search.
+            nextNotesDiscovery = now + 1.0;
+            try { DiscoverNotes(game); }
+            catch (Exception ex)
+            {
+                RestoreNotes();
+                notesFailed = true;
+                MelonLogger.Warning($"Rainbow note discovery stopped: {ex.Message}");
+            }
+        }
+        if (colorFlames && !flamesFailed && flames.Count == 0 && now >= nextFlamesDiscovery)
+        {
+            nextFlamesDiscovery = now + 1.0;
+            try { DiscoverFlames(game); }
+            catch (Exception ex)
+            {
+                RestoreFlames();
+                flamesFailed = true;
+                MelonLogger.Warning($"Rainbow flame discovery stopped: {ex.Message}");
+            }
+        }
+        // Avoid global setter/update hooks until the actual target objects are
+        // known. The flame postfix reapplies the tint after the game's own
+        // Animator update, which was overwriting the previous periodic color.
+        Prepare(harmony, colorNotes && notes.Count != 0, colorFlames && flames.Count != 0);
+        if (!animate) return;
 
         if (colorNotes && !notesFailed)
         {
             try
             {
-                // Incoming notes fade, so the game can rewrite their RGB
-                // before this 20 Hz pass. The setter prefix below changes
-                // those existing writes; this pass animates unchanged notes.
                 applyingOwnColor = true;
                 foreach (var state in notes.Values)
                     if (state.Renderer != null && state.Renderer.enabled && state.Renderer.sprite != null)
@@ -112,13 +147,17 @@ internal sealed class RainbowHighway
                     if (state.Animator == null || state.Renderer == null) continue;
                     // Flame sprites blend additively. Full brightness washes
                     // to white, so use saturated color at lower intensity.
-                    var color = Rainbow(cycle + state.Phase / 5f, .4f);
+                    var color = flamePalette[state.Phase];
                     color.a = state.Default.a;
                     state.Animator.defaultColor = color;
                     color.a = state.Alternate.a;
                     state.Animator.alternateColor = color;
                     if (state.Renderer.enabled && state.Renderer.sprite != null)
+                    {
+                        applyingOwnColor = true;
                         SetRgb(state.Renderer, color);
+                        applyingOwnColor = false;
+                    }
                 }
             }
             catch (Exception ex)
@@ -127,10 +166,11 @@ internal sealed class RainbowHighway
                 flamesFailed = true;
                 MelonLogger.Warning($"Rainbow flames stopped: {ex.Message}");
             }
+            finally { applyingOwnColor = false; }
         }
     }
 
-    private void InstallNoteHook(HarmonyLib.Harmony harmony)
+    private void InstallNoteColorHook(HarmonyLib.Harmony harmony)
     {
         noteColorSetter = typeof(SpriteRenderer).GetProperty("color", BindingFlags.Public | BindingFlags.Instance)?.GetSetMethod()
             ?? throw new MissingMethodException("UnityEngine.SpriteRenderer.color setter");
@@ -144,9 +184,29 @@ internal sealed class RainbowHighway
         }
         catch
         {
-            active = null;
             try { harmony.Unpatch(noteColorSetter, HarmonyPatchType.All, harmony.Id); } catch { }
-            noteHarmony = null;
+            DeactivateIfUnused();
+            throw;
+        }
+    }
+
+    private void InstallFlameUpdateHook(HarmonyLib.Harmony harmony)
+    {
+        flameAnimatorUpdate = typeof(FlameAnimator).GetMethod("Update",
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new MissingMethodException("Il2Cpp.Animator.Update");
+        flameHarmony = harmony;
+        active = this;
+        try
+        {
+            harmony.Patch(flameAnimatorUpdate, postfix: new HarmonyMethod(typeof(RainbowHighway)
+                .GetMethod(nameof(AfterFlameAnimatorUpdate), BindingFlags.Static | BindingFlags.NonPublic)!));
+            flameUpdateHookInstalled = true;
+        }
+        catch
+        {
+            try { harmony.Unpatch(flameAnimatorUpdate, HarmonyPatchType.All, harmony.Id); } catch { }
+            DeactivateIfUnused();
             throw;
         }
     }
@@ -154,41 +214,75 @@ internal sealed class RainbowHighway
     private static void BeforeNoteColor(SpriteRenderer __instance, ref Color value)
     {
         var owner = active;
-        if (owner == null || owner.applyingOwnColor
-            || !owner.notes.TryGetValue(__instance.Pointer, out var state)) return;
-        state.Original = value;
-        var tint = owner.notePalette[state.Phase];
-        value.r = tint.r;
-        value.g = tint.g;
-        value.b = tint.b;
+        if (owner == null || owner.applyingOwnColor) return;
+        var pointer = __instance.Pointer;
+        if (!owner.notes.TryGetValue(pointer, out var note)) return;
+        note.Original = value;
+        var tint = owner.notePalette[note.Phase];
+        value.r = tint.r; value.g = tint.g; value.b = tint.b;
+    }
+
+    private static void AfterFlameAnimatorUpdate(FlameAnimator __instance)
+    {
+        var owner = active;
+        if (owner == null || !owner.flamesByAnimator.TryGetValue(__instance.Pointer, out var flame)) return;
+        var renderer = flame.Renderer;
+        if (renderer == null || !renderer.enabled || renderer.sprite == null) return;
+        var color = owner.flamePalette[flame.Phase];
+        owner.applyingOwnColor = true;
+        try { SetRgb(renderer, color); }
+        finally { owner.applyingOwnColor = false; }
     }
 
     private void DiscoverNotes(GameManager game)
     {
         if (game.playerObjects == null) return;
-        int added = 0;
-        // FindObjectsOfType returns active slots. Repeat at 5 Hz so notes
-        // reused later in the pool are included without a per-frame scan.
-        foreach (var container in UnityEngine.Object.FindObjectsOfType<GuitarNoteContainer>())
+        int added = 0, containerIndex = 0;
+        foreach (var player in game.playerObjects)
         {
-            if (container == null) continue;
-            int phase = (notes.Count / 4) % notePalette.Length;
-            added += Remember(container.Head, phase);
-            added += Remember(container.Body, phase);
-            added += Remember(container.Anim, phase);
-            added += Remember(container.Open_HOPO, phase);
+            if (player == null || player.TryCast<GuitarPlayer>() == null) continue;
+            try
+            {
+                // Search only the guitar's hierarchy; this includes inactive
+                // pooled notes without allocating a scene-wide object list.
+                foreach (var container in player.GetComponentsInChildren<GuitarNoteContainer>(true))
+                {
+                    if (container == null) continue;
+                    int phase = containerIndex++ % notePalette.Length;
+                    added += Remember(container.Head, phase);
+                    added += Remember(container.Body, phase);
+                    added += Remember(container.Anim, phase);
+                    added += Remember(container.Open_HOPO, phase);
+                }
+            }
+            catch { /* A stripped generic specialization falls back below. */ }
         }
-        if (!notesDiscovered && added != 0)
+
+        if (added == 0)
+        {
+            var gameplayScene = SceneManager.GetActiveScene();
+            foreach (var container in Resources.FindObjectsOfTypeAll<GuitarNoteContainer>())
+            {
+                if (container == null || !container.gameObject.scene.IsValid()
+                    || container.gameObject.scene != gameplayScene) continue;
+                int phase = containerIndex++ % notePalette.Length;
+                added += Remember(container.Head, phase);
+                added += Remember(container.Body, phase);
+                added += Remember(container.Anim, phase);
+                added += Remember(container.Open_HOPO, phase);
+            }
+        }
+        if (added != 0)
         {
             notesDiscovered = true;
-            MelonLogger.Msg($"Rainbow notes tracking {notes.Count} active-pool sprites; new slots join during play.");
+            MelonLogger.Msg($"Rainbow notes tracking {notes.Count} pooled sprites, including inactive slots.");
         }
     }
 
     private int Remember(SpriteRenderer? renderer, int phase)
     {
         if (renderer == null || notes.ContainsKey(renderer.Pointer)) return 0;
-        notes.Add(renderer.Pointer, new NoteState(renderer, phase));
+        notes.Add(renderer.Pointer, new SpriteState(renderer, phase));
         return 1;
     }
 
@@ -204,14 +298,19 @@ internal sealed class RainbowHighway
             foreach (var animator in animators)
             {
                 if (animator == null) continue;
-                var renderer = animator.GetComponent<SpriteRenderer>();
+                // Animator stores the renderer it actually updates. This also
+                // handles skins that move the sprite away from the component.
+                var renderer = animator.field_Private_SpriteRenderer_0;
                 if (renderer == null) continue;
-                flames.Add(new FlameState(animator, renderer, renderer.color,
-                    animator.defaultColor, animator.alternateColor, index++ % 5));
+                int phase = index++ % flamePalette.Length;
+                var state = new FlameState(animator, renderer, animator.defaultColor,
+                    animator.alternateColor, renderer.color, phase);
+                flames.Add(state);
+                flamesByAnimator[animator.Pointer] = state;
             }
         }
         if (flames.Count != 0)
-            MelonLogger.Msg($"Rainbow flames found {flames.Count} guitar flame sprites.");
+            MelonLogger.Msg($"Rainbow flames tracking {flamesByAnimator.Count} animator-owned sprite renderer(s).");
     }
 
     private static Color Rainbow(float hue, float brightness)
@@ -230,27 +329,26 @@ internal sealed class RainbowHighway
 
     private void RestoreNotes()
     {
-        if (ReferenceEquals(active, this)) active = null;
-        if (noteHookInstalled && noteColorSetter != null && noteHarmony != null)
-        {
-            try { noteHarmony.Unpatch(noteColorSetter, HarmonyPatchType.All, noteHarmony.Id); }
-            catch (Exception ex) { MelonLogger.Warning($"Rainbow note hook cleanup failed; its inactive prefix passes through: {ex.Message}"); }
-        }
-        noteHookInstalled = false;
-        noteColorSetter = null;
-        noteHarmony = null;
-        applyingOwnColor = false;
+        if (notes.Count == 0 && !notesDiscovered && !notesFailed && !noteHookInstalled)
+        { noteHookFailed = false; return; }
+        applyingOwnColor = true;
         foreach (var state in notes.Values)
             try { if (state.Renderer != null) SetRgb(state.Renderer, state.Original); }
             catch { }
+        applyingOwnColor = false;
         notes.Clear();
         notesDiscovered = false;
         notesFailed = false;
-        nextDiscovery = 0;
+        noteHookFailed = false;
+        nextNotesDiscovery = 0;
+        RemoveColorHookIfUnused();
     }
 
     private void RestoreFlames()
     {
+        if (flames.Count == 0 && !flamesFailed && !flameUpdateHookInstalled)
+        { flameHookFailed = false; return; }
+        applyingOwnColor = true;
         foreach (var state in flames)
             try
             {
@@ -259,17 +357,58 @@ internal sealed class RainbowHighway
                     state.Animator.defaultColor = state.Default;
                     state.Animator.alternateColor = state.Alternate;
                 }
-                if (state.Renderer != null) SetRgb(state.Renderer, state.Original);
+                if (state.Renderer != null) SetRgb(state.Renderer, state.OriginalRenderer);
             }
             catch { }
+        applyingOwnColor = false;
         flames.Clear();
+        flamesByAnimator.Clear();
         flamesFailed = false;
+        flameHookFailed = false;
+        nextFlamesDiscovery = 0;
+        RemoveFlameUpdateHookIfUnused();
+    }
+
+    private void RemoveColorHookIfUnused()
+    {
+        if (notes.Count != 0 || !noteHookInstalled) return;
+        if (noteColorSetter != null && noteHarmony != null)
+        {
+            try { noteHarmony.Unpatch(noteColorSetter, HarmonyPatchType.All, noteHarmony.Id); }
+            catch (Exception ex) { MelonLogger.Warning($"Rainbow color hook cleanup failed; its inactive prefix passes through: {ex.Message}"); }
+        }
+        noteHookInstalled = false;
+        noteColorSetter = null;
+        noteHarmony = null;
+        noteHookFailed = false;
+        DeactivateIfUnused();
+    }
+
+    private void RemoveFlameUpdateHookIfUnused()
+    {
+        if (flames.Count != 0 || !flameUpdateHookInstalled) return;
+        if (flameAnimatorUpdate != null && flameHarmony != null)
+        {
+            try { flameHarmony.Unpatch(flameAnimatorUpdate, HarmonyPatchType.All, flameHarmony.Id); }
+            catch (Exception ex) { MelonLogger.Warning($"Rainbow flame update hook cleanup failed; its inactive postfix passes through: {ex.Message}"); }
+        }
+        flameUpdateHookInstalled = false;
+        flameAnimatorUpdate = null;
+        flameHarmony = null;
+        flameHookFailed = false;
+        DeactivateIfUnused();
+    }
+
+    private void DeactivateIfUnused()
+    {
+        if (!noteHookInstalled && !flameUpdateHookInstalled && ReferenceEquals(active, this)) active = null;
     }
 
     internal void Clear()
     {
         RestoreNotes();
         RestoreFlames();
-        nextPass = nextDiscovery = 0;
+        noteHookFailed = flameHookFailed = false;
+        nextPass = nextNotesDiscovery = nextFlamesDiscovery = 0;
     }
 }

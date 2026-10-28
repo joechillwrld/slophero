@@ -53,6 +53,9 @@ Check(NetworkTickRemainder.PreserveFraction(.105f, networkTickInterval) < networ
 Check(NetworkTickRemainder.PreserveFraction(float.NaN, networkTickInterval) == 0f
     && NetworkTickRemainder.PreserveFraction(.01f, 0f) == 0f,
     "Invalid network tick timing fails open to a zero remainder");
+Check(Convert.ToHexString(NativeRendererFilterStub.Build(new IntPtr(0x200000), new IntPtr(0x300000), new IntPtr(0x400000)))
+    == "49BA000020000000000041803A0074324989CA49C1EA044181E2FF01000049BB00003000000000004B390CD374134B833CD300740D41FFC24181E2FF010000EBE7C349BB000040000000000041FFE3",
+    "Native renderer filter stub keeps its tested pointer lookup, pass-through, and branch layout");
 Check(!PracticeReadiness.CanSelect(false, true, true, true, true, 0),
     "Regression: practice cannot select before scene initialization even when game flags are ready");
 Check(!PracticeReadiness.CanSelect(true, false, true, true, true, 0),

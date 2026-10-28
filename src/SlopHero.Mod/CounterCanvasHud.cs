@@ -190,6 +190,8 @@ internal sealed class CounterCanvasHud
         label.raycastTarget = false;
         label.alignment = TextAlignmentOptions.TopLeft;
         label.enableWordWrapping = songMode;
+        if (!songMode && CounterFont.TextMeshProFont is { } counterFont)
+            label.font = counterFont;
         panel.SetActive(true);
     }
 }

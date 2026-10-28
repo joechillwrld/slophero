@@ -5,6 +5,43 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
+## 0.4.129 gameplay candidate
+
+The current worktree replaces the optional global `Renderer.enabled` Harmony
+prefix with a native pointer filter at seven exact sustain-helper calls. The
+v0.4.128 log recorded 300 pooled glow renderers and 16,038–16,705 redundant
+disable calls per song, with no re-enables blocked; this is the evidence for
+narrowing interception, not proof of an FPS gain. `NativeRendererFilterStub`
+is separately byte-checked by Core checks, and `tools/verify_native_held_glow.py`
+validates all seven callsites against the exact GameAssembly hash. A distinct
+default-off `Hide input viewer during solo songs` setting removes the live
+guitar viewer branch (48 active sprites in the supplied snapshot) while leaving
+instrument polling untouched. Both settings need Windows stability, visual,
+and matched PresentMon tests before any gain claim.
+
+Rainbow notes now refresh membership once per second to include later pool
+objects, the hue cycle is slower, and flame tint is reapplied after the game's
+Animator update to counter its white overwrite. This addresses the reported
+failure modes in code, but ClonZones changes the textures and additive blend;
+the visuals still need the user's in-game check. The full source/evidence
+screen is [performance-screen-2026-10-28.md](performance-screen-2026-10-28.md).
+
+The mod counter overlay now uses one cached runtime Segoe UI font for its IMGUI
+and optional TextMeshPro renderers when the OS supplies it, with Arial and the
+game's original TMP font as fallbacks. It creates the font asset only on first
+HUD use, not in a per-frame path. This is a cosmetic change, not an
+optimization.
+
+The v0.4.128 log contains no PresentMon capture. Its 3,159–3,249 Update/s and
+1,580–1,624 scheduled-render callbacks/s are not presented FPS. The expanded
+WPA tree still points at shared Unity render/cull work without identifying a
+camera or renderer to skip. No new gain is measured. The 0.4.129 Release build
+has zero warnings/errors, all 128 Core checks pass, and both exact-build native
+verifiers pass. The ZIP contains only `Mods/SlopHero.dll`.
+`downloads/SlopHero-0.4.129-alpha.zip` SHA-256:
+`307e30bc49bb3481378b118dc32f7b4f2f87e58bde69ca233174d59bcbaaad68`.
+Windows visual behavior and presented-frame results still need testing.
+
 ## 0.4.128 rainbow/menu fixes and performance screen
 
 The v0.4.127 `Latest.log` shows rainbow notes tracking only the active note

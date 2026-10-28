@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.128", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.129", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -120,6 +120,7 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
         rainbowHighway.Clear();
+        inputViewerSuppression.Clear();
         nativeSustainCache.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
         optionalHudAnimations.Clear();
@@ -207,7 +208,6 @@ public sealed partial class Core : MelonMod
             if (compatible) legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
             if (compatible) nativeSustainCache.Prepare(cacheRegularSustainWrites.Value);
             if (compatible) plainHeldSustains.Prepare(HarmonyInstance, hideHeldSustainGlow.Value);
-            if (compatible) rainbowHighway.Prepare(HarmonyInstance, rainbowNotes.Value);
             if (compatible) rewiredMousePolling.Prepare(HarmonyInstance, pauseRewiredMousePolling.Value);
             if (compatible) rewiredKeyboardPolling.Prepare(HarmonyInstance, pauseRewiredKeyboardPolling.Value);
             if (compatible && staticTmpScaleDuringSong.Value)
@@ -319,6 +319,7 @@ public sealed partial class Core : MelonMod
                 else settingsOpen = !settingsOpen;
                 if (settingsOpen || moveHud || resizeTarget >= 0)
                 {
+                    inputViewerSuppression.Restore();
                     mouseUiGameplay.Disable();
                     legacyMouseEvents.Disable();
                     rewiredMousePolling.Disable();
@@ -374,6 +375,7 @@ public sealed partial class Core : MelonMod
                 UpdateCursor();
             }
             if (!Application.isFocused && mouseUiGameplay.IsInstalled) mouseUiGameplay.Disable();
+            if (!Application.isFocused) inputViewerSuppression.Restore();
             if (!Application.isFocused && legacyMouseEvents.IsInstalled) legacyMouseEvents.Disable();
             if (!Application.isFocused && rewiredMousePolling.IsInstalled) rewiredMousePolling.Disable();
             if (!Application.isFocused) rewiredKeyboardPolling.Disable();
@@ -510,6 +512,7 @@ public sealed partial class Core : MelonMod
                 || skipMouseUiRequested || skipLegacyMouseRequested
                 || throttleWhammyTexture.Value || disableHitParticles.Value || disableSustainParticles.Value
                 || disableFretEffects.Value || disableStarProgressParticles.Value || freezeComboSmokeScroll.Value
+                || hideInputViewerDuringSong.Value
                 || (hideBeats.Value && pauseHiddenBeatlineUpdates.Value);
             bool soloOptimizationCandidate = needsOfflineSoloGate && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
@@ -521,6 +524,8 @@ public sealed partial class Core : MelonMod
             bool online = IsOnline(now);
             bool isOfflineSolo = (activeSoloContext || shortcutCandidate || workerLimitCandidate) && !online;
             offlineSoloOptimizationActive = activeSoloContext && !online;
+            inputViewerSuppression.Update(hideInputViewerDuringSong.Value,
+                hideInputViewerDuringSong.Value && activeSoloContext && isOfflineSolo, now);
             // Unlike UI/input hooks, the worker-count limit is independent of
             // foreground input. Keep it stable while the user alt-tabs during
             // a solo song instead of restoring and reapplying the native pool.
@@ -995,6 +1000,8 @@ public sealed partial class Core : MelonMod
     {
         if (moveHud && moveSong) { DrawSongHud(true); return; }
         hudStyle ??= CreateHudStyle();
+        if (CounterFont.UnityFont is { } counterFont && hudStyle.font != counterFont)
+            hudStyle.font = counterFont;
         int size = Math.Clamp(fontSize.Value, 14, 48);
         Color color = new(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1);
         if (styledHudFont != size) { hudStyle.fontSize = size; styledHudFont = size; }

@@ -38,6 +38,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> skipBackgroundCamera = null!, limitPlayerCameraFarClip = null!;
     private MelonPreferences_Entry<int> farClipDistance = null!;
     private MelonPreferences_Entry<bool> hidePbPopup = null!, hideStarPowerSideGlows = null!;
+    private MelonPreferences_Entry<bool> hideInputViewerDuringSong = null!;
     private MelonPreferences_Entry<bool> preserveNetworkTickRemainder = null!;
     private MelonPreferences_Entry<bool> disableHudCameraBenchmark = null!;
     private MelonPreferences_Entry<bool> disableGuitarCameraBenchmark = null!;
@@ -69,9 +70,10 @@ public sealed partial class Core
     private readonly PlayerCameraFarClipOverride playerCameraFarClip = new();
     private readonly HudCameraBenchmarkOverride hudCameraBenchmark = new();
     private readonly GuitarCameraBenchmarkOverride guitarCameraBenchmark = new();
-    private readonly PlainHeldSustainPrototype plainHeldSustains = new();
+    private readonly NativeHeldSustainGlowSuppressor plainHeldSustains = new();
     private readonly NativeRegularSustainCache nativeSustainCache = new();
     private readonly RainbowHighway rainbowHighway = new();
+    private readonly InputViewerSuppression inputViewerSuppression = new();
     private readonly NetworkTickRemainderOverride networkTickRemainder = new();
     private readonly OptionalHudAnimationsOverride optionalHudAnimations = new();
     private readonly RuntimeTimings timings = new();
@@ -182,6 +184,7 @@ public sealed partial class Core
         pauseRewiredKeyboardPolling = preferences.CreateEntry("PerformancePauseRewiredKeyboardPolling", false);
         limitSlopHeroShortcutPolling = preferences.CreateEntry("PerformanceLimitSlopHeroShortcutPolling", false);
         skipBackgroundCamera = preferences.CreateEntry("PerformanceSkipBackgroundCamera", false);
+        hideInputViewerDuringSong = preferences.CreateEntry("PerformanceHideInputViewer", false);
         limitPlayerCameraFarClip = preferences.CreateEntry("PerformanceLimitPlayerCameraFarClip", false);
         farClipDistance = preferences.CreateEntry("PerformanceGuitarCameraFarClip", 80);
         disableHudCameraBenchmark = preferences.CreateEntry("PerformanceDisableHudCameraBenchmark", false);
@@ -669,7 +672,8 @@ public sealed partial class Core
         Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, servicesY + 150);
         Toggle(useCanvasSongHud, "Use experimental Canvas renderer for the song HUD", x, servicesY + 190);
         Toggle(skipBackgroundCamera, "Skip background camera and hidden video in solo songs", x, servicesY + 230);
-        GUI.Label(new Rect(x + 4, servicesY + 276, 610, 56), "Experimental; default off. The song Canvas avoids per-frame IMGUI text drawing; its frame benefit is unmeasured. Background mode hides its render pass and pauses video while hidden in solo songs.");
+        Toggle(hideInputViewerDuringSong, "Hide input viewer during solo songs", x, servicesY + 270);
+        GUI.Label(new Rect(x + 4, servicesY + 314, 610, 44), "Experimental; default off. Hides only the passive input-display branch to reduce HUD rendering/culling. Restores on pause, settings, or online play; instrument input is unchanged.");
 
         float engineY = y + 770;
         SectionHeader("Engine and scheduler experiments", x, engineY);
@@ -1211,6 +1215,7 @@ public sealed partial class Core
             Bool("PerformancePauseRewiredKeyboardPolling", pauseRewiredKeyboardPolling);
             Bool("PerformanceLimitSlopHeroShortcutPolling", limitSlopHeroShortcutPolling);
             Bool("PerformanceSkipBackgroundCamera", skipBackgroundCamera);
+            Bool("PerformanceHideInputViewer", hideInputViewerDuringSong);
             Bool("PerformanceLimitPlayerCameraFarClip", limitPlayerCameraFarClip);
             Int("PerformanceGuitarCameraFarClip", farClipDistance);
             Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
@@ -1275,6 +1280,7 @@ public sealed partial class Core
         Bool("PerformancePauseRewiredKeyboardPolling", pauseRewiredKeyboardPolling);
         Bool("PerformanceLimitSlopHeroShortcutPolling", limitSlopHeroShortcutPolling);
         Bool("PerformanceSkipBackgroundCamera", skipBackgroundCamera);
+        Bool("PerformanceHideInputViewer", hideInputViewerDuringSong);
         Bool("PerformanceLimitPlayerCameraFarClip", limitPlayerCameraFarClip);
         Int("PerformanceGuitarCameraFarClip", farClipDistance, 40, 120);
         Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
