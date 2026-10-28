@@ -21,6 +21,7 @@ internal static class SongSpeedControl
     private static IntPtr speedSettingField;
     private static Il2Cpp.SongOptions? songOptions;
     private static double nextMenuLookupAt;
+    private static double nextInactivePollAt;
     private static bool trackingMenuSpeed;
     private static bool checkedLowSpeedRecovery;
     private static double nextLowSpeedRecoveryAttempt;
@@ -46,6 +47,7 @@ internal static class SongSpeedControl
 
     public static bool IsSpeedOptionOpen(double now)
     {
+        if (now < nextInactivePollAt) return false;
         if (songOptions == null || songOptions.Pointer == IntPtr.Zero)
         {
             // The option is absent on most non-gameplay screens. A scene-wide
@@ -57,14 +59,21 @@ internal static class SongSpeedControl
             if (optionsObject == null) return false;
             songOptions = optionsObject.GetComponent<Il2Cpp.SongOptions>();
         }
-        return songOptions != null && songOptions.gameObject.activeInHierarchy
+        if (songOptions == null) return false;
+        bool selected = songOptions.gameObject.activeInHierarchy
             && Marshal.ReadInt32(songOptions.Pointer, SongOptionsSelectionOffset) == 0;
+        // The song-options object can remain cached while inactive. Poll a
+        // negative result at 50 Hz instead of crossing into Unity on every
+        // unlocked menu Update; active speed entry still runs each tick.
+        if (!selected) nextInactivePollAt = now + .02;
+        return selected;
     }
 
     public static void ResetMenuCache()
     {
         songOptions = null;
         nextMenuLookupAt = 0;
+        nextInactivePollAt = 0;
         trackingMenuSpeed = false;
         checkedLowSpeedRecovery = false;
         nextLowSpeedRecoveryAttempt = 0;
@@ -85,6 +94,10 @@ internal static class SongSpeedControl
             if (TryRead(out int storedSpeed))
                 checkedLowSpeedRecovery = storedSpeed >= MinimumSpeed || TryWrite(MinimumSpeed);
         }
+
+        if (!editingSpeed && !trackingMenuSpeed
+            && ((songOptions == null && now < nextMenuLookupAt) || now < nextInactivePollAt))
+            return;
 
         // Handle Escape before validating the selected row. Once Clone Hero
         // changes selection or closes SongOptions, the normal validation path

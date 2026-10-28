@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.134", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.135", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -49,6 +49,7 @@ public sealed partial class Core : MelonMod
     private double nextStats, nextGameStateRefresh, nextOverridePass, nextOptionalServicePass, transitionStarted, noticeUntil, finalStatsRefreshUntil;
     private double nextAprilFoolsPass;
     private double nextOptionalHookSettingsPass;
+    private double nextUnfocusedRestorePass;
     private double nextOnlineStateCheck;
     private bool onlineStateKnown, onlineState, offlineSoloOptimizationActive;
     private bool activeGameplayVisualOptimizationActive;
@@ -350,9 +351,9 @@ public sealed partial class Core : MelonMod
                     backgroundCamera.Restore();
                     hudCameraBenchmark.Restore();
                     guitarCameraBenchmark.Restore();
-                    nativeSustainCache.Clear();
-                    fretSortingOrderCache.Clear();
-                    plainHeldSustains.Clear(HarmonyInstance);
+                    nativeSustainCache.Update(cacheRegularSustainWrites.Value, eligible: false);
+                    fretSortingOrderCache.Update(cacheFretSortingWrites.Value, eligibleGameplaySong: false);
+                    plainHeldSustains.Update(HarmonyInstance, hideHeldSustainGlow.Value, eligible: false, game: null);
                     cheatScanner.Disable();
                     gameplayUiEvents.Disable();
                     highwayAnimations.SetSuppressed(false);
@@ -386,7 +387,11 @@ public sealed partial class Core : MelonMod
                 hudDragging = false;
                 SavePreferences();
             }
-            if (!Application.isFocused && (settingsOpen || moveHud || resizeTarget >= 0))
+            // Unity's focus getter crosses the IL2CPP boundary. The game can
+            // run thousands of simulation ticks per second, so read it once
+            // for all of this tick's restore and eligibility checks.
+            bool focused = Application.isFocused;
+            if (!focused && (settingsOpen || moveHud || resizeTarget >= 0))
             {
                 settingsOpen = moveHud = hudDragging = false;
                 resizeTarget = -1;
@@ -398,19 +403,30 @@ public sealed partial class Core : MelonMod
                 SavePreferences();
                 UpdateCursor();
             }
-            if (!Application.isFocused && mouseUiGameplay.IsInstalled) mouseUiGameplay.Disable();
-            if (!Application.isFocused) inputViewerSuppression.Restore();
-            if (!Application.isFocused && legacyMouseEvents.IsInstalled) legacyMouseEvents.Disable();
-            if (!Application.isFocused && rewiredMousePolling.IsInstalled) rewiredMousePolling.Disable();
-            if (!Application.isFocused) rewiredKeyboardPolling.Disable();
-            if (!Application.isFocused) backgroundCamera.Restore();
-            if (!Application.isFocused) hudCameraBenchmark.Restore();
-            if (!Application.isFocused) guitarCameraBenchmark.Restore();
-            if (!Application.isFocused) nativeSustainCache.Clear();
-            if (!Application.isFocused) fretSortingOrderCache.Clear();
-            if (!Application.isFocused) plainHeldSustains.Clear(HarmonyInstance);
-            if (!Application.isFocused) playerCameraFarClip.Restore();
-            if (!Application.isFocused) highwayAnimations.SetSuppressed(false);
+            // The first blur restores immediately. While unfocused, reconcile
+            // at 20 Hz so a scene load cannot leave a new hook active, without
+            // running a dozen idempotent restore routines on every tick.
+            if (focused) nextUnfocusedRestorePass = 0;
+            else if (now >= nextUnfocusedRestorePass)
+            {
+                nextUnfocusedRestorePass = now + .05;
+                if (mouseUiGameplay.IsInstalled) mouseUiGameplay.Disable();
+                inputViewerSuppression.Restore();
+                if (legacyMouseEvents.IsInstalled) legacyMouseEvents.Disable();
+                if (rewiredMousePolling.IsInstalled) rewiredMousePolling.Disable();
+                rewiredKeyboardPolling.Disable();
+                backgroundCamera.Restore();
+                hudCameraBenchmark.Restore();
+                guitarCameraBenchmark.Restore();
+                // Suspend selected native hooks on blur. Their inactive stubs
+                // pass through; uninstalling here forced a costly re-prepare
+                // on the first song tick after Alt+Tab.
+                nativeSustainCache.Update(cacheRegularSustainWrites.Value, eligible: false);
+                fretSortingOrderCache.Update(cacheFretSortingWrites.Value, eligibleGameplaySong: false);
+                plainHeldSustains.Update(HarmonyInstance, hideHeldSustainGlow.Value, eligible: false, game: null);
+                playerCameraFarClip.Restore();
+                highwayAnimations.SetSuppressed(false);
+            }
             if (capture != null)
             {
                 var binding = InputBinding.Capture();
@@ -469,7 +485,7 @@ public sealed partial class Core : MelonMod
             // action is held. HUD data still refreshes at 5 Hz; practice and
             // transition readiness refresh at 20 Hz.
             bool shortcutContext = gameplay && gameplayInitialized && !transition
-                && !settingsOpen && !moveHud && resizeTarget < 0 && Application.isFocused;
+                && !settingsOpen && !moveHud && resizeTarget < 0 && focused;
             if (shortcutPolling.ShouldPoll(limitSlopHeroShortcutPolling.Value, shortcutContext, now,
                     restartButton.Value, practiceButton.Value))
             {
@@ -501,13 +517,13 @@ public sealed partial class Core : MelonMod
             var game = gameplay && gameplayInitialized ? GameManager.field_Private_Static_GameManager_0 : null;
             bool ready = game != null && game.songLoaded && game.playersInit && game.globalVariables != null;
             bool songPlaying = ready && game!.isSongPlaying;
-            if (ready && Application.isFocused && (!songPlaying || game!.isPaused || settingsOpen) && !transition)
+            if (ready && focused && (!songPlaying || game!.isPaused || settingsOpen) && !transition)
             {
                 plainHeldSustains.Warm(hideHeldSustainGlow.Value, game, now);
             }
             practiceModeActive = ready && game!.globalVariables!.isPracticeEnabled;
             bool shortcutCandidate = ready && !transition && !settingsOpen && !moveHud
-                && resizeTarget < 0 && Application.isFocused && !game!.isPaused
+                && resizeTarget < 0 && focused && !game!.isPaused
                 && !game.isSongOver && game.isSongPlaying && game.coroutinesRunning == 0
                 && game.actualPlayerCount == 1 && (int)game.globalVariables!.gameMode == 0
                 && !practiceModeActive && !game.globalVariables.isPlayingSetlist;
@@ -548,7 +564,7 @@ public sealed partial class Core : MelonMod
                 && game.coroutinesRunning == 0 && (int)game.globalVariables!.gameMode == 0
                 && !game.globalVariables.isPlayingSetlist
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0
-                && Application.isFocused;
+                && focused;
             bool activeSoloContext = soloOptimizationCandidate;
             bool online = IsOnline(now);
             bool isOfflineSolo = (activeSoloContext || shortcutCandidate || workerLimitCandidate) && !online;
@@ -558,7 +574,7 @@ public sealed partial class Core : MelonMod
             // controller, or network simulation updates.
             bool activeGameplaySong = ready && songPlaying && !game!.isPaused && !game.isSongOver
                 && game.coroutinesRunning == 0 && !transition && !settingsOpen && !moveHud
-                && resizeTarget < 0 && Application.isFocused;
+                && resizeTarget < 0 && focused;
             activeGameplayVisualOptimizationActive = activeGameplaySong;
             clonZonesFlameSuppressor.Update(disableFretEffects.Value && !rainbowFlames.Value
                 && activeGameplaySong, gameplay);
@@ -636,7 +652,7 @@ public sealed partial class Core : MelonMod
                 playingSetlist: ready && game!.globalVariables!.isPlayingSetlist,
                 transitioning: transition,
                 settingsOpen: settingsOpen || moveHud || resizeTarget >= 0,
-                focused: Application.isFocused,
+                focused: focused,
                 online: !isOfflineSolo);
             bool pauseMouseSampler = mouseSamplerRequested && activeGameplaySong;
             rewiredMousePolling.Update(HarmonyInstance, mouseSamplerRequested, pauseMouseSampler);
