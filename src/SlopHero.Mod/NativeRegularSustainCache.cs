@@ -75,21 +75,24 @@ internal sealed class NativeRegularSustainCache
             if (allocation != IntPtr.Zero || failed) Clear();
             return;
         }
+        if (!eligible)
+        {
+            // Remove the callsite detours outside active play as well as
+            // clearing the cache. A disabled per-call trampoline would cost
+            // more than it can save in menus, pause screens, and online lobbies.
+            if (allocation != IntPtr.Zero || patches.Count != 0) Clear();
+            return;
+        }
         if (failed) return;
         if (!IsInstalled && !failed) Prepare(true);
         if (failed || !IsInstalled) return;
-        if (!eligible)
-        {
-            Disable();
-            return;
-        }
         if (enabled) return;
         try
         {
             Marshal.Copy(new byte[CacheBytes + 16], 0, table, CacheBytes + 16);
             Marshal.WriteByte(flag, 1);
             enabled = true;
-            MelonLogger.Msg("Sloptifine native regular-sustain cache active for this offline solo song.");
+            MelonLogger.Msg("Sloptifine native regular-sustain cache active for this song.");
         }
         catch (Exception ex)
         {

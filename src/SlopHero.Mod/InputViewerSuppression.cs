@@ -45,7 +45,7 @@ internal sealed class InputViewerSuppression
             if (originalActive && root != null && root.activeSelf)
             {
                 root.SetActive(false);
-                MelonLogger.Msg("Sloptifine hid the passive guitar input viewer during offline solo play.");
+                MelonLogger.Msg("Sloptifine hid the passive guitar input viewer during an active song.");
             }
         }
         catch (Exception ex)

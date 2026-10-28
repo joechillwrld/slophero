@@ -103,6 +103,7 @@ internal sealed class NativeHeldSustainGlowSuppressor
         if (!eligible || game == null)
         {
             Deactivate();
+            Uninstall();
             return;
         }
 

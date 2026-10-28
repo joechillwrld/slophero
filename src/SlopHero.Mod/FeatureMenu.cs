@@ -44,6 +44,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> disableGuitarCameraBenchmark = null!;
     private MelonPreferences_Entry<bool> hideHeldSustainGlow = null!;
     private MelonPreferences_Entry<bool> cacheRegularSustainWrites = null!;
+    private MelonPreferences_Entry<bool> cacheFretSortingWrites = null!;
     private MelonPreferences_Entry<bool> rainbowNotes = null!, rainbowFlames = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, settingsWindowOffsetX = null!, settingsWindowOffsetY = null!;
@@ -72,6 +73,7 @@ public sealed partial class Core
     private readonly GuitarCameraBenchmarkOverride guitarCameraBenchmark = new();
     private readonly NativeHeldSustainGlowSuppressor plainHeldSustains = new();
     private readonly NativeRegularSustainCache nativeSustainCache = new();
+    private readonly NativeFretSortingOrderCache fretSortingOrderCache = new();
     private readonly RainbowHighway rainbowHighway = new();
     private readonly InputViewerSuppression inputViewerSuppression = new();
     private readonly NetworkTickRemainderOverride networkTickRemainder = new();
@@ -200,6 +202,7 @@ public sealed partial class Core
         }
         hideHeldSustainGlow = preferences.CreateEntry("PerformanceHideHeldSustainGlow", false);
         cacheRegularSustainWrites = preferences.CreateEntry("PerformanceCacheRegularSustainNative", false);
+        cacheFretSortingWrites = preferences.CreateEntry("PerformanceCacheFretSortingWrites", false);
         // Render-every-update consumed enough CPU to reduce simulation Updates
         // by roughly 35% in the user's four-run comparison. Retire any saved
         // value, including values written by older profiles.
@@ -662,7 +665,7 @@ public sealed partial class Core
         Toggle(freezeComboSmokeScroll, "Pause combo-smoke animation (smoke stays visible)", x, y + 230);
         Toggle(pauseHiddenBeatlineUpdates, "Skip beatline updates while hidden", x, y + 270);
         Toggle(disableAprilFools, "Disable April Fools / NoteBomber chaos and Pong", x, y + 310);
-        GUI.Label(new Rect(x + 4, y + 354, 610, 42), "These visual switches restore on pause, transitions, or online play. Plain tails keep their base sustain body.");
+        GUI.Label(new Rect(x + 4, y + 354, 610, 54), "Effect, Star Power burst, combo-smoke, and input-viewer switches affect visuals during active songs, online too, and restore on pause or transition. Hidden-beatline updates stay solo-only because that renderer also handles April Fools triggers.");
 
         float servicesY = y + 410;
         SectionHeader("Services and HUD", x, servicesY);
@@ -672,8 +675,8 @@ public sealed partial class Core
         Toggle(useCanvasCounterHud, "Use experimental Canvas renderer for the counter HUD", x, servicesY + 150);
         Toggle(useCanvasSongHud, "Use experimental Canvas renderer for the song HUD", x, servicesY + 190);
         Toggle(skipBackgroundCamera, "Skip background camera and hidden video in solo songs", x, servicesY + 230);
-        Toggle(hideInputViewerDuringSong, "Hide input viewer during solo songs", x, servicesY + 270);
-        GUI.Label(new Rect(x + 4, servicesY + 314, 610, 44), "Experimental; default off. Hides only the passive input-display branch to reduce HUD rendering/culling. Restores on pause, settings, or online play; instrument input is unchanged.");
+        Toggle(hideInputViewerDuringSong, "Hide input viewer during active songs", x, servicesY + 270);
+        GUI.Label(new Rect(x + 4, servicesY + 314, 610, 44), "Experimental; default off. Hides only the passive input-display branch during active songs, online too, to reduce HUD rendering/culling. Restores on pause or settings; instrument input is unchanged.");
 
         float engineY = y + 770;
         SectionHeader("Engine and scheduler experiments", x, engineY);
@@ -686,11 +689,12 @@ public sealed partial class Core
         Toggle(reduceUnityJobWorkers, "Use one fewer Unity job worker during offline solo songs", x, engineY + 270);
         Toggle(disableMidiForSession, "Disable drum MIDI input (restart to restore)", x, engineY + 310);
         Toggle(staticTmpScaleDuringSong, "Skip TMP scale checks in offline solo play", x, engineY + 350);
-        Toggle(pauseRewiredMousePolling, "Pause Rewired mouse polling in solo songs", x, engineY + 390);
+        Toggle(pauseRewiredMousePolling, "Pause Rewired mouse polling during songs (online too)", x, engineY + 390);
         Toggle(pauseRewiredKeyboardPolling, "Pause Rewired keyboard polling in solo songs", x, engineY + 430);
         Toggle(limitSlopHeroShortcutPolling, "Limit SlopHero hotkey checks to 120 Hz", x, engineY + 470);
         Toggle(cacheRegularSustainWrites, "Cache repeat regular-sustain native writes (experimental)", x, engineY + 510);
-        GUI.Label(new Rect(x + 4, engineY + 556, 610, 96), "Exact game build only; default off. Patches six sustain callsites: repeat regular-tail property-block writes can skip, and other tail writes invalidate that renderer. Disable if tails look wrong. Keyboard and hotkey options have separate input effects.");
+        Toggle(cacheFretSortingWrites, "Skip repeated fret sorting-order writes (experimental)", x, engineY + 550);
+        GUI.Label(new Rect(x + 4, engineY + 596, 610, 108), "Exact game build only; both caches are default off and active only during songs, including online play. They skip repeat regular-tail property-block submissions and unchanged fret sorting-order setters. They never touch note, controller, or network updates; original callsites return on pause, focus loss, scene changes, or when disabled.");
 
         float renderingY = y + 1460;
         SectionHeader("3D rendering experiment", x, renderingY);
@@ -1222,6 +1226,7 @@ public sealed partial class Core
             Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
             Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
             Bool("PerformanceCacheRegularSustainNative", cacheRegularSustainWrites);
+            Bool("PerformanceCacheFretSortingWrites", cacheFretSortingWrites);
             Bool("PerformanceHidePbPopup", hidePbPopup);
             Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
             Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1287,6 +1292,7 @@ public sealed partial class Core
         Bool("PerformanceDisableGuitarCameraBenchmark", disableGuitarCameraBenchmark);
         Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
         Bool("PerformanceCacheRegularSustainNative", cacheRegularSustainWrites);
+        Bool("PerformanceCacheFretSortingWrites", cacheFretSortingWrites);
         Bool("PerformanceHidePbPopup", hidePbPopup);
         Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
         Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1686,16 +1692,19 @@ public sealed partial class Core
         // the one cleanup pass needed after the user disables colors, then
         // stop dispatching the empty updater while other visual options run.
         bool ringUpdateDue = tintFc.Value || rings.NeedsUpdate;
-        bool disableHits = disableHitParticles.Value && offlineSoloOptimizationActive;
-        bool disableSustains = disableSustainParticles.Value && offlineSoloOptimizationActive;
-        bool disableFrets = disableFretEffects.Value && offlineSoloOptimizationActive;
-        bool preserveRainbowFlames = rainbowFlames.Value && offlineSoloOptimizationActive;
+        // These are presentation-only branches. They may suppress local
+        // effects during online songs without changing note/input/network
+        // simulation; the more invasive update/camera experiments stay solo-only.
+        bool disableHits = disableHitParticles.Value && activeGameplayVisualOptimizationActive;
+        bool disableSustains = disableSustainParticles.Value && activeGameplayVisualOptimizationActive;
+        bool disableFrets = disableFretEffects.Value && activeGameplayVisualOptimizationActive;
+        bool preserveRainbowFlames = rainbowFlames.Value && activeGameplayVisualOptimizationActive;
         bool performanceApplyDue = !performanceError
             && performance.IsApplyDue(disableHits, disableSustains, disableFrets, preserveRainbowFlames, now);
-        bool disableStarProgress = disableStarProgressParticles.Value && offlineSoloOptimizationActive;
+        bool disableStarProgress = disableStarProgressParticles.Value && activeGameplayVisualOptimizationActive;
         bool starProgressApplyDue = !starProgressError
             && starProgressParticles.IsApplyDue(disableStarProgress, now);
-        bool freezeComboSmoke = freezeComboSmokeScroll.Value && offlineSoloOptimizationActive;
+        bool freezeComboSmoke = freezeComboSmokeScroll.Value && activeGameplayVisualOptimizationActive;
         bool comboSmokeRequested = !comboSmokeScrollError && (freezeComboSmoke || comboSmokeScroll.NeedsRestore);
         bool tmpScalePassDue = !staticTmpScaleError && !staticTmpScale.NoTargetsForScene
             && (staticTmpScaleDuringSong.Value || staticTmpScale.IsActive || staticTmpScale.NeedsRestore);

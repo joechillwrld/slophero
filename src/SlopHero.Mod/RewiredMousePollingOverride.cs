@@ -7,9 +7,8 @@ using MelonLoader;
 namespace SlopHero.Mod;
 
 /// <summary>
-/// Default-off experiment that skips Rewired's mouse-only snapshot during
-/// eligible offline solo songs. Keyboard, joystick, and controller updates
-/// remain on their normal paths.
+/// Default-off experiment that skips Rewired's mouse-only snapshot during any
+/// active chart. Keyboard, joystick, and controller updates remain untouched.
 /// </summary>
 internal sealed class RewiredMousePollingOverride
 {
@@ -23,7 +22,7 @@ internal sealed class RewiredMousePollingOverride
     internal bool IsSuppressed => installed && suppressMouse;
 
     // Patch while Gameplay initializes, before the first song frame. The
-    // prefix passes through until the strict offline-solo gate opens.
+    // prefix passes through until active chart play begins.
     internal void Prepare(HarmonyLib.Harmony harmony, bool requested)
     {
         if (requested && !installed && !failed) Install(harmony);
@@ -39,8 +38,8 @@ internal sealed class RewiredMousePollingOverride
             return;
         }
 
-        // Keep the already-prepared prefix installed for this Gameplay scene;
-        // it passes through when play is paused, online, or otherwise ineligible.
+        // Keep the prepared prefix installed for this Gameplay scene; it passes
+        // through when play is paused or otherwise outside an active chart.
         if (!eligibleSoloSong)
         {
             suppressMouse = false;
@@ -81,7 +80,7 @@ internal sealed class RewiredMousePollingOverride
                 BindingFlags.Static | BindingFlags.NonPublic)!;
             harmony.Patch(updateMethod, prefix: new HarmonyMethod(prefix));
             installed = true;
-            MelonLogger.Msg($"Sloptifine mouse-sampler experiment installed in {(Stopwatch.GetTimestamp() - started) * 1000d / Stopwatch.Frequency:0.00} ms; only Rewired mouse snapshots pause during eligible offline solo songs.");
+            MelonLogger.Msg($"Sloptifine mouse-sampler experiment installed in {(Stopwatch.GetTimestamp() - started) * 1000d / Stopwatch.Frequency:0.00} ms; only Rewired mouse snapshots pause during active charts, including online play.");
         }
         catch (Exception ex)
         {

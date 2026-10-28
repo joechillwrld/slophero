@@ -39,11 +39,11 @@ internal sealed class RainbowHighway
     private MethodInfo? noteColorSetter, flameAnimatorUpdate;
     private HarmonyLib.Harmony? noteHarmony, flameHarmony;
     private bool noteHookInstalled, flameUpdateHookInstalled;
-    private bool noteHookFailed, flameHookFailed, applyingOwnColor, notesDiscovered;
+    private bool noteHookFailed, flameHookFailed, applyingOwnColor, notesDiscovered, notesActive;
     private bool notesFailed, flamesFailed;
     private double nextPass, nextNotesDiscovery, nextFlamesDiscovery;
 
-    internal bool HasOverrides => notes.Count != 0 || flames.Count != 0
+    internal bool HasOverrides => notesActive || flames.Count != 0
         || noteHookInstalled || flameUpdateHookInstalled;
 
     internal void Prepare(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames)
@@ -67,11 +67,40 @@ internal sealed class RainbowHighway
     internal void Update(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames, GameManager? game, double now)
     {
         if (!colorNotes) RestoreNotes();
+        else if (!notesActive)
+        {
+            // Game animation may have changed pooled note colors while this
+            // option was off; capture those current vanilla values on re-entry.
+            try
+            {
+                foreach (var state in notes.Values)
+                    if (state.Renderer != null) state.Original = state.Renderer.color;
+                notesActive = true;
+            }
+            catch (Exception ex)
+            {
+                notesFailed = true;
+                MelonLogger.Warning($"Rainbow notes could not refresh saved colors: {ex.Message}");
+            }
+        }
         if (!colorFlames) RestoreFlames();
         if (!colorNotes && !colorFlames) return;
-        if (game == null) { Clear(); return; }
+        if (game == null)
+        {
+            // A manager gap during an in-place restart is not a scene change.
+            // Restore colors/hooks but keep the successful pooled-note scan;
+            // actual scene load/unload callbacks call Clear() and forget it.
+            RestoreNotes();
+            RestoreFlames();
+            return;
+        }
 
         bool animate = now >= nextPass;
+        bool noteDiscoveryDue = colorNotes && !notesFailed && !notesDiscovered && now >= nextNotesDiscovery;
+        bool flameDiscoveryDue = colorFlames && !flamesFailed && flames.Count == 0 && now >= nextFlamesDiscovery;
+        // Palette updates run at 20 Hz. Skip the list, discovery, and hook
+        // checks on all intervening simulation Updates.
+        if (!animate && !noteDiscoveryDue && !flameDiscoveryDue) return;
         float cycle = 0;
         if (animate)
         {
@@ -87,10 +116,11 @@ internal sealed class RainbowHighway
                     flamePalette[i] = Rainbow(cycle + i / (float)flamePalette.Length, .4f);
         }
 
-        if (colorNotes && !notesFailed && now >= nextNotesDiscovery)
+        if (colorNotes && !notesFailed && !notesDiscovered && now >= nextNotesDiscovery)
         {
-            // Discover promptly, then back off once the complete pooled guitar
-            // hierarchy has been found. No per-second scene-wide scan is needed.
+            // Scan once per scene. All 2,000 pooled note renderers, including
+            // inactive slots, are in this guitar hierarchy; calling this
+            // stripped IL2CPP generic a second time can fail at runtime.
             nextNotesDiscovery = now + 1.0;
             try
             {
@@ -216,7 +246,7 @@ internal sealed class RainbowHighway
     private static void BeforeNoteColor(SpriteRenderer __instance, ref Color value)
     {
         var owner = active;
-        if (owner == null || owner.applyingOwnColor) return;
+        if (owner == null || !owner.notesActive || owner.applyingOwnColor) return;
         var pointer = __instance.Pointer;
         if (!owner.notes.TryGetValue(pointer, out var note)) return;
         note.Original = value;
@@ -262,7 +292,7 @@ internal sealed class RainbowHighway
         if (added != 0)
         {
             notesDiscovered = true;
-            MelonLogger.Msg($"Rainbow notes tracking {notes.Count} pooled sprites, including inactive slots.");
+            MelonLogger.Msg($"Rainbow notes tracked {notes.Count} pooled sprites once for this scene, including inactive slots.");
         }
     }
 
@@ -314,21 +344,34 @@ internal sealed class RainbowHighway
         renderer.color = color;
     }
 
-    private void RestoreNotes()
+    private void RestoreNotes(bool forgetSceneCache = false)
     {
-        if (notes.Count == 0 && !notesDiscovered && !notesFailed && !noteHookInstalled)
-        { noteHookFailed = false; return; }
+        if (!notesActive && !notesFailed && !noteHookInstalled)
+        {
+            if (forgetSceneCache)
+            {
+                notes.Clear();
+                notesDiscovered = false;
+                nextNotesDiscovery = 0;
+            }
+            noteHookFailed = false;
+            return;
+        }
+        notesActive = false;
         applyingOwnColor = true;
         foreach (var state in notes.Values)
             try { if (state.Renderer != null) SetRgb(state.Renderer, state.Original); }
             catch { }
         applyingOwnColor = false;
-        notes.Clear();
-        notesDiscovered = false;
         notesFailed = false;
         noteHookFailed = false;
-        nextNotesDiscovery = 0;
         RemoveColorHookIfUnused();
+        if (forgetSceneCache)
+        {
+            notes.Clear();
+            notesDiscovered = false;
+            nextNotesDiscovery = 0;
+        }
     }
 
     private void RestoreFlames()
@@ -358,7 +401,7 @@ internal sealed class RainbowHighway
 
     private void RemoveColorHookIfUnused()
     {
-        if (notes.Count != 0 || !noteHookInstalled) return;
+        if (notesActive || !noteHookInstalled) return;
         if (noteColorSetter != null && noteHarmony != null)
         {
             try { noteHarmony.Unpatch(noteColorSetter, HarmonyPatchType.All, noteHarmony.Id); }
@@ -393,8 +436,9 @@ internal sealed class RainbowHighway
 
     internal void Clear()
     {
-        RestoreNotes();
+        RestoreNotes(forgetSceneCache: true);
         RestoreFlames();
+        notesActive = false;
         noteHookFailed = flameHookFailed = false;
         nextPass = nextNotesDiscovery = nextFlamesDiscovery = 0;
     }

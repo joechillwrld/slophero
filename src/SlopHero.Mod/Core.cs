@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.130", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.131", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -49,6 +49,7 @@ public sealed partial class Core : MelonMod
     private double nextOptionalHookSettingsPass;
     private double nextOnlineStateCheck;
     private bool onlineStateKnown, onlineState, offlineSoloOptimizationActive;
+    private bool activeGameplayVisualOptimizationActive;
     private bool? lastWhammyCapSetting;
     private bool? lastHighwayPauseSetting;
     private bool aprilFoolsError;
@@ -122,6 +123,7 @@ public sealed partial class Core : MelonMod
         rainbowHighway.Clear();
         inputViewerSuppression.Clear();
         nativeSustainCache.Clear();
+        fretSortingOrderCache.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
         optionalHudAnimations.Clear();
         optionalHudGame = null;
@@ -133,6 +135,7 @@ public sealed partial class Core : MelonMod
         onlineStateKnown = false;
         nextOnlineStateCheck = 0;
         offlineSoloOptimizationActive = false;
+        activeGameplayVisualOptimizationActive = false;
         practiceModeActive = false;
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
@@ -206,8 +209,6 @@ public sealed partial class Core : MelonMod
         {
             gameplayInitialized = true;
             if (compatible) legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
-            if (compatible) nativeSustainCache.Prepare(cacheRegularSustainWrites.Value);
-            if (compatible) plainHeldSustains.Prepare(HarmonyInstance, hideHeldSustainGlow.Value);
             if (compatible) rewiredMousePolling.Prepare(HarmonyInstance, pauseRewiredMousePolling.Value);
             if (compatible) rewiredKeyboardPolling.Prepare(HarmonyInstance, pauseRewiredKeyboardPolling.Value);
             if (compatible && staticTmpScaleDuringSong.Value)
@@ -234,6 +235,7 @@ public sealed partial class Core : MelonMod
         playerCameraFarClip.Clear();
         rainbowHighway.Clear();
         nativeSustainCache.Clear();
+        fretSortingOrderCache.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
         optionalHudAnimations.Clear();
         optionalHudGame = null;
@@ -254,7 +256,14 @@ public sealed partial class Core : MelonMod
         highwayAnimations.Clear(HarmonyInstance);
         lastHighwayPauseSetting = null;
         nextOptionalHookSettingsPass = 0;
-        if (sceneName == "Gameplay") { gameplay = false; gameplayInitialized = false; practiceModeActive = false; }
+        if (sceneName == "Gameplay")
+        {
+            gameplay = false;
+            gameplayInitialized = false;
+            practiceModeActive = false;
+            offlineSoloOptimizationActive = false;
+            activeGameplayVisualOptimizationActive = false;
+        }
         settingsOpen = moveHud = hudDragging = false;
         resizeTarget = -1;
         resizeHandle = -1;
@@ -327,7 +336,8 @@ public sealed partial class Core : MelonMod
                     backgroundCamera.Restore();
                     hudCameraBenchmark.Restore();
                     guitarCameraBenchmark.Restore();
-                    nativeSustainCache.Disable();
+                    nativeSustainCache.Clear();
+                    fretSortingOrderCache.Clear();
                     plainHeldSustains.Clear(HarmonyInstance);
                     cheatScanner.Disable();
                     gameplayUiEvents.Disable();
@@ -382,7 +392,8 @@ public sealed partial class Core : MelonMod
             if (!Application.isFocused) backgroundCamera.Restore();
             if (!Application.isFocused) hudCameraBenchmark.Restore();
             if (!Application.isFocused) guitarCameraBenchmark.Restore();
-            if (!Application.isFocused) nativeSustainCache.Disable();
+            if (!Application.isFocused) nativeSustainCache.Clear();
+            if (!Application.isFocused) fretSortingOrderCache.Clear();
             if (!Application.isFocused) plainHeldSustains.Clear(HarmonyInstance);
             if (!Application.isFocused) playerCameraFarClip.Restore();
             if (!Application.isFocused) highwayAnimations.SetSuppressed(false);
@@ -478,7 +489,6 @@ public sealed partial class Core : MelonMod
             bool songPlaying = ready && game!.isSongPlaying;
             if (ready && Application.isFocused && (!songPlaying || game!.isPaused || settingsOpen) && !transition)
             {
-                plainHeldSustains.Prepare(HarmonyInstance, hideHeldSustainGlow.Value);
                 plainHeldSustains.Warm(hideHeldSustainGlow.Value, game, now);
             }
             practiceModeActive = ready && game!.globalVariables!.isPracticeEnabled;
@@ -499,6 +509,7 @@ public sealed partial class Core : MelonMod
             bool guitarCameraBenchmarkRequested = disableGuitarCameraBenchmark.Value;
             bool plainHeldSustainRequested = hideHeldSustainGlow.Value;
             bool nativeSustainRequested = cacheRegularSustainWrites.Value;
+            bool fretSortingCacheRequested = cacheFretSortingWrites.Value;
             bool workerLimitCandidate = workerLimitRequested && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0;
@@ -508,7 +519,7 @@ public sealed partial class Core : MelonMod
                 || workerLimitRequested || mouseSamplerRequested || keyboardSamplerRequested
                 || backgroundCameraRequested || farClipRequested || hudCameraBenchmarkRequested
                 || guitarCameraBenchmarkRequested
-                || plainHeldSustainRequested || nativeSustainRequested
+                || plainHeldSustainRequested || nativeSustainRequested || fretSortingCacheRequested
                 || skipMouseUiRequested || skipLegacyMouseRequested
                 || throttleWhammyTexture.Value || disableHitParticles.Value || disableSustainParticles.Value
                 || disableFretEffects.Value || disableStarProgressParticles.Value || freezeComboSmokeScroll.Value
@@ -524,8 +535,15 @@ public sealed partial class Core : MelonMod
             bool online = IsOnline(now);
             bool isOfflineSolo = (activeSoloContext || shortcutCandidate || workerLimitCandidate) && !online;
             offlineSoloOptimizationActive = activeSoloContext && !online;
+            // These paths are local UI/visual work. They can be skipped during
+            // any active chart, including online play, without touching note,
+            // controller, or network simulation updates.
+            bool activeGameplaySong = ready && songPlaying && !game!.isPaused && !game.isSongOver
+                && game.coroutinesRunning == 0 && !transition && !settingsOpen && !moveHud
+                && resizeTarget < 0 && Application.isFocused;
+            activeGameplayVisualOptimizationActive = activeGameplaySong;
             inputViewerSuppression.Update(hideInputViewerDuringSong.Value,
-                hideInputViewerDuringSong.Value && activeSoloContext && isOfflineSolo, now);
+                hideInputViewerDuringSong.Value && activeGameplaySong, now);
             // Unlike UI/input hooks, the worker-count limit is independent of
             // foreground input. Keep it stable while the user alt-tabs during
             // a solo song instead of restoring and reapplying the native pool.
@@ -579,17 +597,15 @@ public sealed partial class Core : MelonMod
                 finalStatsRefreshUntil = now + 1;
             }
             lastStatsSongPlaying = songPlaying;
-            bool activeSongMouseSuppression = ready && songPlaying && !game!.isPaused && !game.isSongOver
-                && game.coroutinesRunning == 0 && !transition && !settingsOpen && !moveHud
-                && resizeTarget < 0 && Application.isFocused && offlineSoloOptimizationActive;
-            whammyTextureThrottle.SetSuppressed(!activeSongMouseSuppression);
-            mouseUiGameplay.Update(HarmonyInstance, skipMouseUiRequested, skipMouseUiRequested && activeSongMouseSuppression);
-            legacyMouseEvents.Update(skipLegacyMouseRequested, activeSongMouseSuppression);
+            whammyTextureThrottle.SetSuppressed(!activeGameplaySong);
+            mouseUiGameplay.Update(HarmonyInstance, skipMouseUiRequested, skipMouseUiRequested && activeGameplaySong);
+            legacyMouseEvents.Update(skipLegacyMouseRequested, activeGameplaySong);
             // These scoped experiments share the same offline solo gate. Read
             // the IL2CPP game properties once, and only when one is requested.
             bool scopedExperimentRequested = mouseSamplerRequested || keyboardSamplerRequested
                 || backgroundCameraRequested || farClipRequested || hudCameraBenchmarkRequested
-                || guitarCameraBenchmarkRequested || plainHeldSustainRequested || nativeSustainRequested;
+                || guitarCameraBenchmarkRequested || plainHeldSustainRequested || nativeSustainRequested
+                || fretSortingCacheRequested;
             bool eligibleScopedExperiment = scopedExperimentRequested && OfflineSoloSongScope.IsEligible(
                 requested: true, gameReady: ready, songPlaying: songPlaying,
                 paused: ready && game!.isPaused,
@@ -602,7 +618,7 @@ public sealed partial class Core : MelonMod
                 settingsOpen: settingsOpen || moveHud || resizeTarget >= 0,
                 focused: Application.isFocused,
                 online: !isOfflineSolo);
-            bool pauseMouseSampler = mouseSamplerRequested && eligibleScopedExperiment;
+            bool pauseMouseSampler = mouseSamplerRequested && activeGameplaySong;
             rewiredMousePolling.Update(HarmonyInstance, mouseSamplerRequested, pauseMouseSampler);
             bool pauseKeyboardSampler = keyboardSamplerRequested && eligibleScopedExperiment;
             if (keyboardSamplerRequested || rewiredKeyboardPolling.IsInstalled)
@@ -629,11 +645,12 @@ public sealed partial class Core : MelonMod
                 farClipDistance.Value);
             if (playerCameraFarClip.ConsumeFailure() is string farClipFailure)
                 LoggerInstance.Warning($"Guitar-camera far-clip experiment stopped; original camera restored: {farClipFailure}");
-            bool eligibleRenderPrototype = eligibleScopedExperiment && activeSoloContext && isOfflineSolo
+            bool eligibleRenderPrototype = activeGameplaySong
                 && !hudCameraBenchmarkRequested && !guitarCameraBenchmarkRequested
                 && !hudCameraBenchmark.IsActive && !guitarCameraBenchmark.IsActive;
             plainHeldSustains.Update(HarmonyInstance, plainHeldSustainRequested, eligibleRenderPrototype, game);
             nativeSustainCache.Update(nativeSustainRequested, eligibleRenderPrototype);
+            fretSortingOrderCache.Update(fretSortingCacheRequested, eligibleRenderPrototype);
             if (rainbowNotes.Value || rainbowFlames.Value || rainbowHighway.HasOverrides)
                 rainbowHighway.Update(HarmonyInstance, rainbowNotes.Value, rainbowFlames.Value,
                     ready ? game : null, now);
@@ -745,6 +762,7 @@ public sealed partial class Core : MelonMod
             playerCameraFarClip.Clear();
             rainbowHighway.Clear();
             nativeSustainCache.Clear();
+            fretSortingOrderCache.Clear();
             plainHeldSustains.Clear(HarmonyInstance);
             whammyTextureThrottle.Clear(HarmonyInstance);
             unityJobWorkerLimit.Clear();
@@ -771,7 +789,8 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Restore();
         playerCameraFarClip.Restore();
         rainbowHighway.Clear();
-        nativeSustainCache.Disable();
+        nativeSustainCache.Clear();
+        fretSortingOrderCache.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
@@ -800,7 +819,8 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Restore();
         playerCameraFarClip.Restore();
         rainbowHighway.Clear();
-        nativeSustainCache.Disable();
+        nativeSustainCache.Clear();
+        fretSortingOrderCache.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
@@ -1181,6 +1201,7 @@ public sealed partial class Core : MelonMod
         playerCameraFarClip.Clear();
         rainbowHighway.Clear();
         nativeSustainCache.Clear();
+        fretSortingOrderCache.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
         networkTickRemainder.Clear(HarmonyInstance);
         optionalHudAnimations.Clear();

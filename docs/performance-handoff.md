@@ -5,6 +5,23 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
+## 0.4.131 current work
+
+The v0.4.130 log repeatedly discovers 2,000 rainbow-note sprites and then
+fails its next generic scan with `Method unstripping failed`. The new path keeps
+that scene cache across option toggles and temporary manager gaps and performs
+palette/list work at 20 Hz. Cosmetic particle/fret effects, Star Power burst,
+combo smoke, and the passive input viewer now remain eligible during online
+songs; the native sustain/fret caches, whammy gate, and mouse-only paths are
+likewise active only during a chart. BeatRenderer suspension, worker count,
+camera tests, keyboard polling, and broad gameplay callbacks remain solo-only.
+This version adds a separate default-off fourteen-callsite sorting-order cache.
+All changes build and pass the current native/Core checks, but no FPS gain or
+Windows visual fix is claimed yet. Full scope and evidence are in
+[the 2026-10-28 follow-up](performance-followup-2026-10-28.md).
+The private-alpha ZIP contains only `Mods/SlopHero.dll`; SHA-256:
+`90fe4bec03fd810fd5d719eb02ab6e9ffd83345bae11a038864d5e0b6dc6d5ba`.
+
 ## 0.4.130 rainbow repair and latest Windows evidence
 
 The 0.4.129 log caught two integration failures. Rainbow notes found 2,000
@@ -26,6 +43,13 @@ with different song sections, so they cannot isolate either toggle. Version
 0.4.130 logs rainbow and input-viewer state and reports when that viewer is
 hidden/restored. Full measurements and limits are in
 [performance-followup-2026-10-27.md](performance-followup-2026-10-27.md).
+Older 1,860/s and 1,937/s captures were HUD/guitar camera benchmarks that
+hid major visuals, so they are not evidence that normal-play FPS regressed.
+The latest raw rows show 21–28 frames over 2 ms per 30-second run, none above
+4 ms; every frame above 3 ms is almost entirely CPU busy. Treat CPU render
+submission as the current bottleneck lead, but do not credit individual toggles
+because the captures combined several options. The cross-capture analysis is
+recorded in the follow-up note.
 
 Release build: zero warnings/errors; 128 Core checks pass; both exact-build
 native sustain verifiers pass. No FPS gain is claimed. The ZIP contains only
