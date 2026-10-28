@@ -82,7 +82,7 @@ internal sealed class ComboSmokeScrollOverride
     private void Discover(GameManager? game, double realtime)
     {
         // Run only while the opt-in switch is enabled, and anchor discovery to
-        // active nonremote guitars so online opponents remain untouched. The
+        // active controller-backed guitars so online opponents remain untouched. The
         // game can keep inputEnabled false during transitions even while the
         // local guitar's cosmetic hierarchy is already live.
         nextDiscovery = realtime + 2;
@@ -91,7 +91,10 @@ internal sealed class ComboSmokeScrollOverride
             if (game?.playerObjects == null) return;
             foreach (var player in game.playerObjects)
             {
-                if (player == null || !player.enabled || player.isRemotePlayerPlaying) continue;
+                // isRemotePlayerPlaying reports combo activity, not ownership.
+                // The Rewired player reference identifies this machine's slot.
+                if (player == null || !player.enabled || player.player == null
+                    || player.player.field_Public_Player_0 == null) continue;
                 var guitar = player.TryCast<GuitarPlayer>();
                 if (guitar == null) continue;
                 // Smoke is a fixed pair in the player prefab. A recreated

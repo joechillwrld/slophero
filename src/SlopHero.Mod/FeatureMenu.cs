@@ -633,9 +633,9 @@ public sealed partial class Core
         Toggle(lockSpeed, "Constant practice note speed (experimental)", x, y + 156);
         GUI.Label(new Rect(x + 4, y + 202, 610, 84), "Visual changes preserve gameplay and note timing. Hiding fret strings also pauses their alignment scripts. Practice speed compensation applies only in practice. Turn an option off to restore its normal appearance.");
         SectionHeader("Optional HUD animations", x, y + 300);
-        Toggle(hideStarPowerSideGlows, "Hide Star Power side glows during solo songs", x, y + 330);
-        Toggle(hidePbPopup, "Hide personal-best popup during solo songs", x, y + 372);
-        GUI.Label(new Rect(x + 4, y + 420, 610, 84), "Experimental; default off. Side-glow branches deactivate during active offline solo songs and restore on pause or song exit; their animation may restart. The Star Power controller, score, and notes stay active.");
+        Toggle(hideStarPowerSideGlows, "Hide Star Power side glows during songs", x, y + 330);
+        Toggle(hidePbPopup, "Hide personal-best popup during songs", x, y + 372);
+        GUI.Label(new Rect(x + 4, y + 420, 610, 84), "Experimental; default off. Side-glow branches deactivate during active songs, online too, and restore on pause or song exit; their animation may restart. The Star Power controller, score, and notes stay active.");
     }
 
     private void DrawColorSettings(float x, float y)
@@ -694,7 +694,7 @@ public sealed partial class Core
         Toggle(limitSlopHeroShortcutPolling, "Limit SlopHero hotkey checks to 120 Hz", x, engineY + 470);
         Toggle(cacheRegularSustainWrites, "Cache repeat regular-sustain native writes (experimental)", x, engineY + 510);
         Toggle(cacheFretSortingWrites, "Skip repeated fret sorting-order writes (experimental)", x, engineY + 550);
-        GUI.Label(new Rect(x + 4, engineY + 596, 610, 108), "Exact game build only; both caches are default off and active only during songs, including online play. They skip repeat regular-tail property-block submissions and unchanged fret sorting-order setters. They never touch note, controller, or network updates; original callsites return on pause, focus loss, scene changes, or when disabled.");
+        GUI.Label(new Rect(x + 4, engineY + 596, 610, 108), "Exact game build only; both caches are default off and active only during songs, including online play. They skip unchanged regular-tail property-block sequences and repeat fret sorting-order writes. They never touch note, controller, or network updates; original callsites return on pause, focus loss, scene changes, or when disabled.");
 
         float renderingY = y + 1460;
         SectionHeader("3D rendering experiment", x, renderingY);
@@ -1847,10 +1847,9 @@ public sealed partial class Core
             bool eligibleExceptPauseOrFocus = game != null && game.songLoaded && game.playersInit
                 && game.globalVariables != null && game.isSongPlaying
                 && !game.isSongOver && game.coroutinesRunning == 0
-                && game.actualPlayerCount == 1 && (int)game.globalVariables.gameMode == 0
-                && !game.globalVariables.isPlayingSetlist && !transition && !settingsOpen
+                && game.actualPlayerCount > 0 && !transition && !settingsOpen
                 && !moveHud && resizeTarget < 0 && nativeMoveTarget == 0
-                && editApply == null && capture == null && !IsOnline(now);
+                && editApply == null && capture == null;
             bool paused = game != null && game.isPaused;
             bool focused = Application.isFocused;
             bool eligible = eligibleExceptPauseOrFocus && !paused && focused;

@@ -8,7 +8,7 @@ namespace SlopHero.Mod;
 /// <summary>
 /// Exact-scene, optional visual-only suppression. The score notification
 /// controller and StarPowerController stay active; only their own visual
-/// branches are paused in eligible offline solo play.
+/// branches are paused during eligible active songs.
 /// </summary>
 internal sealed class OptionalHudAnimationsOverride
 {
@@ -155,7 +155,8 @@ internal sealed class OptionalHudAnimationsOverride
         UnityAnimator? leftAnimator = null, rightAnimator = null;
         if (game.playerObjects != null)
             foreach (var player in game.playerObjects)
-                if (player != null && player.enabled && player.TryCast<GuitarPlayer>() != null)
+                if (player != null && player.enabled && player.TryCast<GuitarPlayer>() != null
+                    && player.player != null && player.player.field_Public_Player_0 != null)
                 {
                     var controller = player.gameObject.GetComponentInChildren<StarPowerController>(true);
                     if (controller == null) continue;

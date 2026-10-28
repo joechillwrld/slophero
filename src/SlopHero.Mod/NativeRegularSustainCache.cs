@@ -6,24 +6,28 @@ namespace SlopHero.Mod;
 
 /// <summary>
 /// Exact-build, default-off cache for one regular upcoming-tail output.
-/// The patch changes six direct calls inside the guitar sustain helpers,
-/// never the shared Unity property-block setter. Other tail writes invalidate
-/// the corresponding renderer slot before passing through.
+/// A repeat skips its GetPropertyBlock/SetFloat/SetPropertyBlock sequence at
+/// the producer; other tail submissions invalidate the renderer slot.
 /// </summary>
 internal sealed class NativeRegularSustainCache
 {
     private const int SetPropertyBlockRva = 0x2870DE0;
+    private const int GetPropertyBlockRva = 0x2870D50;
+    private const int EarlyCheckRva = 0x1156B10;
+    private const int AfterRegularPropertyBlockRva = 0x1156B49;
     private const int CacheEntries = 128;
     private const int CacheBytes = CacheEntries * 16;
     private const int PageSize = 4096;
     private const int AllocationBytes = 2 * PageSize;
     private const int InvalidationStubOffset = 256;
+    private const int EarlyCheckStubOffset = 512;
     private const uint MemCommitReserve = 0x3000, MemRelease = 0x8000;
     private const uint PageReadWrite = 0x04, PageExecuteRead = 0x20, PageExecuteReadWrite = 0x40;
 
     private readonly record struct Site(int Rva, string ExpectedHex, bool Cache);
     private static readonly Site[] Sites =
     {
+        new(EarlyCheckRva, "E83BA27101", false), // skip whole unchanged regular sequence
         new(0x1156B44, "E897A27101", true),  // regular upcoming tail
         new(0x1155B9D, "E83EB27101", false), // held tail body
         new(0x1155C52, "E889B17101", false), // held tail glow
@@ -33,8 +37,8 @@ internal sealed class NativeRegularSustainCache
     };
 
     // Pure x64 stubs assembled from the documented register state at the
-    // exact callsites. Both use only volatile GPRs and preserve RCX/RDX/R8
-    // for the original IL2CPP call. The regular path compares XMM12's length
+    // exact callsites. They use only volatile GPRs and preserve RCX/RDX/R8
+    // for the original IL2CPP calls. The regular path compares XMM12's length
     // against a direct-mapped renderer slot; collisions are safe misses.
     private const string CacheStubHex =
         "49BA887766554433221141803A0074384989CA49C1EA044183E27F49C1E204" +
@@ -44,9 +48,19 @@ internal sealed class NativeRegularSustainCache
         "49BA887766554433221141803A0074284989CA49C1EA044183E27F49C1E204" +
         "49BB99887766554433224D01DA49390A750749C70200000000" +
         "49BBAA9988776655443341FFE3";
+    // The early check only reads slots committed at the regular setter. A
+    // repeat changes its call return address to the first instruction after
+    // that setter, preserving the producer's color/counter and loop work.
+    // On a miss, it tail-calls the original GetPropertyBlock.
+    private const string EarlyCheckStubHex =
+        "49BA887766554433221141803A0074484989CA49C1EA044183E27F49C1E204" +
+        "49BB99887766554433224D01DA49390A752766450F7EE345395A08751C" +
+        "49BBAABBCCDDEEFF001149FF0349BB80706050403020104C891C24C3" +
+        "49BBAA9988776655443341FFE3";
     private const long FlagMarker = 0x1122334455667788;
     private const long TableMarker = 0x2233445566778899;
     private const long OriginalMarker = 0x33445566778899AA;
+    private const long SkipTargetMarker = 0x1020304050607080;
 
     private sealed record Patch(IntPtr Address, byte[] Original, byte[] Replacement);
     private readonly List<Patch> patches = new();
@@ -109,7 +123,7 @@ internal sealed class NativeRegularSustainCache
         enabled = false;
         Marshal.WriteByte(flag, 0);
         long saved = Marshal.ReadInt64(skipped);
-        MelonLogger.Msg($"Sloptifine native regular-sustain cache skipped {saved} repeat property-block submission(s).");
+        MelonLogger.Msg($"Sloptifine native regular-sustain cache skipped {saved} repeat property-block sequence(s).");
     }
 
     internal void Clear()
@@ -192,6 +206,7 @@ internal sealed class NativeRegularSustainCache
         var originalTarget = IntPtr.Add(gameAssemblyBase, SetPropertyBlockRva);
         WriteStub(allocation, CacheStubHex, originalTarget);
         WriteStub(IntPtr.Add(allocation, InvalidationStubOffset), InvalidateStubHex, originalTarget);
+        WriteEarlyCheckStub(IntPtr.Add(allocation, EarlyCheckStubOffset));
         if (!VirtualProtect(allocation, PageSize, PageExecuteRead, out _))
             throw new InvalidOperationException("Could not protect the native sustain bridge as executable.");
         if (!FlushInstructionCache(GetCurrentProcess(), allocation, PageSize))
@@ -203,7 +218,8 @@ internal sealed class NativeRegularSustainCache
         {
             IntPtr call = IntPtr.Add(gameAssemblyBase, site.Rva);
             byte[] original = Convert.FromHexString(site.ExpectedHex);
-            IntPtr stub = site.Cache ? allocation : IntPtr.Add(allocation, InvalidationStubOffset);
+            IntPtr stub = site.Rva == EarlyCheckRva ? IntPtr.Add(allocation, EarlyCheckStubOffset)
+                : site.Cache ? allocation : IntPtr.Add(allocation, InvalidationStubOffset);
             long displacement = stub.ToInt64() - (call.ToInt64() + 5);
             if (displacement < int.MinValue || displacement > int.MaxValue)
                 throw new InvalidOperationException("The sustain bridge is outside the relative-call range.");
@@ -213,7 +229,7 @@ internal sealed class NativeRegularSustainCache
             patches.Add(new Patch(call, original, replacement));
         }
         foreach (var patch in patches) WriteCode(patch.Address, patch.Replacement);
-        MelonLogger.Msg("Sloptifine native regular-sustain cache prepared at six exact game callsites.");
+        MelonLogger.Msg("Sloptifine native regular-sustain cache prepared at seven exact game callsites.");
     }
 
     private void WriteStub(IntPtr destination, string hex, IntPtr originalTarget)
@@ -222,6 +238,17 @@ internal sealed class NativeRegularSustainCache
         ReplaceAddress(bytes, FlagMarker, flag);
         ReplaceAddress(bytes, TableMarker, table);
         ReplaceAddress(bytes, OriginalMarker, originalTarget);
+        Marshal.Copy(bytes, 0, destination, bytes.Length);
+    }
+
+    private void WriteEarlyCheckStub(IntPtr destination)
+    {
+        byte[] bytes = Convert.FromHexString(EarlyCheckStubHex);
+        ReplaceAddress(bytes, FlagMarker, flag);
+        ReplaceAddress(bytes, TableMarker, table);
+        ReplaceAddress(bytes, 0x1100FFEEDDCCBBAA, skipped);
+        ReplaceAddress(bytes, SkipTargetMarker, IntPtr.Add(gameAssemblyBase, AfterRegularPropertyBlockRva));
+        ReplaceAddress(bytes, OriginalMarker, IntPtr.Add(gameAssemblyBase, GetPropertyBlockRva));
         Marshal.Copy(bytes, 0, destination, bytes.Length);
     }
 

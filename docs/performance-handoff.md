@@ -5,6 +5,16 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
+## 0.4.132 current build
+
+The default-off regular-sustain cache now skips the entire repeated
+GetPropertyBlock/SetFloat/SetPropertyBlock sequence at seven exact game
+callsites. Star Power side-glow and personal-best suppression can run during
+online songs, and both side-glow and combo-smoke discovery select the local
+controller-backed player. The exact native verification, build, package hash,
+and next mapped sprite-setter lead are in
+[the 0.4.132 follow-up](performance-followup-2026-10-28b.md).
+
 ## 0.4.131 current work
 
 The v0.4.130 log repeatedly discovers 2,000 rainbow-note sprites and then
