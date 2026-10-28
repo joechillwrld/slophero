@@ -91,10 +91,9 @@ internal sealed class NativeRegularSustainCache
         }
         if (!eligible)
         {
-            // Remove the callsite detours outside active play as well as
-            // clearing the cache. A disabled per-call trampoline would cost
-            // more than it can save in menus, pause screens, and online lobbies.
-            if (allocation != IntPtr.Zero || patches.Count != 0) Clear();
+            // Keep an installed, inactive bridge within Gameplay so pause or
+            // restart cannot reinstall seven detours on the first song tick.
+            Disable();
             return;
         }
         if (failed) return;

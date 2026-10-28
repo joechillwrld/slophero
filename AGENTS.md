@@ -45,7 +45,10 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.133. Its ClonZones flame bridge, separate
+The latest packaged build is 0.4.134. Its shared rainbow-speed slider,
+pre-song native-hook preparation, ClonZones empty-hook gate, and practice
+section-title check are in `docs/performance-followup-2026-10-28c.md`.
+Version 0.4.133's ClonZones flame bridge, separate
 default-off flame-tick test, rainbow-note cleanup, original-renderer fret
 research, and four-run PresentMon comparison are in
 `docs/clonzones-render-followup-2026-10-28.md`. The previous 0.4.132

@@ -90,6 +90,8 @@ internal sealed class NativeHeldSustainGlowSuppressor
 
     internal void Update(bool requested, bool eligible, GameManager? game)
     {
+        if (!requested && allocation == IntPtr.Zero && patches.Count == 0
+            && renderers.Count == 0 && warmedGlowRenderers.Count == 0 && !failed) return;
         if (!requested)
         {
             Deactivate();
@@ -103,7 +105,6 @@ internal sealed class NativeHeldSustainGlowSuppressor
         if (!eligible || game == null)
         {
             Deactivate();
-            Uninstall();
             return;
         }
 

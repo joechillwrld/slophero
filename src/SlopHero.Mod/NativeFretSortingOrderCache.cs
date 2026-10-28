@@ -6,9 +6,9 @@ namespace SlopHero.Mod;
 
 /// <summary>
 /// Default-off exact-build cache for repeated sorting-order writes made by
-/// GuitarFretAnimator's visible and idle helpers. The patch exists only while
-/// an eligible song is active, so menus and paused play have no trampoline
-/// overhead. The patch skips only redundant local renderer property writes.
+/// GuitarFretAnimator's visible and idle helpers. When selected, the patch
+/// is prepared inactive during Gameplay initialization and restored on scene
+/// exit. It skips only redundant local renderer property writes during songs.
 /// </summary>
 internal sealed class NativeFretSortingOrderCache
 {
@@ -67,17 +67,31 @@ internal sealed class NativeFretSortingOrderCache
     internal bool IsActive => active;
     internal bool IsInstalled => allocation != IntPtr.Zero && patches.Count == Sites.Length;
 
-    internal void Update(bool requested, bool eligibleGameplaySong)
+    internal void Prepare(bool requested)
     {
-        if (!requested || !eligibleGameplaySong)
+        if (!requested || IsInstalled || failed) return;
+        try { Install(); }
+        catch (Exception ex)
         {
             Clear();
+            failed = true;
+            MelonLogger.Warning($"Fret sorting-order cache could not prepare: {ex.Message}");
+        }
+    }
+
+    internal void Update(bool requested, bool eligibleGameplaySong)
+    {
+        if (!requested && allocation == IntPtr.Zero && patches.Count == 0 && !failed) return;
+        if (!requested || !eligibleGameplaySong)
+        {
+            if (!requested) Clear();
+            else Deactivate();
             return;
         }
         if (failed) return;
         try
         {
-            if (!IsInstalled) Install();
+            if (!IsInstalled) Prepare(true);
             if (failed || !IsInstalled) return;
             if (active) return;
 
@@ -99,23 +113,7 @@ internal sealed class NativeFretSortingOrderCache
 
     internal void Clear()
     {
-        if (activeFlag != IntPtr.Zero)
-        {
-            try { Marshal.WriteByte(activeFlag, 0); }
-            catch (Exception ex) { MelonLogger.Warning($"Could not deactivate fret sorting-order cache: {ex.Message}"); }
-        }
-        Thread.MemoryBarrier();
-        active = false;
-        if (skippedCounter != IntPtr.Zero)
-        {
-            try
-            {
-                long skipped = Marshal.ReadInt64(skippedCounter);
-                if (skipped != 0) MelonLogger.Msg($"Fret sorting-order cache skipped {skipped:N0} repeated Unity setter call(s).");
-            }
-            catch { }
-        }
-
+        Deactivate();
         bool restored = true;
         foreach (var patch in patches)
         {
@@ -147,6 +145,27 @@ internal sealed class NativeFretSortingOrderCache
             MelonLogger.Warning("Could not free the inactive fret sorting-order bridge.");
         allocation = table = activeFlag = skippedCounter = IntPtr.Zero;
         failed = false;
+    }
+
+    private void Deactivate()
+    {
+        if (!active) return;
+        if (activeFlag != IntPtr.Zero)
+        {
+            try { Marshal.WriteByte(activeFlag, 0); }
+            catch (Exception ex) { MelonLogger.Warning($"Could not deactivate fret sorting-order cache: {ex.Message}"); }
+        }
+        Thread.MemoryBarrier();
+        active = false;
+        if (skippedCounter != IntPtr.Zero)
+        {
+            try
+            {
+                long skipped = Marshal.ReadInt64(skippedCounter);
+                if (skipped != 0) MelonLogger.Msg($"Fret sorting-order cache skipped {skipped:N0} repeated Unity setter call(s).");
+            }
+            catch { }
+        }
     }
 
     private void Install()

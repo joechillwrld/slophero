@@ -1,11 +1,18 @@
-# SlopHero 0.4.133 alpha
+# SlopHero 0.4.134 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: reversible
 experiments judged by measurements. Gameplay timing, online play, and the
 1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.133
+build, compiled against its loader and generated assemblies. Version 0.4.134
+adds a shared rainbow cycle-speed slider and prepares selected native sustain,
+fret, and glow hooks before the first active song update. The ClonZones flame
+tick hook now stays uninstalled while the fret-effects switch has already
+suspended those flames. The current scene confirms SlopHero's practice HUD
+offset/scale target is the stats panel; the centered section-name label is a
+separate sibling. See the [0.4.134 follow-up](docs/performance-followup-2026-10-28c.md).
+Version 0.4.133
 corrects rainbow-note lane grouping and colors ClonZones' actual replacement
 flames through its neutral sprite bank. The existing fret-effects switch also
 suspends ClonZones' replacement flames, while a separate default-off option
@@ -327,7 +334,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.133 alpha](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.133-alpha.zip?raw=1)
+[Download SlopHero v0.4.134 alpha](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.134-alpha.zip?raw=1)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

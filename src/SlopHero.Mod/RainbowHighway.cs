@@ -77,7 +77,8 @@ internal sealed class RainbowHighway
             }
     }
 
-    internal void Update(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames, GameManager? game, double now)
+    internal void Update(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames, GameManager? game, double now,
+        float cyclesPerSecond)
     {
         if (!colorNotes) RestoreNotes();
         else if (!notesActive)
@@ -123,7 +124,7 @@ internal sealed class RainbowHighway
             nextPass = now + .05;
             // Slower hue drift makes the note colors less frantic while
             // retaining a smooth 20 Hz palette update.
-            cycle = (float)(now * .12 % 1.0);
+            cycle = (float)(now * Math.Clamp(cyclesPerSecond, .05f, .8f) % 1.0);
             if (colorNotes && !notesFailed)
                 for (int i = 0; i < notePalette.Length; i++)
                     notePalette[i] = Rainbow(cycle + i / (float)notePalette.Length, 1f);

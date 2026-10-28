@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.133", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.134", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -215,7 +215,13 @@ public sealed partial class Core : MelonMod
             if (compatible) legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
             if (compatible) rewiredMousePolling.Prepare(HarmonyInstance, pauseRewiredMousePolling.Value);
             if (compatible) rewiredKeyboardPolling.Prepare(HarmonyInstance, pauseRewiredKeyboardPolling.Value);
-            if (compatible && limitClonZonesFlameTicks.Value)
+            // Patch exact native callsites while the Gameplay scene is
+            // initializing, before the first active-song Update.
+            if (compatible) plainHeldSustains.Prepare(hideHeldSustainGlow.Value);
+            if (compatible) nativeSustainCache.Prepare(cacheRegularSustainWrites.Value);
+            if (compatible) fretSortingOrderCache.Prepare(cacheFretSortingWrites.Value);
+            if (compatible && limitClonZonesFlameTicks.Value
+                && (!disableFretEffects.Value || rainbowFlames.Value))
                 clonZonesFlameTickGate.Update(HarmonyInstance, requested: true, activeSong: false);
             if (compatible && staticTmpScaleDuringSong.Value)
             {
@@ -518,7 +524,10 @@ public sealed partial class Core : MelonMod
             bool plainHeldSustainRequested = hideHeldSustainGlow.Value;
             bool nativeSustainRequested = cacheRegularSustainWrites.Value;
             bool fretSortingCacheRequested = cacheFretSortingWrites.Value;
-            bool clonZonesTickRequested = limitClonZonesFlameTicks.Value;
+            // When fret effects have already stopped ClonZones flames, its
+            // high-frequency Tick prefix would only add an empty-pool check.
+            bool clonZonesTickRequested = limitClonZonesFlameTicks.Value
+                && (!disableFretEffects.Value || rainbowFlames.Value);
             bool workerLimitCandidate = workerLimitRequested && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0;
@@ -667,7 +676,7 @@ public sealed partial class Core : MelonMod
                     clonZonesTickRequested && activeGameplaySong);
             if (rainbowNotes.Value || rainbowFlames.Value || rainbowHighway.HasOverrides)
                 rainbowHighway.Update(HarmonyInstance, rainbowNotes.Value, rainbowFlames.Value,
-                    ready ? game : null, now);
+                    ready ? game : null, now, rainbowCyclesPerSecond.Value);
             if (ready) CompletePracticeTransition(game!);
             bool allow = shortcutCandidate && isOfflineSolo;
             if (restartHold.Update(allow && restartPressed, allow, now, Duration))

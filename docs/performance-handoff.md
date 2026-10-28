@@ -5,7 +5,17 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
-## 0.4.133 current build
+## 0.4.134 current build
+
+The 0.4.133 log confirms both rainbow features work visually according to
+the user. Version 0.4.134 adds a shared speed slider, moves selected native
+hook preparation before the first active song update, and avoids an idle
+ClonZones flame hook when fret effects are already suppressed. The exact
+practice-scene hierarchy and timing evidence are in
+[the 0.4.134 follow-up](performance-followup-2026-10-28c.md). Presented FPS
+impact remains unmeasured.
+
+## 0.4.133 prior build
 
 The ClonZones replacement-flame bridge, existing fret-effects switch
 integration, separate default-off flame-tick test, and general rainbow-note
