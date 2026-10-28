@@ -5,7 +5,17 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
-## 0.4.132 current build
+## 0.4.133 current build
+
+The ClonZones replacement-flame bridge, existing fret-effects switch
+integration, separate default-off flame-tick test, and general rainbow-note
+pool/hierarchy cleanup are in
+[the ClonZones and render follow-up](clonzones-render-followup-2026-10-28.md).
+The same note records ClonZones' original-renderer fret configuration,
+the four-run PresentMon cache comparison, and the six mapped game sustain
+sprite-setter calls. None establishes an FPS gain yet.
+
+## 0.4.132 prior build
 
 The default-off regular-sustain cache now skips the entire repeated
 GetPropertyBlock/SetFloat/SetPropertyBlock sequence at seven exact game

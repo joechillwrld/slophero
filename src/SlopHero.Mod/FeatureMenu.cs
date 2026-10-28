@@ -45,6 +45,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> hideHeldSustainGlow = null!;
     private MelonPreferences_Entry<bool> cacheRegularSustainWrites = null!;
     private MelonPreferences_Entry<bool> cacheFretSortingWrites = null!;
+    private MelonPreferences_Entry<bool> limitClonZonesFlameTicks = null!;
     private MelonPreferences_Entry<bool> rainbowNotes = null!, rainbowFlames = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, settingsWindowOffsetX = null!, settingsWindowOffsetY = null!;
@@ -203,6 +204,7 @@ public sealed partial class Core
         hideHeldSustainGlow = preferences.CreateEntry("PerformanceHideHeldSustainGlow", false);
         cacheRegularSustainWrites = preferences.CreateEntry("PerformanceCacheRegularSustainNative", false);
         cacheFretSortingWrites = preferences.CreateEntry("PerformanceCacheFretSortingWrites", false);
+        limitClonZonesFlameTicks = preferences.CreateEntry("PerformanceLimitClonZonesFlameTicks", false);
         // Render-every-update consumed enough CPU to reduce simulation Updates
         // by roughly 35% in the user's four-run comparison. Retire any saved
         // value, including values written by older profiles.
@@ -378,7 +380,7 @@ public sealed partial class Core
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 4 => 640, 6 => 2160, _ => 500 };
+        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 4 => 640, 6 => 2240, _ => 500 };
         Rect viewport = new(frameX + sidebarWidth + 12, frameY + 132, 680, menuHeight - 146);
         Rect content = new(0, 0, 656, contentHeight);
         settingsScrollPosition = GUI.BeginScrollView(viewport, settingsScrollPosition, content);
@@ -651,7 +653,7 @@ public sealed partial class Core
         SectionHeader("Highway colors", x, y + 430);
         Toggle(rainbowNotes, "Rainbow notes", x, y + 460);
         Toggle(rainbowFlames, "Rainbow fret flames", x, y + 500);
-        GUI.Label(new Rect(x + 4, y + 545, 610, 56), "Optional color animation for the local guitar. The game's normal colors return when disabled. Rainbow flames keep their five flame animators visible even when other fret effects are suppressed.");
+        GUI.Label(new Rect(x + 4, y + 545, 610, 56), "Optional color animation for the local guitar. Normal colors return when disabled. With ClonZones 2.0, rainbow flames tint its replacement sprites; the fret-effects switch otherwise suspends those sprites too.");
     }
 
     private void DrawPerformanceSettings(float x, float y)
@@ -694,9 +696,10 @@ public sealed partial class Core
         Toggle(limitSlopHeroShortcutPolling, "Limit SlopHero hotkey checks to 120 Hz", x, engineY + 470);
         Toggle(cacheRegularSustainWrites, "Cache repeat regular-sustain native writes (experimental)", x, engineY + 510);
         Toggle(cacheFretSortingWrites, "Skip repeated fret sorting-order writes (experimental)", x, engineY + 550);
-        GUI.Label(new Rect(x + 4, engineY + 596, 610, 108), "Exact game build only; both caches are default off and active only during songs, including online play. They skip unchanged regular-tail property-block sequences and repeat fret sorting-order writes. They never touch note, controller, or network updates; original callsites return on pause, focus loss, scene changes, or when disabled.");
+        Toggle(limitClonZonesFlameTicks, "Trim blank ClonZones flames / cap polls (experimental)", x, engineY + 590);
+        GUI.Label(new Rect(x + 4, engineY + 636, 610, 108), "Both native caches are default off; your four recent PresentMon runs did not show an FPS gain from either. The separate ClonZones test caps active-flame checks at 240 Hz and, for the exact uploaded Moonlight pack, ends the fully transparent last eight frames early. Flame animation may lag by up to 4 ms. Input and note timing are unchanged.");
 
-        float renderingY = y + 1460;
+        float renderingY = y + 1540;
         SectionHeader("3D rendering experiment", x, renderingY);
         Toggle(limitPlayerCameraFarClip, "Limit guitar-camera far clip in solo songs", x, renderingY + 30);
         Number("Guitar-camera far clip (units)", farClipDistance.Value, x, renderingY + 74, 40, 120,
@@ -1227,6 +1230,7 @@ public sealed partial class Core
             Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
             Bool("PerformanceCacheRegularSustainNative", cacheRegularSustainWrites);
             Bool("PerformanceCacheFretSortingWrites", cacheFretSortingWrites);
+            Bool("PerformanceLimitClonZonesFlameTicks", limitClonZonesFlameTicks);
             Bool("PerformanceHidePbPopup", hidePbPopup);
             Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
             Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1293,6 +1297,7 @@ public sealed partial class Core
         Bool("PerformanceHideHeldSustainGlow", hideHeldSustainGlow);
         Bool("PerformanceCacheRegularSustainNative", cacheRegularSustainWrites);
         Bool("PerformanceCacheFretSortingWrites", cacheFretSortingWrites);
+        Bool("PerformanceLimitClonZonesFlameTicks", limitClonZonesFlameTicks);
         Bool("PerformanceHidePbPopup", hidePbPopup);
         Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
         Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);

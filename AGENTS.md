@@ -45,7 +45,12 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.128. It uses a borderless one-pixel style for
+The latest packaged build is 0.4.133. Its ClonZones flame bridge, separate
+default-off flame-tick test, rainbow-note cleanup, original-renderer fret
+research, and four-run PresentMon comparison are in
+`docs/clonzones-render-followup-2026-10-28.md`. The previous 0.4.132
+native/online work is in `docs/performance-followup-2026-10-28b.md`.
+Version 0.4.128 uses a borderless one-pixel style for
 the selected menu stripe; rainbow notes now follow the game's color writes
 and discover active pool slots during songs, while the additive flame tint
 is dimmed to retain hue. The default-off plain-held-glow experiment prepares

@@ -10,13 +10,22 @@ namespace SlopHero.Mod;
 /// <summary>Optional guitar colors; the setter hook exists only while a rainbow option is on.</summary>
 internal sealed class RainbowHighway
 {
+    private sealed class NoteGroup
+    {
+        internal readonly GameObject Object;
+        internal readonly List<SpriteState> Sprites = new(4);
+        internal int Phase;
+        internal NoteGroup(GameObject gameObject, int phase) { Object = gameObject; Phase = phase; }
+    }
+
     private sealed class SpriteState
     {
         internal readonly SpriteRenderer Renderer;
-        internal readonly int Phase;
-        internal Color Original;
-        internal SpriteState(SpriteRenderer renderer, int phase)
-        { Renderer = renderer; Phase = phase; Original = renderer.color; }
+        internal readonly NoteGroup Group;
+        internal readonly bool IsBody;
+        internal Color Original, Displayed;
+        internal SpriteState(SpriteRenderer renderer, NoteGroup group, bool isBody)
+        { Renderer = renderer; Group = group; IsBody = isBody; Original = Displayed = renderer.color; }
     }
 
     private sealed class FlameState
@@ -32,7 +41,10 @@ internal sealed class RainbowHighway
 
     private static RainbowHighway? active;
     private readonly Dictionary<IntPtr, SpriteState> notes = new();
+    private readonly List<NoteGroup> noteGroups = new();
     private readonly Dictionary<IntPtr, FlameState> flamesByAnimator = new();
+    private readonly Dictionary<IntPtr, int> flamePhases = new();
+    private readonly ClonZonesFlameBridge clonZonesFlames = new();
     private readonly List<FlameState> flames = new();
     private readonly Color[] notePalette = new Color[12];
     private readonly Color[] flamePalette = new Color[5];
@@ -43,7 +55,7 @@ internal sealed class RainbowHighway
     private bool notesFailed, flamesFailed;
     private double nextPass, nextNotesDiscovery, nextFlamesDiscovery;
 
-    internal bool HasOverrides => notesActive || flames.Count != 0
+    internal bool HasOverrides => notesActive || flames.Count != 0 || clonZonesFlames.IsActive
         || noteHookInstalled || flameUpdateHookInstalled;
 
     internal void Prepare(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames)
@@ -55,6 +67,7 @@ internal sealed class RainbowHighway
             noteHookFailed = true;
             MelonLogger.Warning($"Rainbow note color hook could not install; periodic tinting will remain as fallback: {ex.Message}");
         }
+        if (colorFlames && flames.Count != 0 && clonZonesFlames.TryEnable(harmony)) return;
         if (colorFlames && flames.Count != 0 && !flameHookFailed && !flameUpdateHookInstalled)
             try { InstallFlameUpdateHook(harmony); }
             catch (Exception ex)
@@ -74,7 +87,8 @@ internal sealed class RainbowHighway
             try
             {
                 foreach (var state in notes.Values)
-                    if (state.Renderer != null) state.Original = state.Renderer.color;
+                    if (state.Renderer != null)
+                        state.Original = state.Displayed = state.Renderer.color;
                 notesActive = true;
             }
             catch (Exception ex)
@@ -95,9 +109,11 @@ internal sealed class RainbowHighway
             return;
         }
 
-        bool animate = now >= nextPass;
         bool noteDiscoveryDue = colorNotes && !notesFailed && !notesDiscovered && now >= nextNotesDiscovery;
         bool flameDiscoveryDue = colorFlames && !flamesFailed && flames.Count == 0 && now >= nextFlamesDiscovery;
+        // Initialize a usable palette on the same pass that binds the new
+        // ClonZones pool, so the first hit cannot inherit an all-zero tint.
+        bool animate = now >= nextPass || flameDiscoveryDue;
         // Palette updates run at 20 Hz. Skip the list, discovery, and hook
         // checks on all intervening simulation Updates.
         if (!animate && !noteDiscoveryDue && !flameDiscoveryDue) return;
@@ -113,7 +129,8 @@ internal sealed class RainbowHighway
                     notePalette[i] = Rainbow(cycle + i / (float)notePalette.Length, 1f);
             if (colorFlames && !flamesFailed)
                 for (int i = 0; i < flamePalette.Length; i++)
-                    flamePalette[i] = Rainbow(cycle + i / (float)flamePalette.Length, .4f);
+                    flamePalette[i] = Rainbow(cycle + i / (float)flamePalette.Length,
+                        clonZonesFlames.IsActive ? .7f : .4f);
         }
 
         if (colorNotes && !notesFailed && !notesDiscovered && now >= nextNotesDiscovery)
@@ -156,10 +173,16 @@ internal sealed class RainbowHighway
             try
             {
                 applyingOwnColor = true;
-                foreach (var state in notes.Values)
-                    if (state.Renderer != null && state.Renderer.gameObject.activeInHierarchy
-                        && state.Renderer.enabled && state.Renderer.sprite != null)
-                        SetRgb(state.Renderer, notePalette[state.Phase]);
+                foreach (var group in noteGroups)
+                {
+                    // The 2,000 sprites belong to 500 pooled containers. One
+                    // parent activity check avoids three redundant hierarchy
+                    // walks for each inactive note on every tint pass.
+                    if (!group.Object.activeInHierarchy) continue;
+                    foreach (var state in group.Sprites)
+                        if (state.Renderer != null && state.Renderer.enabled && state.Renderer.sprite != null)
+                            SetNoteRgb(state, notePalette[group.Phase]);
+                }
             }
             catch (Exception ex)
             {
@@ -174,7 +197,9 @@ internal sealed class RainbowHighway
         {
             try
             {
-                foreach (var state in flames)
+                if (clonZonesFlames.IsActive)
+                    clonZonesFlames.Tint(flamePalette, flamePhases);
+                else foreach (var state in flames)
                 {
                     if (state.Animator == null || state.Renderer == null) continue;
                     // Flame sprites blend additively. Full brightness washes
@@ -249,9 +274,21 @@ internal sealed class RainbowHighway
         if (owner == null || !owner.notesActive || owner.applyingOwnColor) return;
         var pointer = __instance.Pointer;
         if (!owner.notes.TryGetValue(pointer, out var note)) return;
-        note.Original = value;
-        var tint = owner.notePalette[note.Phase];
+        var tint = owner.notePalette[note.Group.Phase];
+        // The game's SetState reads the already-tinted RGB back just to
+        // change alpha. Do not mistake that write for a new vanilla color.
+        var displayed = note.Displayed;
+        if (MathF.Abs(value.r - displayed.r) < .001f && MathF.Abs(value.g - displayed.g) < .001f
+            && MathF.Abs(value.b - displayed.b) < .001f)
+            note.Original.a = value.a;
+        else
+        {
+            note.Original = value;
+            if (note.IsBody && TryResolveLane(value, out int phase)) note.Group.Phase = phase;
+            tint = owner.notePalette[note.Group.Phase];
+        }
         value.r = tint.r; value.g = tint.g; value.b = tint.b;
+        note.Displayed = value;
     }
 
     private static void AfterFlameAnimatorUpdate(FlameAnimator __instance)
@@ -278,11 +315,17 @@ internal sealed class RainbowHighway
             foreach (var container in player.GetComponentsInChildren<GuitarNoteContainer>(true))
             {
                 if (container == null) continue;
-                int phase = containerIndex++ % notePalette.Length;
-                added += Remember(container.Head, phase);
-                added += Remember(container.Body, phase);
-                added += Remember(container.Anim, phase);
-                added += Remember(container.Open_HOPO, phase);
+                // One shared phase follows the lane color written by the
+                // game. Pool order is unrelated to lane and caused recycled
+                // notes to jump unpredictably around the rainbow.
+                var group = new NoteGroup(container.gameObject, (containerIndex++ % 5) * 2);
+                if (container.Body != null && TryResolveLane(container.Body.color, out int lanePhase))
+                    group.Phase = lanePhase;
+                added += Remember(container.Head, group);
+                added += Remember(container.Body, group, isBody: true);
+                added += Remember(container.Anim, group);
+                added += Remember(container.Open_HOPO, group);
+                noteGroups.Add(group);
             }
         }
 
@@ -296,11 +339,28 @@ internal sealed class RainbowHighway
         }
     }
 
-    private int Remember(SpriteRenderer? renderer, int phase)
+    private int Remember(SpriteRenderer? renderer, NoteGroup group, bool isBody = false)
     {
         if (renderer == null || notes.ContainsKey(renderer.Pointer)) return 0;
-        notes.Add(renderer.Pointer, new SpriteState(renderer, phase));
+        var state = new SpriteState(renderer, group, isBody);
+        notes.Add(renderer.Pointer, state);
+        group.Sprites.Add(state);
         return 1;
+    }
+
+    private static bool TryResolveLane(Color color, out int phase)
+    {
+        phase = 0;
+        // The current game's five normal Body colors match the older game's
+        // green/red/yellow/blue/orange palette. Ignore cyan Star Power and
+        // white alpha-only updates; those retain the container's last lane.
+        if (color.g > .75f && color.r < .25f && color.b < .3f) { phase = 0; return true; }
+        if (color.r > .75f && color.g < .25f && color.b < .3f) { phase = 2; return true; }
+        if (color.r > .75f && color.g > .75f && color.b < .3f) { phase = 4; return true; }
+        if (color.b > .7f && color.r < .3f && color.g < .75f) { phase = 7; return true; }
+        if (color.r > .75f && color.g > .3f && color.g < .75f && color.b < .3f)
+        { phase = 9; return true; }
+        return false;
     }
 
     private void DiscoverFlames(GameManager game)
@@ -324,6 +384,7 @@ internal sealed class RainbowHighway
                     animator.alternateColor, renderer.color, phase);
                 flames.Add(state);
                 flamesByAnimator[animator.Pointer] = state;
+                flamePhases[animator.Pointer] = phase;
             }
         }
         if (flames.Count != 0)
@@ -344,6 +405,15 @@ internal sealed class RainbowHighway
         renderer.color = color;
     }
 
+    private static void SetNoteRgb(SpriteState state, Color color)
+    {
+        var current = state.Displayed;
+        if (current.r == color.r && current.g == color.g && current.b == color.b) return;
+        color.a = current.a;
+        state.Renderer.color = color;
+        state.Displayed = color;
+    }
+
     private void RestoreNotes(bool forgetSceneCache = false)
     {
         if (!notesActive && !notesFailed && !noteHookInstalled)
@@ -351,6 +421,7 @@ internal sealed class RainbowHighway
             if (forgetSceneCache)
             {
                 notes.Clear();
+                noteGroups.Clear();
                 notesDiscovered = false;
                 nextNotesDiscovery = 0;
             }
@@ -360,7 +431,12 @@ internal sealed class RainbowHighway
         notesActive = false;
         applyingOwnColor = true;
         foreach (var state in notes.Values)
-            try { if (state.Renderer != null) SetRgb(state.Renderer, state.Original); }
+            try
+            {
+                if (state.Renderer == null) continue;
+                SetRgb(state.Renderer, state.Original);
+                state.Displayed = state.Original;
+            }
             catch { }
         applyingOwnColor = false;
         notesFailed = false;
@@ -369,6 +445,7 @@ internal sealed class RainbowHighway
         if (forgetSceneCache)
         {
             notes.Clear();
+            noteGroups.Clear();
             notesDiscovered = false;
             nextNotesDiscovery = 0;
         }
@@ -376,8 +453,9 @@ internal sealed class RainbowHighway
 
     private void RestoreFlames()
     {
-        if (flames.Count == 0 && !flamesFailed && !flameUpdateHookInstalled)
+        if (flames.Count == 0 && !flamesFailed && !flameUpdateHookInstalled && !clonZonesFlames.IsActive)
         { flameHookFailed = false; return; }
+        clonZonesFlames.Restore();
         applyingOwnColor = true;
         foreach (var state in flames)
             try
@@ -393,6 +471,7 @@ internal sealed class RainbowHighway
         applyingOwnColor = false;
         flames.Clear();
         flamesByAnimator.Clear();
+        flamePhases.Clear();
         flamesFailed = false;
         flameHookFailed = false;
         nextFlamesDiscovery = 0;

@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.132", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.133", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -22,6 +22,8 @@ public sealed partial class Core : MelonMod
     private readonly NativeHudLayout nativeHud = new();
     private readonly CounterCanvasHud counterCanvas = new();
     private readonly CounterCanvasHud songCanvas = new(songMode: true);
+    private readonly ClonZonesFlameTickGate clonZonesFlameTickGate = new();
+    private readonly ClonZonesFlameSuppressor clonZonesFlameSuppressor = new();
     private SettingsProfiles? settingsProfiles;
     private string[] profileNames = Array.Empty<string>();
     private int profileIndex;
@@ -121,6 +123,8 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
         rainbowHighway.Clear();
+        clonZonesFlameTickGate.Clear();
+        clonZonesFlameSuppressor.Clear();
         inputViewerSuppression.Clear();
         nativeSustainCache.Clear();
         fretSortingOrderCache.Clear();
@@ -211,6 +215,8 @@ public sealed partial class Core : MelonMod
             if (compatible) legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
             if (compatible) rewiredMousePolling.Prepare(HarmonyInstance, pauseRewiredMousePolling.Value);
             if (compatible) rewiredKeyboardPolling.Prepare(HarmonyInstance, pauseRewiredKeyboardPolling.Value);
+            if (compatible && limitClonZonesFlameTicks.Value)
+                clonZonesFlameTickGate.Update(HarmonyInstance, requested: true, activeSong: false);
             if (compatible && staticTmpScaleDuringSong.Value)
             {
                 try { staticTmpScale.Prepare(); }
@@ -234,6 +240,8 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
         rainbowHighway.Clear();
+        clonZonesFlameTickGate.Clear();
+        clonZonesFlameSuppressor.Clear();
         nativeSustainCache.Clear();
         fretSortingOrderCache.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
@@ -510,6 +518,7 @@ public sealed partial class Core : MelonMod
             bool plainHeldSustainRequested = hideHeldSustainGlow.Value;
             bool nativeSustainRequested = cacheRegularSustainWrites.Value;
             bool fretSortingCacheRequested = cacheFretSortingWrites.Value;
+            bool clonZonesTickRequested = limitClonZonesFlameTicks.Value;
             bool workerLimitCandidate = workerLimitRequested && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
                 && !transition && !settingsOpen && !moveHud && resizeTarget < 0;
@@ -542,6 +551,8 @@ public sealed partial class Core : MelonMod
                 && game.coroutinesRunning == 0 && !transition && !settingsOpen && !moveHud
                 && resizeTarget < 0 && Application.isFocused;
             activeGameplayVisualOptimizationActive = activeGameplaySong;
+            clonZonesFlameSuppressor.Update(disableFretEffects.Value && !rainbowFlames.Value
+                && activeGameplaySong, gameplay);
             inputViewerSuppression.Update(hideInputViewerDuringSong.Value,
                 hideInputViewerDuringSong.Value && activeGameplaySong, now);
             // Unlike UI/input hooks, the worker-count limit is independent of
@@ -651,6 +662,9 @@ public sealed partial class Core : MelonMod
             plainHeldSustains.Update(HarmonyInstance, plainHeldSustainRequested, eligibleRenderPrototype, game);
             nativeSustainCache.Update(nativeSustainRequested, eligibleRenderPrototype);
             fretSortingOrderCache.Update(fretSortingCacheRequested, eligibleRenderPrototype);
+            if (clonZonesTickRequested || clonZonesFlameTickGate.IsInstalled)
+                clonZonesFlameTickGate.Update(HarmonyInstance, clonZonesTickRequested,
+                    clonZonesTickRequested && activeGameplaySong);
             if (rainbowNotes.Value || rainbowFlames.Value || rainbowHighway.HasOverrides)
                 rainbowHighway.Update(HarmonyInstance, rainbowNotes.Value, rainbowFlames.Value,
                     ready ? game : null, now);
@@ -761,6 +775,8 @@ public sealed partial class Core : MelonMod
             guitarCameraBenchmark.Clear();
             playerCameraFarClip.Clear();
             rainbowHighway.Clear();
+            clonZonesFlameTickGate.Clear();
+            clonZonesFlameSuppressor.Update(false, gameplay);
             nativeSustainCache.Clear();
             fretSortingOrderCache.Clear();
             plainHeldSustains.Clear(HarmonyInstance);
@@ -789,6 +805,8 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Restore();
         playerCameraFarClip.Restore();
         rainbowHighway.Clear();
+        clonZonesFlameTickGate.Clear();
+        clonZonesFlameSuppressor.Update(false, gameplay);
         nativeSustainCache.Clear();
         fretSortingOrderCache.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
@@ -819,6 +837,8 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Restore();
         playerCameraFarClip.Restore();
         rainbowHighway.Clear();
+        clonZonesFlameTickGate.Clear();
+        clonZonesFlameSuppressor.Update(false, gameplay);
         nativeSustainCache.Clear();
         fretSortingOrderCache.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
@@ -1200,6 +1220,8 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
         rainbowHighway.Clear();
+        clonZonesFlameTickGate.Clear();
+        clonZonesFlameSuppressor.Clear();
         nativeSustainCache.Clear();
         fretSortingOrderCache.Clear();
         plainHeldSustains.Clear(HarmonyInstance);
