@@ -20,17 +20,19 @@ internal sealed class PerformanceOverrides
         Renderer? Renderer, bool RendererEnabled);
     private sealed class NeckEffects
     {
-        public NeckEffects(ParticleEffect[] particles, Animator[] animators,
+        public NeckEffects(ParticleEffect[] particles, Animator[] lightningAnimators, Animator[] sparkAnimators,
             Animator[] flameAnimators, CustomFadeProperties[] fretFades)
         {
             Particles = particles;
-            Animators = animators;
+            LightningAnimators = lightningAnimators;
+            SparkAnimators = sparkAnimators;
             FlameAnimators = flameAnimators;
             FretFades = fretFades;
         }
 
         public ParticleEffect[] Particles { get; }
-        public Animator[] Animators { get; }
+        public Animator[] LightningAnimators { get; }
+        public Animator[] SparkAnimators { get; }
         public Animator[] FlameAnimators { get; }
         public CustomFadeProperties[] FretFades { get; }
     }
@@ -41,21 +43,22 @@ internal sealed class PerformanceOverrides
     private readonly Dictionary<IntPtr, (Renderer Component, bool Enabled)> renderers = new();
     private readonly Dictionary<IntPtr, NeckEffects> neckEffects = new();
     private readonly Dictionary<IntPtr, Renderer[]> animatorRenderers = new();
-    private bool hitParticles, sustainParticles, fretEffects, rainbowFlamesPreserved;
+    private bool hitParticles, sustainParticles, fretEffects, lightningOnly, rainbowFlamesPreserved;
     private double nextScan;
 
-    public bool NeedsUpdate => hitParticles || sustainParticles || fretEffects
+    public bool NeedsUpdate => hitParticles || sustainParticles || fretEffects || lightningOnly
         || particles.Count != 0 || animators.Count != 0 || fretFades.Count != 0 || renderers.Count != 0;
 
     public bool IsApplyDue(bool disableHitParticles, bool disableSustainParticles,
-        bool disableFretEffects, bool preserveRainbowFlames, double realtime)
+        bool disableFretEffects, bool disableLightningOnly, bool preserveRainbowFlames, double realtime)
     {
         preserveRainbowFlames &= disableFretEffects;
         bool changed = hitParticles != disableHitParticles || sustainParticles != disableSustainParticles
-            || fretEffects != disableFretEffects || rainbowFlamesPreserved != preserveRainbowFlames;
+            || fretEffects != disableFretEffects || lightningOnly != disableLightningOnly
+            || rainbowFlamesPreserved != preserveRainbowFlames;
         if (changed) return true;
         if (!NeedsUpdate) return false;
-        if (!disableHitParticles && !disableSustainParticles && !disableFretEffects) return true;
+        if (!disableHitParticles && !disableSustainParticles && !disableFretEffects && !disableLightningOnly) return true;
         return realtime >= nextScan;
     }
 
@@ -73,23 +76,25 @@ internal sealed class PerformanceOverrides
     public void Clear()
     {
         Restore();
-        hitParticles = sustainParticles = fretEffects = rainbowFlamesPreserved = false;
+        hitParticles = sustainParticles = fretEffects = lightningOnly = rainbowFlamesPreserved = false;
         nextScan = 0;
     }
 
     public void Apply(GameManager game, bool disableHitParticles, bool disableSustainParticles,
-        bool disableFretEffects, bool preserveRainbowFlames, double realtime)
+        bool disableFretEffects, bool disableLightningOnly, bool preserveRainbowFlames, double realtime)
     {
         preserveRainbowFlames &= disableFretEffects;
         bool changed = hitParticles != disableHitParticles || sustainParticles != disableSustainParticles
-            || fretEffects != disableFretEffects || rainbowFlamesPreserved != preserveRainbowFlames;
+            || fretEffects != disableFretEffects || lightningOnly != disableLightningOnly
+            || rainbowFlamesPreserved != preserveRainbowFlames;
         hitParticles = disableHitParticles;
         sustainParticles = disableSustainParticles;
         fretEffects = disableFretEffects;
+        lightningOnly = disableLightningOnly;
         rainbowFlamesPreserved = preserveRainbowFlames;
 
         if (!NeedsUpdate) return;
-        if (!disableHitParticles && !disableSustainParticles && !disableFretEffects)
+        if (!disableHitParticles && !disableSustainParticles && !disableFretEffects && !disableLightningOnly)
         {
             Restore();
             return;
@@ -117,9 +122,23 @@ internal sealed class PerformanceOverrides
                 if (suppress) Disable(system); else Restore(system);
             }
 
+            if (disableFretEffects || disableLightningOnly)
+            {
+                foreach (var effectAnimator in effects.LightningAnimators)
+                    if (effectAnimator != null) Disable(effectAnimator);
+                foreach (var fretFade in effects.FretFades)
+                    if (fretFade != null) Disable(fretFade);
+            }
+            else
+            {
+                foreach (var animatorToRestore in effects.LightningAnimators)
+                    if (animatorToRestore != null) Restore(animatorToRestore);
+                foreach (var fretFadeToRestore in effects.FretFades)
+                    if (fretFadeToRestore != null) Restore(fretFadeToRestore);
+            }
             if (disableFretEffects)
             {
-                foreach (var effectAnimator in effects.Animators)
+                foreach (var effectAnimator in effects.SparkAnimators)
                     if (effectAnimator != null) Disable(effectAnimator);
                 foreach (var flameAnimator in effects.FlameAnimators)
                     if (flameAnimator != null)
@@ -127,17 +146,13 @@ internal sealed class PerformanceOverrides
                         if (preserveRainbowFlames) Restore(flameAnimator);
                         else Disable(flameAnimator);
                     }
-                foreach (var fretFade in effects.FretFades)
-                    if (fretFade != null) Disable(fretFade);
             }
             else
             {
-                foreach (var animatorToRestore in effects.Animators)
+                foreach (var animatorToRestore in effects.SparkAnimators)
                     if (animatorToRestore != null) Restore(animatorToRestore);
                 foreach (var flameAnimator in effects.FlameAnimators)
                     if (flameAnimator != null) Restore(flameAnimator);
-                foreach (var fretFadeToRestore in effects.FretFades)
-                    if (fretFadeToRestore != null) Restore(fretFadeToRestore);
             }
         }
     }
@@ -175,18 +190,22 @@ internal sealed class PerformanceOverrides
             }
         }
 
-        return new NeckEffects(particles.ToArray(), EffectAnimators(neck).ToArray(),
+        return new NeckEffects(particles.ToArray(), LightningAnimators(neck).ToArray(),
+            SparkAnimators(neck).ToArray(),
             neck.FlameAnimators == null ? Array.Empty<Animator>() : neck.FlameAnimators.Where(a => a != null).ToArray(),
             fretFades.ToArray());
     }
 
-    private static IEnumerable<Animator> EffectAnimators(BaseNeckController neck)
+    private static IEnumerable<Animator> LightningAnimators(BaseNeckController neck)
     {
         if (neck.LightningAnimators != null)
             foreach (var animator in neck.LightningAnimators) if (animator != null) yield return animator;
         if (neck.LightningAnimators2 != null)
             foreach (var animator in neck.LightningAnimators2) if (animator != null) yield return animator;
+    }
 
+    private static IEnumerable<Animator> SparkAnimators(BaseNeckController neck)
+    {
         var guitar = neck.TryCast<GuitarNeckController>();
         if (guitar != null)
         {
