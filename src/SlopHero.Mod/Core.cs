@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.140", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.141", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -177,6 +177,7 @@ public sealed partial class Core : MelonMod
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Clear();
         inputViewerSuppression.Clear();
+        compactScoreHudOverride.Clear();
         ResetNativeBridgesForScene();
         optionalHudAnimations.Clear();
         optionalHudGame = null;
@@ -297,6 +298,7 @@ public sealed partial class Core : MelonMod
         playerCameraFarClip.Clear();
         rainbowHighway.Clear();
         staticMeterAttach.Clear();
+        compactScoreHudOverride.Clear();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Clear();
         ResetNativeBridgesForScene();
@@ -606,7 +608,7 @@ public sealed partial class Core : MelonMod
                 || skipMouseUiRequested || skipLegacyMouseRequested
                 || throttleWhammyTexture.Value || disableHitParticles.Value || disableSustainParticles.Value
                 || disableFretEffects.Value || disableStarProgressParticles.Value || freezeComboSmokeScroll.Value
-                || hideInputViewerDuringSong.Value
+                || hideInputViewerDuringSong.Value || compactScoreHud.Value
                 || (hideBeats.Value && pauseHiddenBeatlineUpdates.Value);
             bool soloOptimizationCandidate = needsOfflineSoloGate && ready && songPlaying
                 && !game!.isPaused && !game.isSongOver && game.actualPlayerCount == 1
@@ -847,6 +849,7 @@ public sealed partial class Core : MelonMod
             playerCameraFarClip.Clear();
             rainbowHighway.Clear();
             staticMeterAttach.Clear();
+            compactScoreHudOverride.Clear();
             clonZonesFlameTickGate.Clear();
             clonZonesFlameSuppressor.Update(false, gameplay);
             nativeSustainCache.Clear();
@@ -879,6 +882,7 @@ public sealed partial class Core : MelonMod
         playerCameraFarClip.Restore();
         rainbowHighway.Clear();
         staticMeterAttach.Clear();
+        compactScoreHudOverride.Restore();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Update(false, gameplay);
         ResetNativeBridgesForScene();
@@ -911,6 +915,7 @@ public sealed partial class Core : MelonMod
         playerCameraFarClip.Restore();
         rainbowHighway.Clear();
         staticMeterAttach.Clear();
+        compactScoreHudOverride.Restore();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Update(false, gameplay);
         ResetNativeBridgesForScene();
@@ -1032,8 +1037,13 @@ public sealed partial class Core : MelonMod
         // while editing so sliders, typing, and dragging remain responsive.
         bool resizeEditing = resizeTarget >= 0;
         if (!settingsOpen && !moveHud && !resizeEditing && Event.current.type != EventType.Repaint) return;
-        if (counterCanvas.Visible && (!showHud.Value || settingsOpen || moveHud || resizeEditing
-            || !gameplay || string.IsNullOrEmpty(statsText))) counterCanvas.Hide();
+        if (counterCanvas.Visible && (settingsOpen || moveHud || resizeEditing || !gameplay
+            || (!showHud.Value && !compactScoreHudOverride.IsActive)
+            || (string.IsNullOrEmpty(statsText) && !compactScoreHudOverride.IsActive)))
+        {
+            compactScoreHudOverride.Restore();
+            counterCanvas.Hide();
+        }
         if (songCanvas.Visible && (!showSong.Value || settingsOpen || moveHud || resizeEditing
             || !gameplay || string.IsNullOrEmpty(songText))) songCanvas.Hide();
         bool noticeVisible = !compatible || (noticeUntil > 0 && clock.Elapsed.TotalSeconds < noticeUntil);
@@ -1294,6 +1304,7 @@ public sealed partial class Core : MelonMod
         playerCameraFarClip.Clear();
         rainbowHighway.Clear();
         staticMeterAttach.Clear();
+        compactScoreHudOverride.Clear();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Clear();
         nativeSustainCache.Clear();

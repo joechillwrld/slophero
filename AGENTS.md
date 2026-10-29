@@ -45,7 +45,12 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.140. It adds a separate default-off fret
+The latest packaged build is 0.4.141. It fixes rainbow phase after song
+restart and high-slider hue clipping, adds zero-default stable per-note
+variety, and prototypes a separate default-off compact score/combo Canvas
+replacement for 23 native sprites. The compact HUD needs Windows visual and
+frame testing. One input-viewer A/B pair favored hiding, but needs replication. See
+`docs/performance-followup-2026-10-29f.md`. Version 0.4.140 adds a separate default-off fret
 lightning-only suppression, keeping flames and sparks. See
 `docs/performance-followup-2026-10-29e.md`. Version 0.4.139 adds a stopped rainbow cycle for a
 fixed hue palette, saturation and brightness up to 200%, and a separate

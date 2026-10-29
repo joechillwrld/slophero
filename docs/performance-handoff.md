@@ -5,7 +5,15 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
-## 0.4.140 current build
+## 0.4.141 current build
+
+Rainbow phase, high-slider gamut behavior, and stable per-note variety are
+updated. A separate default-off compact score/combo HUD experiment preserves
+the values as Canvas text while suppressing 23 native renderers in solo play.
+Its visual parity and FPS impact are unverified. See [the 0.4.141
+follow-up](performance-followup-2026-10-29f.md).
+
+## 0.4.140 prior build
 
 The Gameplay snapshot shows ten active fret-lightning `CustomFadeProperties`
 scripts. A new default-off switch suppresses only these scripts and their
@@ -14,6 +22,10 @@ It needs a Windows visual and matched frame test. See [the 0.4.140
 follow-up](performance-followup-2026-10-29e.md).
 
 ## 0.4.139 prior build
+
+The 2026-10-29 input-viewer A/B pair favored hiding it by roughly 63
+presented FPS, but is one pair with unmatched chart sections; see [the 0.4.141
+follow-up](performance-followup-2026-10-29f.md).
 
 Rainbow colors can now stop cycling at a predictable base hue, so hue
 rotation produces a fixed palette. Saturation and brightness can reach 200%.

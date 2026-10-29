@@ -16,7 +16,7 @@ internal sealed class RuntimeTimings
     private float maxUpdateMs;
     private double maxRenderMs, maxRepaintMs;
     private long start, deadline;
-    private readonly Dictionary<int, CameraTiming> cameras = new();
+    private readonly Dictionary<IntPtr, CameraTiming> cameras = new();
     private Camera.CameraCallback? preCullCallback, preRenderCallback, postRenderCallback;
     private sealed class CameraTiming
     {
@@ -67,8 +67,13 @@ internal sealed class RuntimeTimings
     {
         try
         {
-            if (camera == null) return null;
-            int id = camera.GetInstanceID();
+            if (ReferenceEquals(camera, null)) return null;
+            // Unity invokes these callbacks for every render of each camera.
+            // The IL2CPP wrapper pointer is already available; GetInstanceID
+            // crossed into native code three times per camera per frame while
+            // the optional timing capture was running.
+            IntPtr id = camera.Pointer;
+            if (id == IntPtr.Zero) return null;
             if (cameras.TryGetValue(id, out var timing)) return timing;
             timing = new CameraTiming { Name = camera.gameObject.name };
             cameras.Add(id, timing);

@@ -7,6 +7,21 @@ void Check(bool condition, string name)
     if (!condition) throw new Exception(name);
     checks++;
 }
+Check(RainbowColorCurve.Shape(.5f, 1f, 1f, 1f) == .5f,
+    "Default rainbow channel is unchanged");
+Check(RainbowColorCurve.Shape(.25f, 2f, 1.5f, 2f) > .2f,
+    "High color sliders retain an intermediate orange channel");
+Check(RainbowColorCurve.Shape(0f, 2f, 1.5f, 2f) == 0f,
+    "High color sliders do not introduce an unwanted third channel");
+Check(RainbowColorCurve.Shape(1f, 2f, 1.5f, 2f) <= 1.2f,
+    "High brightness stays below the previous twofold HDR clipping level");
+Check(RainbowNoteVariation.PaletteIndex(2, 0, 0f) == 10,
+    "Zero note variety preserves the lane palette");
+Check(RainbowNoteVariation.PaletteIndex(2, 0, 1f) == RainbowNoteVariation.PaletteIndex(2, 0, 1f)
+    && RainbowNoteVariation.PaletteIndex(2, 0, 1f) != RainbowNoteVariation.PaletteIndex(2, 1, 1f),
+    "Note variety is stable for a pool slot and differs across slots");
+Check(Enumerable.Range(0, 60).Select(slot => RainbowNoteVariation.PaletteIndex(2, slot, 1f)).Distinct().Count() == 60,
+    "Full note variety covers the complete hue palette");
 var hold = new HoldTrigger();
 Check(!hold.Update(true, true, 0, .75), "Initial press");
 Check(!hold.Update(true, true, .5, .75), "Short hold");

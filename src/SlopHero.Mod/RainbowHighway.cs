@@ -2,13 +2,14 @@ using System.Reflection;
 using HarmonyLib;
 using Il2Cpp;
 using MelonLoader;
+using SlopHero.Core;
 using UnityEngine;
 using FlameAnimator = Il2Cpp.Animator;
 
 namespace SlopHero.Mod;
 
 internal readonly record struct RainbowColorOptions(
-    float HueOffsetDegrees, float HueSpread, float Saturation, float Contrast, float Brightness);
+    float HueOffsetDegrees, float HueSpread, float NoteVariety, float Saturation, float Contrast, float Brightness);
 
 /// <summary>Optional guitar colors; the setter hook exists only while a rainbow option is on.</summary>
 internal sealed class RainbowHighway
@@ -17,8 +18,10 @@ internal sealed class RainbowHighway
     {
         internal readonly GameObject Object;
         internal readonly List<SpriteState> Sprites = new(4);
+        internal readonly int PoolSlot;
         internal int Phase;
-        internal NoteGroup(GameObject gameObject, int phase) { Object = gameObject; Phase = phase; }
+        internal NoteGroup(GameObject gameObject, int phase, int poolSlot)
+        { Object = gameObject; Phase = phase; PoolSlot = poolSlot; }
     }
 
     private sealed class SpriteState
@@ -51,6 +54,7 @@ internal sealed class RainbowHighway
     private readonly ClonZonesFlameBridge clonZonesFlames = new();
     private readonly List<FlameState> flames = new();
     private readonly Color[] notePalette = new Color[12];
+    private readonly Color[] variedNotePalette = new Color[60];
     private readonly Color[] flamePalette = new Color[5];
     private MethodInfo? noteColorSetter, flameAnimatorUpdate;
     private HarmonyLib.Harmony? noteHarmony, flameHarmony;
@@ -63,6 +67,10 @@ internal sealed class RainbowHighway
     private double huePhase, lastHueSample;
     private float previousCycleRate;
     private bool hueSampled;
+    private float noteVariety;
+    private RainbowColorOptions lastPaletteOptions;
+    private float lastPaletteCycle;
+    private bool lastPaletteClonZones, paletteValid, notePaletteValid, flamePaletteValid;
 
     internal bool HasOverrides => notesActive || flames.Count != 0 || clonZonesFlames.IsActive
         || noteHookInstalled || flameUpdateHookInstalled;
@@ -154,7 +162,10 @@ internal sealed class RainbowHighway
             float rate = CycleRate(cyclesPerSecond);
             if (!hueSampled || now < lastHueSample)
             {
-                huePhase = now * rate % 1.0;
+                // A scene reload clears this state. Starting from absolute
+                // uptime gave the same saved hue rotation a different
+                // initial color on every song/restart.
+                huePhase = 0;
                 hueSampled = true;
             }
             else if (rate == 0f && previousCycleRate != 0f)
@@ -169,17 +180,40 @@ internal sealed class RainbowHighway
             cycle = (float)huePhase;
             float offset = Math.Clamp(float.IsFinite(colorOptions.HueOffsetDegrees) ? colorOptions.HueOffsetDegrees : 0f, 0f, 355f) / 360f;
             float spread = Math.Clamp(float.IsFinite(colorOptions.HueSpread) ? colorOptions.HueSpread : 1f, 0f, 2f);
+            noteVariety = Math.Clamp(float.IsFinite(colorOptions.NoteVariety) ? colorOptions.NoteVariety : 0f, 0f, 1f);
             float saturation = Math.Clamp(float.IsFinite(colorOptions.Saturation) ? colorOptions.Saturation : .95f, 0f, 2f);
             float contrast = Math.Clamp(float.IsFinite(colorOptions.Contrast) ? colorOptions.Contrast : 1f, .5f, 1.5f);
             float brightness = Math.Clamp(float.IsFinite(colorOptions.Brightness) ? colorOptions.Brightness : 1f, .3f, 2f);
-            if (colorNotes && !notesFailed)
+            // A stopped cycle still scans newly active pooled notes at 30 Hz,
+            // but its palette does not need 30 HSV/conversion passes per
+            // second when no slider or flame source changed.
+            bool paletteDirty = !paletteValid || cycle != lastPaletteCycle
+                || colorOptions != lastPaletteOptions || clonZonesFlames.IsActive != lastPaletteClonZones
+                || (colorNotes && !notesFailed && !notePaletteValid)
+                || (colorFlames && !flamesFailed && !flamePaletteValid);
+            if (paletteDirty && colorNotes && !notesFailed)
+            {
                 for (int i = 0; i < notePalette.Length; i++)
                     notePalette[i] = Rainbow(cycle + offset + i / (float)notePalette.Length * spread,
                         brightness, saturation, contrast);
-            if (colorFlames && !flamesFailed)
+                if (noteVariety > 0f)
+                    for (int i = 0; i < variedNotePalette.Length; i++)
+                        variedNotePalette[i] = Rainbow(cycle + offset + i / (float)variedNotePalette.Length * spread,
+                            brightness, saturation, contrast);
+            }
+            if (paletteDirty && colorFlames && !flamesFailed)
                 for (int i = 0; i < flamePalette.Length; i++)
                     flamePalette[i] = Rainbow(cycle + offset + i / (float)flamePalette.Length * spread,
                         (clonZonesFlames.IsActive ? .7f : .4f) * brightness, saturation, contrast);
+            if (paletteDirty)
+            {
+                notePaletteValid = colorNotes && !notesFailed;
+                flamePaletteValid = colorFlames && !flamesFailed;
+                lastPaletteOptions = colorOptions;
+                lastPaletteCycle = cycle;
+                lastPaletteClonZones = clonZonesFlames.IsActive;
+                paletteValid = true;
+            }
         }
 
         if (colorNotes && !notesFailed && !notesDiscovered && now >= nextNotesDiscovery)
@@ -239,9 +273,10 @@ internal sealed class RainbowHighway
                     // Cached groups may have deactivated since the last scan;
                     // checking this short list also avoids tinting hidden art.
                     if (!group.Object.activeInHierarchy) continue;
+                    var tint = NoteColor(group);
                     foreach (var state in group.Sprites)
                         if (state.Renderer != null && state.Renderer.enabled && state.Renderer.sprite != null)
-                            SetNoteRgb(state, notePalette[group.Phase]);
+                            SetNoteRgb(state, tint);
                 }
             }
             catch (Exception ex)
@@ -334,7 +369,7 @@ internal sealed class RainbowHighway
         if (owner == null || !owner.notesActive || owner.applyingOwnColor) return;
         var pointer = __instance.Pointer;
         if (!owner.notes.TryGetValue(pointer, out var note)) return;
-        var tint = owner.notePalette[note.Group.Phase];
+        var tint = owner.NoteColor(note.Group);
         // The game's SetState reads the already-tinted RGB back just to
         // change alpha. Do not mistake that write for a new vanilla color.
         var displayed = note.Displayed;
@@ -345,7 +380,7 @@ internal sealed class RainbowHighway
         {
             note.Original = value;
             if (note.IsBody && TryResolveLane(value, out int phase)) note.Group.Phase = phase;
-            tint = owner.notePalette[note.Group.Phase];
+            tint = owner.NoteColor(note.Group);
         }
         value.r = tint.r; value.g = tint.g; value.b = tint.b;
         note.Displayed = value;
@@ -378,7 +413,8 @@ internal sealed class RainbowHighway
                 // One shared phase follows the lane color written by the
                 // game. Pool order is unrelated to lane and caused recycled
                 // notes to jump unpredictably around the rainbow.
-                var group = new NoteGroup(container.gameObject, (containerIndex++ % 5) * 2);
+                int slot = containerIndex++;
+                var group = new NoteGroup(container.gameObject, (slot % 5) * 2, slot);
                 if (container.Body != null && TryResolveLane(container.Body.color, out int lanePhase))
                     group.Phase = lanePhase;
                 added += Remember(container.Head, group);
@@ -408,6 +444,10 @@ internal sealed class RainbowHighway
         group.Sprites.Add(state);
         return 1;
     }
+
+    private Color NoteColor(NoteGroup group) => noteVariety > 0f
+        ? variedNotePalette[RainbowNoteVariation.PaletteIndex(group.Phase, group.PoolSlot, noteVariety)]
+        : notePalette[group.Phase];
 
     private static bool TryResolveLane(Color color, out int phase)
     {
@@ -456,19 +496,10 @@ internal sealed class RainbowHighway
     {
         hue -= MathF.Floor(hue);
         var rgb = Color.HSVToRGB(hue, MathF.Min(saturation, 1f), 1f);
-        if (saturation > 1f)
-        {
-            // HSV is capped at full saturation. Above 100%, expand each
-            // channel away from its luminance so the extra range is real.
-            float grey = rgb.r * .2126f + rgb.g * .7152f + rgb.b * .0722f;
-            rgb.r = MathF.Max(0f, grey + (rgb.r - grey) * saturation);
-            rgb.g = MathF.Max(0f, grey + (rgb.g - grey) * saturation);
-            rgb.b = MathF.Max(0f, grey + (rgb.b - grey) * saturation);
-        }
         return new Color(
-            Math.Clamp(((rgb.r - .5f) * contrast + .5f) * brightness, 0f, 2f),
-            Math.Clamp(((rgb.g - .5f) * contrast + .5f) * brightness, 0f, 2f),
-            Math.Clamp(((rgb.b - .5f) * contrast + .5f) * brightness, 0f, 2f),
+            RainbowColorCurve.Shape(rgb.r, saturation, contrast, brightness),
+            RainbowColorCurve.Shape(rgb.g, saturation, contrast, brightness),
+            RainbowColorCurve.Shape(rgb.b, saturation, contrast, brightness),
             1f);
     }
 
@@ -602,5 +633,7 @@ internal sealed class RainbowHighway
         huePhase = lastHueSample = 0;
         previousCycleRate = 0;
         hueSampled = false;
+        paletteValid = false;
+        notePaletteValid = flamePaletteValid = false;
     }
 }

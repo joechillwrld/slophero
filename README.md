@@ -1,11 +1,19 @@
-# SlopHero 0.4.140 alpha
+# SlopHero 0.4.141 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: reversible
 experiments judged by measurements. Gameplay timing, online play, and the
 1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.140
+build, compiled against its loader and generated assemblies. Version 0.4.141
+starts moving rainbow at the same hue after a song restart, keeps intermediate
+hues visible when saturation and brightness are raised, and adds a zero-default
+note-variety slider for many stable simultaneous colors. A separate default-off
+compact score/combo experiment replaces 23 native sprites with numbers in the
+counter Canvas during solo songs; its frame-rate effect needs a Windows A/B.
+The latest input-viewer hide comparison was promising but needs a repeated
+same-song test; see the
+[0.4.141 follow-up](docs/performance-followup-2026-10-29f.md). Version 0.4.140
 adds a separate default-off fret-lightning-only suppression that leaves fret
 flames and sparks active. Its effect on FPS is unmeasured; see the
 [0.4.140 follow-up](docs/performance-followup-2026-10-29e.md). Version 0.4.139
@@ -353,14 +361,14 @@ during active solo songs, resuming on pause. The cheat-scanner switch also
 pauses its persistent per-tick scan during solo songs. The whammy upload cap
 is default-off and scoped to Gameplay. GPU compute rendering remains
 untouched. Earlier versions also added a separate option to suppress the
-star-progress particle burst. The star bar, score, note timing, and 1000 Hz
+star-progress particle burst. The star bar, score logic, note timing, and 1000 Hz
 instrument polling remain untouched. When UI event processing is enabled,
 keyboard/controller UI navigation pauses during the song and returns on pause.
 See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.140 alpha](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.140-alpha.zip?raw=1)
+[Download SlopHero v0.4.141 alpha](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.141-alpha.zip?raw=1)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

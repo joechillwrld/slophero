@@ -16,6 +16,7 @@ internal sealed class NativeHudLayout
     private readonly Vector3[] resizeRendererCorners = new Vector3[8];
     private Il2CppStructArray<Vector3>? nativeHudRectCorners;
     private readonly List<Transform> scoreGroupScratch = new(48);
+    private readonly List<IntPtr> restoreScratch = new(32);
     private InputViewer[]? inputViewers;
     private SPBar[]? spBars;
     private StarProgress[]? starProgresses;
@@ -302,26 +303,32 @@ internal sealed class NativeHudLayout
 
     private void RestoreKind(int kind)
     {
-        foreach (var pair in resized.ToArray())
+        if (resized.Count == 0) return;
+        restoreScratch.Clear();
+        foreach (var pair in resized)
         {
-            if (pair.Value.Transform == null) { resized.Remove(pair.Key); continue; }
+            if (pair.Value.Transform == null) { restoreScratch.Add(pair.Key); continue; }
             if (pair.Value.Kind != kind) continue;
             pair.Value.Transform.localScale = pair.Value.Original;
-            resized.Remove(pair.Key);
+            restoreScratch.Add(pair.Key);
         }
+        foreach (var key in restoreScratch) resized.Remove(key);
     }
 
     private void RestoreKind(Type componentType)
     {
-        foreach (var pair in resized.ToArray())
+        if (resized.Count == 0) return;
+        int kind = componentType == typeof(InputViewer) ? 2 : componentType == typeof(SPBar) ? 3
+            : componentType == typeof(SongProgress) ? 4 : 0;
+        restoreScratch.Clear();
+        foreach (var pair in resized)
         {
-            if (pair.Value.Transform == null) { resized.Remove(pair.Key); continue; }
-            int kind = componentType == typeof(InputViewer) ? 2 : componentType == typeof(SPBar) ? 3
-                : componentType == typeof(SongProgress) ? 4 : 0;
+            if (pair.Value.Transform == null) { restoreScratch.Add(pair.Key); continue; }
             if (pair.Value.Kind != kind) continue;
             pair.Value.Transform.localScale = pair.Value.Original;
-            resized.Remove(pair.Key);
+            restoreScratch.Add(pair.Key);
         }
+        foreach (var key in restoreScratch) resized.Remove(key);
     }
 
     private void RestoreScales()
