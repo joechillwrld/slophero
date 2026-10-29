@@ -43,11 +43,19 @@ before code, so this build leaves native bridge lifecycles unchanged.
 
 The uploaded ClonZones assembly supports switching off overlay creation and
 usage, which would remove roughly 20 extra fret renderers in this pack.
-Its original-renderer path still changes fret layering and possibly art.
-The implementation is already selectable in ClonZones' `[fret]` config; a
-visual comparison at rest, press, Star Power, open notes, and sustain is
-needed before SlopHero could present it as a safe option. The user requested
-this visual research first, so this build leaves that mode unchanged.
+IL inspection confirms that, with overlay usage off, `ApplyPressState` writes
+the pack's base, head, and lip frames to the original BaseRenderer,
+HeadRenderer, and HalfCoverRenderer. `ApplyFretLayering` re-enables those
+original renderers and sets their intended sort orders; its lift branch also
+falls back to the original LiftRenderer. The existing ClonZones setters
+already read and compare sprite pointers, enabled states, and sort orders
+before writing, so another blanket setter cache would duplicate that work.
+The original-renderer path still changes fret layering and possibly art;
+`HideVanillaOverlayLayers` is called in both modes. The implementation is
+already selectable in ClonZones' `[fret]` config; a visual comparison at
+rest, press, Star Power, open notes, and sustain is needed before SlopHero
+could present it as a safe option. The user requested this visual research
+first, so this build leaves that mode unchanged.
 
 Neither the two code-level performance cleanups nor the color controls have
 a measured FPS gain. The next useful frame test is a full 30-second run per
