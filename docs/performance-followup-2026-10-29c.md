@@ -63,6 +63,25 @@ evidence that it causes these recurrent spikes. Native/WPA attribution of a
 matching time window is the next research step; no guessed periodic hook was
 added to this build.
 
+After packaging, I checked four additional full-length raw captures from the
+earlier sustain-cache two-by-two test. Each 30-second run has 9–11 presents
+above 3 ms, with about 99% of each slow interval in CPU busy and no PSO
+compilation on those rows. The median gap between slow events is about
+3.05–3.14 seconds in the `neither`, `skip`, `cache`, and `both` runs. Older
+October 26 runs also have CPU-busy spikes, often about 2.2 seconds apart;
+the October 28 run has them farther apart. This makes the spikes a persistent
+target across several option states, but the changing cadence does not support
+attributing them to one fixed 3.5-second timer. The current game callback at
+each slow present is still unknown. The source archive's matching 3.5-second
+wait belongs to a one-time high-score animation, and its `StartSettingsWrite`
+coroutine is triggered on settings writes rather than a gameplay timer.
+
+The current uploaded WPA table is an aggregate stack tree and has no sample
+timestamp column, so it cannot be aligned to these slow presents. A future
+time-aligned CPU sample trace during the same run would distinguish Unity/game
+callback work from collection or driver activity; the saved `.wpaProfile`
+alone cannot recover that attribution.
+
 ## Compact Windows test
 
 Start with a normal chart and inspect the menu, fret art, note colors, and

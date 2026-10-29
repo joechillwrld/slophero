@@ -13,7 +13,10 @@ hook retention between scenes, and a 30 Hz active-pool scan while rainbow
 notes are selected. Their risks, exact-build evidence, and combined test
 steps are in [the 0.4.138 follow-up](performance-followup-2026-10-29c.md).
 No FPS gain is measured yet. Keep the 0.4.137 on/off capture duration
-limitation in view.
+limitation in view. A post-package comparison of older full-length captures
+found recurring CPU-busy present spikes across several option states, with
+session-dependent cadence; see the same follow-up for limits and the next
+attribution target.
 
 ## 0.4.137 prior build
 
@@ -372,14 +375,15 @@ remaining cost of eligible rendered-frame work.
 
 ## Still open: evidence to turn into code
 
-**Geometry batching follow-up (2026-10-26):** the shipped regular sustain
-shader's no-external-sizing variant allows a real combined mesh after its
-per-tail length deformation is baked into vertices. The default-off offline
-solo prototype now does this only for dense upcoming regular tails, while
-preserving the glow and held-tail paths. Its Unity calls compile but need a
-Windows activation/visual test and matched frame comparison. Open bodies and
-glows also disable ordinary batching; note heads and input-viewer materials
-generally do not. See [the mapping and ranked follow-ons](sustain-geometry-batching-2026-10-26.md).
+**Geometry batching follow-up (2026-10-26):** the regular sustain shader's
+no-external-sizing variant permits a combined mesh after per-tail length
+deformation is baked into vertices. The earlier regular-tail prototype was
+retired in 0.4.123 after it failed to produce a useful batch and its native
+bridge had runtime/visual uncertainty. No geometry batch is active in the
+current build. Open bodies and glows also disable ordinary batching; note
+heads and input-viewer materials generally do not. A new attempt needs a
+current draw-call capture, an exact active-tail count, and a visual parity
+check. See [the mapping and ranked follow-ons](sustain-geometry-batching-2026-10-26.md).
 
 **New aggressive rendering proposals (2026-10-26):** read
 [the sustain/HUD implementation plan](aggressive-render-targets-2026-10-26.md)
