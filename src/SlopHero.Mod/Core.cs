@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.135", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.136", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -50,6 +50,8 @@ public sealed partial class Core : MelonMod
     private double nextAprilFoolsPass;
     private double nextOptionalHookSettingsPass;
     private double nextUnfocusedRestorePass;
+    private double nextRainbowPreferenceCheck, nextRainbowAnimationCheck;
+    private bool rainbowAnimationPending;
     private double nextOnlineStateCheck;
     private bool onlineStateKnown, onlineState, offlineSoloOptimizationActive;
     private bool activeGameplayVisualOptimizationActive;
@@ -124,6 +126,7 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
         rainbowHighway.Clear();
+        staticMeterAttach.Clear();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Clear();
         inputViewerSuppression.Clear();
@@ -247,6 +250,7 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
         rainbowHighway.Clear();
+        staticMeterAttach.Clear();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Clear();
         nativeSustainCache.Clear();
@@ -554,6 +558,7 @@ public sealed partial class Core : MelonMod
                 || backgroundCameraRequested || farClipRequested || hudCameraBenchmarkRequested
                 || guitarCameraBenchmarkRequested
                 || plainHeldSustainRequested || nativeSustainRequested || fretSortingCacheRequested
+                || pauseStaticMeterAttach.Value || freezeComboSmokeScroll.Value
                 || skipMouseUiRequested || skipLegacyMouseRequested
                 || throttleWhammyTexture.Value || disableHitParticles.Value || disableSustainParticles.Value
                 || disableFretEffects.Value || disableStarProgressParticles.Value || freezeComboSmokeScroll.Value
@@ -690,9 +695,6 @@ public sealed partial class Core : MelonMod
             if (clonZonesTickRequested || clonZonesFlameTickGate.IsInstalled)
                 clonZonesFlameTickGate.Update(HarmonyInstance, clonZonesTickRequested,
                     clonZonesTickRequested && activeGameplaySong);
-            if (rainbowNotes.Value || rainbowFlames.Value || rainbowHighway.HasOverrides)
-                rainbowHighway.Update(HarmonyInstance, rainbowNotes.Value, rainbowFlames.Value,
-                    ready ? game : null, now, rainbowCyclesPerSecond.Value);
             if (ready) CompletePracticeTransition(game!);
             bool allow = shortcutCandidate && isOfflineSolo;
             if (restartHold.Update(allow && restartPressed, allow, now, Duration))
@@ -800,6 +802,7 @@ public sealed partial class Core : MelonMod
             guitarCameraBenchmark.Clear();
             playerCameraFarClip.Clear();
             rainbowHighway.Clear();
+            staticMeterAttach.Clear();
             clonZonesFlameTickGate.Clear();
             clonZonesFlameSuppressor.Update(false, gameplay);
             nativeSustainCache.Clear();
@@ -830,6 +833,7 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Restore();
         playerCameraFarClip.Restore();
         rainbowHighway.Clear();
+        staticMeterAttach.Clear();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Update(false, gameplay);
         nativeSustainCache.Clear();
@@ -862,6 +866,7 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Restore();
         playerCameraFarClip.Restore();
         rainbowHighway.Clear();
+        staticMeterAttach.Clear();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Update(false, gameplay);
         nativeSustainCache.Clear();
@@ -1245,6 +1250,7 @@ public sealed partial class Core : MelonMod
         guitarCameraBenchmark.Clear();
         playerCameraFarClip.Clear();
         rainbowHighway.Clear();
+        staticMeterAttach.Clear();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Clear();
         nativeSustainCache.Clear();

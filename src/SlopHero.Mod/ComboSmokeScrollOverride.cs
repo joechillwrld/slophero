@@ -34,7 +34,7 @@ internal sealed class ComboSmokeScrollOverride
         }
     }
 
-    public void Apply(bool freeze, GameManager? game, double realtime)
+    public void Apply(bool freeze, GameManager? game, double realtime, bool offlineSolo)
     {
         if (!freeze)
         {
@@ -46,7 +46,7 @@ internal sealed class ComboSmokeScrollOverride
         // Player visuals can be recreated during a practice transition without
         // changing scenes. Recheck slowly while enabled so replacement smoke
         // components are found, while avoiding a hierarchy walk every frame.
-        if (realtime >= nextDiscovery) Discover(game, realtime);
+        if (realtime >= nextDiscovery) Discover(game, realtime, offlineSolo);
 
         List<IntPtr>? stale = null;
         foreach (var pair in states)
@@ -79,7 +79,7 @@ internal sealed class ComboSmokeScrollOverride
         warnedDiscovery = false;
     }
 
-    private void Discover(GameManager? game, double realtime)
+    private void Discover(GameManager? game, double realtime, bool offlineSolo)
     {
         // Run only while the opt-in switch is enabled, and anchor discovery to
         // active controller-backed guitars so online opponents remain untouched. The
@@ -93,10 +93,15 @@ internal sealed class ComboSmokeScrollOverride
             {
                 // isRemotePlayerPlaying reports combo activity, not ownership.
                 // The Rewired player reference identifies this machine's slot.
-                if (player == null || !player.enabled || player.player == null
-                    || player.player.field_Public_Player_0 == null) continue;
+                if (player == null || !player.enabled) continue;
                 var guitar = player.TryCast<GuitarPlayer>();
                 if (guitar == null) continue;
+                // The live solo snapshot contains both smoke objects, while
+                // the old controller-reference guard found neither. In a
+                // verified offline one-player song, the only guitar is local;
+                // allow its cosmetic branch even if Rewired has no wrapper.
+                if (!offlineSolo && (player.player == null
+                    || player.player.field_Public_Player_0 == null)) continue;
                 // Smoke is a fixed pair in the player prefab. A recreated
                 // practice player has a new pointer and still gets scanned.
                 if (discoveredPlayers.Contains(guitar.Pointer)) continue;

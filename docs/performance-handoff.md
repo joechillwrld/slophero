@@ -5,7 +5,19 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
-## 0.4.135 current build
+## 0.4.136 current build
+
+Version 0.4.136 moves optional rainbow colors from the ordinary 20 Hz visual
+pass to a bounded 60–120 Hz pass and integrates hue across speed changes.
+It adds the separate default-off, two-meter SpriteAttach pause experiment and
+repairs solo combo-smoke discovery, whose switch reported zero tracked scripts
+despite both scripts appearing in the live snapshot. The supplied 0.4.135
+PresentMon capture is CPU-bound but has no matched A/B, and rainbow was off
+in that run. The extra combo/streak attachment remains research only. See
+[the 0.4.136 follow-up](performance-followup-2026-10-29.md) for evidence,
+limits, and the next visual/frame checks.
+
+## 0.4.135 prior build
 
 Version 0.4.135 removes repeated Unity focus reads at unlocked simulation
 rates, polls inactive SongOptions less often, and retains selected inactive

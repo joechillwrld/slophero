@@ -32,6 +32,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> pauseHighwayAnimations = null!;
     private MelonPreferences_Entry<bool> reduceUnityJobWorkers = null!;
     private MelonPreferences_Entry<bool> staticTmpScaleDuringSong = null!;
+    private MelonPreferences_Entry<bool> pauseStaticMeterAttach = null!;
     private MelonPreferences_Entry<bool> pauseRewiredMousePolling = null!;
     private MelonPreferences_Entry<bool> pauseRewiredKeyboardPolling = null!;
     private MelonPreferences_Entry<bool> limitSlopHeroShortcutPolling = null!;
@@ -77,6 +78,7 @@ public sealed partial class Core
     private readonly NativeRegularSustainCache nativeSustainCache = new();
     private readonly NativeFretSortingOrderCache fretSortingOrderCache = new();
     private readonly RainbowHighway rainbowHighway = new();
+    private readonly StaticMeterAttachOverride staticMeterAttach = new();
     private readonly InputViewerSuppression inputViewerSuppression = new();
     private readonly NetworkTickRemainderOverride networkTickRemainder = new();
     private readonly OptionalHudAnimationsOverride optionalHudAnimations = new();
@@ -184,6 +186,7 @@ public sealed partial class Core
         pauseHighwayAnimations = preferences.CreateEntry("PerformancePauseHighwayAnimations", false);
         reduceUnityJobWorkers = preferences.CreateEntry("PerformanceReduceUnityJobWorkers", false);
         staticTmpScaleDuringSong = preferences.CreateEntry("PerformanceStaticTmpScaleDuringSong", false);
+        pauseStaticMeterAttach = preferences.CreateEntry("PerformancePauseStaticMeterAttach", false);
         pauseRewiredMousePolling = preferences.CreateEntry("PerformancePauseRewiredMousePolling", false);
         pauseRewiredKeyboardPolling = preferences.CreateEntry("PerformancePauseRewiredKeyboardPolling", false);
         limitSlopHeroShortcutPolling = preferences.CreateEntry("PerformanceLimitSlopHeroShortcutPolling", false);
@@ -704,9 +707,10 @@ public sealed partial class Core
         Toggle(cacheRegularSustainWrites, "Cache repeat regular-sustain native writes (experimental)", x, engineY + 510);
         Toggle(cacheFretSortingWrites, "Skip repeated fret sorting-order writes (experimental)", x, engineY + 550);
         Toggle(limitClonZonesFlameTicks, "Trim blank ClonZones flames / cap polls (experimental)", x, engineY + 590);
-        GUI.Label(new Rect(x + 4, engineY + 636, 610, 108), "Both native caches are default off; your four recent PresentMon runs did not show an FPS gain from either. The separate ClonZones test caps active-flame checks at 240 Hz and, for the exact uploaded Moonlight pack, ends the fully transparent last eight frames early. Flame animation may lag by up to 4 ms. Input and note timing are unchanged.");
+        Toggle(pauseStaticMeterAttach, "Pause stable SP bar / rock meter attachment scripts (experimental)", x, engineY + 630);
+        GUI.Label(new Rect(x + 4, engineY + 678, 610, 108), "Default-off experiments. The two native caches showed no FPS gain in your four comparison runs. ClonZones flame checks can lag by up to 4 ms. The meter script test checks camera and target changes at 20 Hz, so its visuals could briefly lag; scoring and input are untouched.");
 
-        float renderingY = y + 1540;
+        float renderingY = y + 1600;
         SectionHeader("3D rendering experiment", x, renderingY);
         Toggle(limitPlayerCameraFarClip, "Limit guitar-camera far clip in solo songs", x, renderingY + 30);
         Number("Guitar-camera far clip (units)", farClipDistance.Value, x, renderingY + 74, 40, 120,
@@ -1225,6 +1229,7 @@ public sealed partial class Core
             Bool("PerformancePauseHighwayAnimations", pauseHighwayAnimations);
             Bool("PerformanceReduceUnityJobWorkers", reduceUnityJobWorkers);
             Bool("PerformanceStaticTmpScaleDuringSong", staticTmpScaleDuringSong);
+            Bool("PerformancePauseStaticMeterAttach", pauseStaticMeterAttach);
             Bool("PerformancePauseRewiredMousePolling", pauseRewiredMousePolling);
             Bool("PerformancePauseRewiredKeyboardPolling", pauseRewiredKeyboardPolling);
             Bool("PerformanceLimitSlopHeroShortcutPolling", limitSlopHeroShortcutPolling);
@@ -1293,6 +1298,7 @@ public sealed partial class Core
         Bool("PerformancePauseHighwayAnimations", pauseHighwayAnimations);
         Bool("PerformanceReduceUnityJobWorkers", reduceUnityJobWorkers);
         Bool("PerformanceStaticTmpScaleDuringSong", staticTmpScaleDuringSong);
+        Bool("PerformancePauseStaticMeterAttach", pauseStaticMeterAttach);
         Bool("PerformancePauseRewiredMousePolling", pauseRewiredMousePolling);
         Bool("PerformancePauseRewiredKeyboardPolling", pauseRewiredKeyboardPolling);
         Bool("PerformanceLimitSlopHeroShortcutPolling", limitSlopHeroShortcutPolling);
@@ -1630,12 +1636,32 @@ public sealed partial class Core
             if (staticTmpScale.IsActive || staticTmpScale.NeedsRestore)
                 UpdateStaticTmpScaleExperiment(null, clock.Elapsed.TotalSeconds);
             if (optionalHudAnimations.NeedsRestore) optionalHudAnimations.Clear();
+            if (staticMeterAttach.NeedsRestore) staticMeterAttach.Clear();
             return;
         }
         // Read preference entries and inspect Unity objects at the same 20 Hz
         // cadence as the actual visual work. On an unlocked game, doing these
         // checks first would still repeat them thousands of times per second.
         double now = clock.Elapsed.TotalSeconds;
+        // Color animation has its own bounded cadence. The ordinary visual
+        // pass below stays at 20 Hz; a 20 Hz rainbow palette was visibly
+        // stepping even when the game rendered far more often.
+        if (now >= nextRainbowPreferenceCheck)
+        {
+            nextRainbowPreferenceCheck = now + .05;
+            rainbowAnimationPending = rainbowNotes.Value || rainbowFlames.Value || rainbowHighway.HasOverrides;
+        }
+        if (rainbowAnimationPending && now >= nextRainbowAnimationCheck)
+        {
+            nextRainbowAnimationCheck = now + RainbowHighway.PaletteInterval(rainbowCyclesPerSecond.Value);
+            long rainbowTiming = timings.Begin();
+            try
+            {
+                rainbowHighway.Update(HarmonyInstance, rainbowNotes.Value, rainbowFlames.Value,
+                    Il2Cpp.GameManager.field_Private_Static_GameManager_0, now, rainbowCyclesPerSecond.Value);
+            }
+            finally { timings.End(9, rainbowTiming); }
+        }
         HandleOptionalHudResume(now);
         if (now < nextOverridePass) return;
         nextOverridePass = now + .05;
@@ -1724,17 +1750,30 @@ public sealed partial class Core
             && (staticTmpScaleDuringSong.Value || staticTmpScale.IsActive || staticTmpScale.NeedsRestore);
         bool optionalHudPassDue = !optionalHudAnimationsError
             && (hidePbPopup.Value || hideStarPowerSideGlows.Value || optionalHudAnimations.NeedsRestore);
+        bool meterAttachPassDue = pauseStaticMeterAttach.Value || staticMeterAttach.NeedsRestore;
         optionalHudAnimations.UpdateFocusHook(
             hidePbPopup.Value || hideStarPowerSideGlows.Value, gameplay);
         bool visualPending = !visualError && (visualRequested || practiceSpeedRequested || visuals.NeedsUpdate
             || ringUpdateDue);
         if (!nativeHudPending && !visualPending && !comboSmokeRequested && !performanceApplyDue
-            && !starProgressApplyDue && !tmpScalePassDue && !optionalHudPassDue) return;
+            && !starProgressApplyDue && !tmpScalePassDue && !optionalHudPassDue
+            && !meterAttachPassDue) return;
 
         // Avoid GameManager/IL2CPP property reads at the unlocked update rate.
         // All HUD and visual changes refresh at 5–20 Hz, so resolving the
         // manager at the same cadence is sufficient.
         var game = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
+        if (meterAttachPassDue)
+        {
+            long meterTiming = timings.Begin();
+            try
+            {
+                staticMeterAttach.Update(pauseStaticMeterAttach.Value,
+                    offlineSoloOptimizationActive && activeGameplayVisualOptimizationActive
+                    && !settingsOpen && Application.isFocused, game);
+            }
+            finally { timings.End(10, meterTiming); }
+        }
         if (optionalHudPassDue) UpdateOptionalHudAnimations(game, now);
         if (tmpScalePassDue) UpdateStaticTmpScaleExperiment(game, now);
         if (starProgressApplyDue)
@@ -1751,13 +1790,15 @@ public sealed partial class Core
         }
         if (comboSmokeRequested)
         {
-            try { comboSmokeScroll.Apply(freezeComboSmoke, game, now); }
+            long comboSmokeTiming = timings.Begin();
+            try { comboSmokeScroll.Apply(freezeComboSmoke, game, now, offlineSoloOptimizationActive); }
             catch (Exception ex)
             {
                 comboSmokeScroll.Clear();
                 comboSmokeScrollError = true;
                 LoggerInstance.Warning($"Combo smoke optimization stopped; original animation states were restored: {ex.Message}");
             }
+            finally { timings.End(11, comboSmokeTiming); }
         }
         if (game == null || game.globalVariables == null) return;
         bool songReady = game.songLoaded && game.playersInit;

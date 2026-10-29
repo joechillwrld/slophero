@@ -45,7 +45,11 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.135. Its focus/menu polling and native-hook
+The latest packaged build is 0.4.136. It fixes the optional rainbow palette
+cadence and speed continuity, adds a default-off stable SP/rock meter
+SpriteAttach test, and corrects combo-smoke discovery during offline solo
+play. Its evidence and limits are in
+`docs/performance-followup-2026-10-29.md`. Version 0.4.135's focus/menu polling and native-hook
 resume cleanup are in `docs/performance-followup-2026-10-28d.md`.
 Version 0.4.134's shared rainbow-speed slider,
 pre-song native-hook preparation, ClonZones empty-hook gate, and practice

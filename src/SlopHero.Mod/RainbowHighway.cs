@@ -54,9 +54,18 @@ internal sealed class RainbowHighway
     private bool noteHookFailed, flameHookFailed, applyingOwnColor, notesDiscovered, notesActive;
     private bool notesFailed, flamesFailed;
     private double nextPass, nextNotesDiscovery, nextFlamesDiscovery;
+    private double huePhase, lastHueSample;
+    private float previousCycleRate;
+    private bool hueSampled;
 
     internal bool HasOverrides => notesActive || flames.Count != 0 || clonZonesFlames.IsActive
         || noteHookInstalled || flameUpdateHookInstalled;
+
+    internal static float CycleRate(float configured) => float.IsFinite(configured)
+        ? Math.Clamp(configured, .05f, .8f) : .18f;
+
+    internal static double PaletteInterval(float configured) =>
+        1.0 / Math.Clamp(CycleRate(configured) * 200.0, 60.0, 120.0);
 
     internal void Prepare(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames)
     {
@@ -115,16 +124,29 @@ internal sealed class RainbowHighway
         // Initialize a usable palette on the same pass that binds the new
         // ClonZones pool, so the first hit cannot inherit an all-zero tint.
         bool animate = now >= nextPass || flameDiscoveryDue;
-        // Palette updates run at 20 Hz. Skip the list, discovery, and hook
-        // checks on all intervening simulation Updates.
+        // Palette updates run at 60–120 Hz while enabled. Skip the list,
+        // discovery, and hook checks on intervening simulation Updates.
         if (!animate && !noteDiscoveryDue && !flameDiscoveryDue) return;
         float cycle = 0;
         if (animate)
         {
-            nextPass = now + .05;
-            // Slower hue drift makes the note colors less frantic while
-            // retaining a smooth 20 Hz palette update.
-            cycle = (float)(now * Math.Clamp(cyclesPerSecond, .05f, .8f) % 1.0);
+            // A 20 Hz tint made the colors visibly step against Clone Hero's
+            // much faster render cadence. Scale sampling with hue speed while
+            // bounding optional CPU work to 60–120 passes per second.
+            nextPass = now + PaletteInterval(cyclesPerSecond);
+            // Integrate the previous rate through this sample, then adopt a
+            // newly selected rate. Multiplying absolute uptime by the new
+            // rate jumped to an unrelated hue when the slider moved.
+            float rate = CycleRate(cyclesPerSecond);
+            if (!hueSampled || now < lastHueSample)
+            {
+                huePhase = now * rate % 1.0;
+                hueSampled = true;
+            }
+            else huePhase = (huePhase + (now - lastHueSample) * previousCycleRate) % 1.0;
+            lastHueSample = now;
+            previousCycleRate = rate;
+            cycle = (float)huePhase;
             if (colorNotes && !notesFailed)
                 for (int i = 0; i < notePalette.Length; i++)
                     notePalette[i] = Rainbow(cycle + i / (float)notePalette.Length, 1f);
@@ -521,5 +543,8 @@ internal sealed class RainbowHighway
         notesActive = false;
         noteHookFailed = flameHookFailed = false;
         nextPass = nextNotesDiscovery = nextFlamesDiscovery = 0;
+        huePhase = lastHueSample = 0;
+        previousCycleRate = 0;
+        hueSampled = false;
     }
 }
