@@ -11,6 +11,7 @@ namespace SlopHero.Mod;
 /// </summary>
 internal sealed class ComboSmokeScrollOverride
 {
+    private static readonly string[] SmokeNames = { "smoke_combo_fast", "smoke_combo_slow" };
     private readonly record struct ScrollState(UVScroll Component, bool Enabled);
     private readonly Dictionary<IntPtr, ScrollState> states = new();
     private readonly HashSet<IntPtr> discoveredPlayers = new();
@@ -108,19 +109,13 @@ internal sealed class ComboSmokeScrollOverride
                 var guitarRoot = guitar.transform;
 
                 int found = 0;
-                // The current player strips some closed GetComponentsInChildren<T>
-                // wrappers. The live Gameplay snapshot already uses this
-                // scene-wide UVScroll lookup successfully and finds the pair.
-                foreach (var component in UnityEngine.Object.FindObjectsOfType<UVScroll>())
+                // These are fixed paths in the exact-build guitar prefab. Resolve
+                // the two children directly instead of enumerating every UVScroll
+                // in the scene on each discovery pass.
+                foreach (string name in SmokeNames)
                 {
+                    var component = guitarRoot.Find("Combo/multiplier/" + name)?.GetComponent<UVScroll>();
                     if (component == null) continue;
-                    var parent = component.transform.parent;
-                    var combo = parent == null ? null : parent.parent;
-                    if (parent == null || parent.name != "multiplier"
-                        || combo == null || combo.name != "Combo"
-                        || combo.parent == null || combo.parent.Pointer != guitarRoot.Pointer) continue;
-                    string objectName = component.gameObject.name;
-                    if (objectName != "smoke_combo_fast" && objectName != "smoke_combo_slow") continue;
                     found++;
                     if (states.ContainsKey(component.Pointer)) continue;
                     states.Add(component.Pointer, new ScrollState(component, component.enabled));

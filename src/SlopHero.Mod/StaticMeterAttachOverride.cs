@@ -35,13 +35,27 @@ internal sealed class StaticMeterAttachOverride
                 && AnchorBottom.Equals(other.AnchorBottom) && ScaleOffset == other.ScaleOffset
                 && Sprite == other.Sprite && Targets.AsSpan().SequenceEqual(other.Targets);
         }
+
+        internal void CopyFrom(Snapshot other)
+        {
+            Width = other.Width; Height = other.Height;
+            View = other.View; Projection = other.Projection;
+            Root = other.Root; Reference = other.Reference;
+            CameraRect = other.CameraRect; CameraPixelRect = other.CameraPixelRect;
+            AnchorTop = other.AnchorTop; AnchorBottom = other.AnchorBottom;
+            ScaleOffset = other.ScaleOffset; Sprite = other.Sprite;
+            if (Targets.Length != other.Targets.Length) Targets = new TargetPose[other.Targets.Length];
+            other.Targets.AsSpan().CopyTo(Targets);
+        }
     }
 
     private sealed class State
     {
         internal readonly SpriteAttach Attach;
         internal readonly bool OriginalEnabled;
-        internal Snapshot? Last;
+        internal readonly Snapshot Last = new();
+        internal readonly Snapshot Scratch = new();
+        internal bool HasLast;
         internal int StableChecks;
         internal bool Paused;
 
@@ -82,11 +96,15 @@ internal sealed class StaticMeterAttachOverride
                     Restore(state);
                     continue;
                 }
-                Snapshot? current = Capture(attach);
-                if (current == null || state.Last == null || !current.Matches(state.Last))
+                bool captured = Capture(attach, state.Scratch);
+                if (!captured || !state.HasLast || !state.Scratch.Matches(state.Last))
                 {
                     Restore(state);
-                    state.Last = current;
+                    if (captured)
+                    {
+                        state.Last.CopyFrom(state.Scratch);
+                        state.HasLast = true;
+                    }
                     continue;
                 }
                 if (++state.StableChecks >= 2 && attach.enabled)
@@ -130,36 +148,33 @@ internal sealed class StaticMeterAttachOverride
         return false;
     }
 
-    private static Snapshot? Capture(SpriteAttach attach)
+    private static bool Capture(SpriteAttach attach, Snapshot result)
     {
         var camera = attach.playerCam;
         var reference = attach.referenceSprite;
         var targets = attach.objectsToScale;
-        if (camera == null || reference == null || targets == null) return null;
-        var result = new Snapshot
-        {
-            Width = Screen.width,
-            Height = Screen.height,
-            View = camera.worldToCameraMatrix,
-            Projection = camera.projectionMatrix,
-            CameraRect = camera.rect,
-            CameraPixelRect = camera.pixelRect,
-            Root = attach.transform.localToWorldMatrix,
-            Reference = reference.transform.localToWorldMatrix,
-            AnchorTop = attach.anchorTop,
-            AnchorBottom = attach.anchorBottom,
-            ScaleOffset = attach.scaleOffset,
-            Sprite = reference.sprite?.Pointer ?? IntPtr.Zero,
-            Targets = new TargetPose[targets.Length]
-        };
+        if (camera == null || reference == null || targets == null) return false;
+        result.Width = Screen.width;
+        result.Height = Screen.height;
+        result.View = camera.worldToCameraMatrix;
+        result.Projection = camera.projectionMatrix;
+        result.CameraRect = camera.rect;
+        result.CameraPixelRect = camera.pixelRect;
+        result.Root = attach.transform.localToWorldMatrix;
+        result.Reference = reference.transform.localToWorldMatrix;
+        result.AnchorTop = attach.anchorTop;
+        result.AnchorBottom = attach.anchorBottom;
+        result.ScaleOffset = attach.scaleOffset;
+        result.Sprite = reference.sprite?.Pointer ?? IntPtr.Zero;
+        if (result.Targets.Length != targets.Length) result.Targets = new TargetPose[targets.Length];
         for (int i = 0; i < targets.Length; i++)
         {
             var target = targets[i];
-            if (target == null) return null;
+            if (target == null) return false;
             result.Targets[i] = new TargetPose(target.Pointer, target.localPosition,
                 target.localRotation, target.localScale);
         }
-        return result;
+        return true;
     }
 
     private static void Restore(State state)
@@ -171,7 +186,7 @@ internal sealed class StaticMeterAttachOverride
         }
         state.Paused = false;
         state.StableChecks = 0;
-        state.Last = null;
+        state.HasLast = false;
     }
 
     private void Restore()

@@ -45,7 +45,14 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.136. It fixes the optional rainbow palette
+The latest packaged build is 0.4.137. It adds rainbow hue spread/offset,
+saturation, contrast, and brightness, plus a settings-menu surface tint;
+combo-smoke discovery uses direct prefab paths and the default-off meter
+check reuses its comparison buffers. The user's 0.4.136 on capture is only
+0.035 seconds, so it cannot establish an FPS change. The ClonZones original-
+renderer and native bridge reuse ideas remain research pending visual and
+lifecycle checks. See `docs/performance-followup-2026-10-29b.md`.
+Version 0.4.136 fixes the optional rainbow palette
 cadence and speed continuity, adds a default-off stable SP/rock meter
 SpriteAttach test, and corrects combo-smoke discovery during offline solo
 play. Its evidence and limits are in

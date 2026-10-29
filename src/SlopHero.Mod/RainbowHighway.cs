@@ -7,6 +7,9 @@ using FlameAnimator = Il2Cpp.Animator;
 
 namespace SlopHero.Mod;
 
+internal readonly record struct RainbowColorOptions(
+    float HueOffsetDegrees, float HueSpread, float Saturation, float Contrast, float Brightness);
+
 /// <summary>Optional guitar colors; the setter hook exists only while a rainbow option is on.</summary>
 internal sealed class RainbowHighway
 {
@@ -87,7 +90,7 @@ internal sealed class RainbowHighway
     }
 
     internal void Update(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames, GameManager? game, double now,
-        float cyclesPerSecond)
+        float cyclesPerSecond, RainbowColorOptions colorOptions)
     {
         if (!colorNotes) RestoreNotes();
         else if (!notesActive)
@@ -147,13 +150,19 @@ internal sealed class RainbowHighway
             lastHueSample = now;
             previousCycleRate = rate;
             cycle = (float)huePhase;
+            float offset = Math.Clamp(float.IsFinite(colorOptions.HueOffsetDegrees) ? colorOptions.HueOffsetDegrees : 0f, 0f, 360f) / 360f;
+            float spread = Math.Clamp(float.IsFinite(colorOptions.HueSpread) ? colorOptions.HueSpread : 1f, 0f, 2f);
+            float saturation = Math.Clamp(float.IsFinite(colorOptions.Saturation) ? colorOptions.Saturation : .95f, 0f, 1f);
+            float contrast = Math.Clamp(float.IsFinite(colorOptions.Contrast) ? colorOptions.Contrast : 1f, .5f, 1.5f);
+            float brightness = Math.Clamp(float.IsFinite(colorOptions.Brightness) ? colorOptions.Brightness : 1f, .3f, 1f);
             if (colorNotes && !notesFailed)
                 for (int i = 0; i < notePalette.Length; i++)
-                    notePalette[i] = Rainbow(cycle + i / (float)notePalette.Length, 1f);
+                    notePalette[i] = Rainbow(cycle + offset + i / (float)notePalette.Length * spread,
+                        brightness, saturation, contrast);
             if (colorFlames && !flamesFailed)
                 for (int i = 0; i < flamePalette.Length; i++)
-                    flamePalette[i] = Rainbow(cycle + i / (float)flamePalette.Length,
-                        clonZonesFlames.IsActive ? .7f : .4f);
+                    flamePalette[i] = Rainbow(cycle + offset + i / (float)flamePalette.Length * spread,
+                        (clonZonesFlames.IsActive ? .7f : .4f) * brightness, saturation, contrast);
         }
 
         if (colorNotes && !notesFailed && !notesDiscovered && now >= nextNotesDiscovery)
@@ -414,10 +423,15 @@ internal sealed class RainbowHighway
             MelonLogger.Msg($"Rainbow flames tracking {flamesByAnimator.Count} animator-owned sprite renderer(s).");
     }
 
-    private static Color Rainbow(float hue, float brightness)
+    private static Color Rainbow(float hue, float brightness, float saturation, float contrast)
     {
         hue -= MathF.Floor(hue);
-        return Color.HSVToRGB(hue, .95f, brightness);
+        var rgb = Color.HSVToRGB(hue, saturation, 1f);
+        return new Color(
+            Math.Clamp((rgb.r - .5f) * contrast + .5f, 0f, 1f) * brightness,
+            Math.Clamp((rgb.g - .5f) * contrast + .5f, 0f, 1f) * brightness,
+            Math.Clamp((rgb.b - .5f) * contrast + .5f, 0f, 1f) * brightness,
+            1f);
     }
 
     private static void SetRgb(SpriteRenderer renderer, Color color)

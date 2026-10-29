@@ -1,11 +1,16 @@
-# SlopHero 0.4.136 alpha
+# SlopHero 0.4.137 alpha
 
 **Sloptifine** is the name for SlopHero's performance work: reversible
 experiments judged by measurements. Gameplay timing, online play, and the
 1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.136
+build, compiled against its loader and generated assemblies. Version 0.4.137
+adds rainbow hue offset, lane spread, saturation, contrast, and brightness
+controls, plus a customizable settings-menu surface tint and matching popups.
+It removes a scene-wide combo-smoke lookup and repeated managed allocations
+from the optional meter-attachment check. See the [0.4.137 follow-up](docs/performance-followup-2026-10-29b.md).
+Version 0.4.136
 smooths the optional rainbow colors at a bounded 60–120 Hz, keeps their hue
 continuous when the speed slider changes, adds a default-off stable meter
 attachment test, and repairs the combo-smoke switch's solo guitar discovery.
@@ -343,7 +348,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.136 alpha](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.136-alpha.zip?raw=1)
+[Download SlopHero v0.4.137 alpha](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.137-alpha.zip?raw=1)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

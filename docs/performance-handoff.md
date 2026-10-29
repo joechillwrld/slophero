@@ -5,7 +5,19 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
-## 0.4.136 current build
+## 0.4.137 current build
+
+Rainbow hue offset/spread, saturation, contrast, and brightness are now
+customizable. The settings menu has a separate surface tint and strength;
+color-only profiles include all these entries. Combo-smoke discovery uses
+its two exact prefab paths rather than a scene-wide UVScroll scan, and the
+default-off meter check reuses its managed snapshot buffers. The uploaded
+on capture is only 0.035 seconds and cannot be compared to the 30-second off
+capture for FPS. Native bridge reuse and ClonZones' original-renderer mode
+remain research pending the requested lifecycle/visual checks. See
+[the 0.4.137 follow-up](performance-followup-2026-10-29b.md).
+
+## 0.4.136 prior build
 
 Version 0.4.136 moves optional rainbow colors from the ordinary 20 Hz visual
 pass to a bounded 60–120 Hz pass and integrates hue across speed changes.

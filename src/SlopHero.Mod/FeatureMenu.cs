@@ -16,7 +16,8 @@ public sealed partial class Core
     private MelonPreferences_Entry<int> songX = null!, songY = null!, songFont = null!;
     private MelonPreferences_Entry<float> practiceHudX = null!, practiceHudY = null!, fpsHudX = null!, fpsHudY = null!;
     private MelonPreferences_Entry<float> songOpacity = null!;
-    private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!, menuAccentHex = null!;
+    private MelonPreferences_Entry<string> songColor = null!, fcColor = null!, pfcColor = null!, starColor = null!, progressColor = null!, scoreColor = null!, songProgressColor = null!, menuAccentHex = null!, menuSurfaceHex = null!;
+    private MelonPreferences_Entry<float> menuTintStrength = null!;
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
     private MelonPreferences_Entry<bool> pauseHiddenBeatlineUpdates = null!;
     private MelonPreferences_Entry<bool> disableAprilFools = null!;
@@ -48,7 +49,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> cacheFretSortingWrites = null!;
     private MelonPreferences_Entry<bool> limitClonZonesFlameTicks = null!;
     private MelonPreferences_Entry<bool> rainbowNotes = null!, rainbowFlames = null!;
-    private MelonPreferences_Entry<float> rainbowCyclesPerSecond = null!;
+    private MelonPreferences_Entry<float> rainbowCyclesPerSecond = null!, rainbowHueOffset = null!, rainbowHueSpread = null!, rainbowSaturation = null!, rainbowContrast = null!, rainbowBrightness = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, settingsWindowOffsetX = null!, settingsWindowOffsetY = null!;
     private MelonPreferences_Entry<float> scoreHudScale = null!, inputViewerScale = null!, starPowerHudScale = null!, practiceHudScale = null!, fpsHudScale = null!;
@@ -221,6 +222,11 @@ public sealed partial class Core
         rainbowNotes = preferences.CreateEntry("RainbowNotes", false);
         rainbowFlames = preferences.CreateEntry("RainbowFlames", false);
         rainbowCyclesPerSecond = preferences.CreateEntry("RainbowCyclesPerSecond", .18f);
+        rainbowHueOffset = preferences.CreateEntry("RainbowHueOffsetDegrees", 0f);
+        rainbowHueSpread = preferences.CreateEntry("RainbowHueSpread", 1f);
+        rainbowSaturation = preferences.CreateEntry("RainbowSaturation", .95f);
+        rainbowContrast = preferences.CreateEntry("RainbowContrast", 1f);
+        rainbowBrightness = preferences.CreateEntry("RainbowBrightness", 1f);
         // Retire experiments that added global setter/camera work, never drew
         // a batch, or found no eligible material in the user's Windows runs.
         // Ignore their old profile keys below so imports cannot revive them.
@@ -262,6 +268,8 @@ public sealed partial class Core
         scoreColor = preferences.CreateEntry("ScoreTextColor", "FFFFFF");
         InitializeSongSpeedMenu();
         menuAccentHex = preferences.CreateEntry("MenuAccentColor", "A000FF");
+        menuSurfaceHex = preferences.CreateEntry("MenuSurfaceTintColor", "A000FF");
+        menuTintStrength = preferences.CreateEntry("MenuTintStrength", 0f);
     }
 
     private void DrawSettings()
@@ -306,13 +314,13 @@ public sealed partial class Core
                     menuAccentLineStyle.active.background = menuAccentLineStyle.focused.background = Texture2D.whiteTexture;
             }
             GUI.color = Color.white;
-            GUI.backgroundColor = new Color(.035f, .04f, .055f, 1);
+            GUI.backgroundColor = MenuSurface(.035f, .04f, .055f);
             GUI.Box(new Rect(frameX, frameY, menuWidth, menuHeight), "", menuFlatStyle);
-            GUI.backgroundColor = new Color(.025f, .03f, .043f, 1);
+            GUI.backgroundColor = MenuSurface(.025f, .03f, .043f);
             GUI.Box(new Rect(frameX, frameY, sidebarWidth, menuHeight), "", menuFlatStyle);
-            GUI.backgroundColor = new Color(.075f, .08f, .10f, 1);
+            GUI.backgroundColor = MenuSurface(.075f, .08f, .10f);
             GUI.Box(new Rect(frameX + sidebarWidth, frameY, menuWidth - sidebarWidth, menuHeight), "", menuFlatStyle);
-            GUI.backgroundColor = new Color(.045f, .05f, .065f, 1);
+            GUI.backgroundColor = MenuSurface(.045f, .05f, .065f);
             GUI.Box(new Rect(frameX, frameY, menuWidth, 58), "", menuFlatStyle);
 
             menuHeaderStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
@@ -320,7 +328,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.128", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.137", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -348,7 +356,7 @@ public sealed partial class Core
                 Color accent = MenuAccentColor();
                 GUI.backgroundColor = selected
                     ? new Color(accent.r * .34f, accent.g * .34f, accent.b * .34f, 1)
-                    : hovered ? new Color(.11f, .12f, .16f, 1) : new Color(.045f, .05f, .065f, 1);
+                    : hovered ? MenuSurface(.11f, .12f, .16f) : MenuSurface(.045f, .05f, .065f);
                 if (GUI.Button(rect, SettingsPages[i], menuNavStyle) && settingsPage != i)
                 {
                     settingsPage = i;
@@ -368,7 +376,7 @@ public sealed partial class Core
 
             GUI.backgroundColor = MenuAccentColor();
             GUI.Box(new Rect(frameX, frameY, menuWidth, 3), "", menuFlatStyle);
-            GUI.backgroundColor = new Color(.075f, .08f, .10f, 1);
+            GUI.backgroundColor = MenuSurface(.075f, .08f, .10f);
             GUI.Box(new Rect(frameX + sidebarWidth + 12, frameY + 70, menuWidth - sidebarWidth - 24, menuHeight - 82), "", menuFlatStyle);
             // Use the character as a faint watermark beneath the page controls,
             // rather than a separate sticker in an empty side column.
@@ -385,7 +393,7 @@ public sealed partial class Core
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 4 => 720, 6 => 2240, _ => 500 };
+        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 4 => 1230, 6 => 2240, _ => 500 };
         Rect viewport = new(frameX + sidebarWidth + 12, frameY + 132, 680, menuHeight - 146);
         Rect content = new(0, 0, 656, contentHeight);
         settingsScrollPosition = GUI.BeginScrollView(viewport, settingsScrollPosition, content);
@@ -393,7 +401,7 @@ public sealed partial class Core
         Color controlBackground = GUI.backgroundColor, controlColor = GUI.contentColor;
         try
         {
-            GUI.backgroundColor = new Color(.14f, .15f, .19f, 1);
+            GUI.backgroundColor = MenuSurface(.14f, .15f, .19f);
             GUI.contentColor = new Color(.92f, .93f, .97f, 1);
             switch (settingsPage)
             {
@@ -654,16 +662,36 @@ public sealed partial class Core
         Hex(starColor, "Stars", x, y + 192); Hex(progressColor, "Star progress bar", x, y + 232);
         Hex(scoreColor, "Score / accuracy text", x, y + 272);
         Hex(songProgressColor, "Song progress bar", x, y + 312);
-        Hex(menuAccentHex, "Menu accent", x, y + 352);
-        SectionHeader("Highway colors", x, y + 430);
-        Toggle(rainbowNotes, "Rainbow notes", x, y + 460);
-        Toggle(rainbowFlames, "Rainbow fret flames", x, y + 500);
-        float rate = Math.Clamp(rainbowCyclesPerSecond.Value, .05f, .8f);
-        GUI.Label(new Rect(x + 4, y + 545, 610, 28), $"Rainbow cycle: {1f / rate:0.0} seconds");
-        float selectedRate = MathF.Round(GUI.HorizontalSlider(new Rect(x + 8, y + 578, 530, 24), rate, .05f, .8f) * 100f) / 100f;
+        SectionHeader("Menu theme", x, y + 384);
+        Hex(menuAccentHex, "Menu accent", x, y + 414);
+        Hex(menuSurfaceHex, "Menu surface tint", x, y + 454);
+        FloatSlider(menuTintStrength, "Menu tint strength", x, y + 500, 0f, 1f, .05f, 100f, "%");
+
+        SectionHeader("Highway colors", x, y + 580);
+        Toggle(rainbowNotes, "Rainbow notes", x, y + 610);
+        Toggle(rainbowFlames, "Rainbow fret flames", x, y + 650);
+        float rate = RainbowHighway.CycleRate(rainbowCyclesPerSecond.Value);
+        GUI.Label(new Rect(x + 4, y + 700, 610, 28), $"Rainbow cycle: {1f / rate:0.0} seconds");
+        float selectedRate = MathF.Round(GUI.HorizontalSlider(new Rect(x + 8, y + 730, 530, 24), rate, .05f, .8f) * 100f) / 100f;
         if (selectedRate != rainbowCyclesPerSecond.Value)
         { rainbowCyclesPerSecond.Value = selectedRate; preferencesDirty = true; }
-        GUI.Label(new Rect(x + 4, y + 616, 610, 62), "Sets the note and flame color cycle together. Normal colors return when disabled. With ClonZones 2.0, rainbow flames tint its replacement sprites; the fret-effects switch otherwise suspends those sprites too.");
+        FloatSlider(rainbowHueOffset, "Hue offset", x, y + 768, 0f, 360f, 5f, 1f, "°");
+        FloatSlider(rainbowHueSpread, "Hue spread between lanes", x, y + 830, 0f, 2f, .05f, 100f, "%");
+        FloatSlider(rainbowSaturation, "Saturation", x, y + 892, 0f, 1f, .05f, 100f, "%");
+        FloatSlider(rainbowContrast, "Contrast", x, y + 954, .5f, 1.5f, .05f, 1f, "x");
+        FloatSlider(rainbowBrightness, "Brightness", x, y + 1016, .3f, 1f, .05f, 100f, "%");
+        GUI.Label(new Rect(x + 4, y + 1090, 610, 72), "Rainbow controls affect notes and flames together during a song. Zero hue spread gives every lane the same moving hue. Menu tint affects this settings window and its value popups. Normal colors return when rainbow is off.");
+    }
+
+    private void FloatSlider(MelonPreferences_Entry<float> entry, string label, float x, float y,
+        float min, float max, float step, float displayScale, string unit)
+    {
+        float current = float.IsFinite(entry.Value) ? Math.Clamp(entry.Value, min, max) : min;
+        GUI.Label(new Rect(x + 4, y, 610, 28), $"{label}: {current * displayScale:0.##}{unit}");
+        float selected = GUI.HorizontalSlider(new Rect(x + 8, y + 30, 530, 24), current, min, max);
+        selected = Math.Clamp(MathF.Round(selected / step) * step, min, max);
+        if (selected != entry.Value)
+        { entry.Value = selected; preferencesDirty = true; }
     }
 
     private void DrawPerformanceSettings(float x, float y)
@@ -740,13 +768,13 @@ public sealed partial class Core
             bool changed = GUI.Button(row, "", menuClickStyle);
             if (hovered)
             {
-                GUI.backgroundColor = new Color(.10f, .11f, .15f, 1);
+                GUI.backgroundColor = MenuSurface(.10f, .11f, .15f);
                 GUI.Box(row, "", menuFlatStyle);
             }
-            GUI.backgroundColor = new Color(.10f, .11f, .14f, 1);
+            GUI.backgroundColor = MenuSurface(.10f, .11f, .14f);
             Rect checkbox = new(x + 8, y + 6, 24, 24);
             GUI.Box(checkbox, "", menuFlatStyle);
-            GUI.backgroundColor = entry.Value ? MenuAccentColor() : new Color(.055f, .06f, .075f, 1);
+            GUI.backgroundColor = entry.Value ? MenuAccentColor() : MenuSurface(.055f, .06f, .075f);
             Rect checkboxInner = new(checkbox.x + 2, checkbox.y + 2, checkbox.width - 4, checkbox.height - 4);
             GUI.Box(checkboxInner, "", menuFlatStyle);
             GUI.backgroundColor = previousBackground;
@@ -1172,6 +1200,25 @@ public sealed partial class Core
         return color;
     }
 
+    private Color MenuSurface(float red, float green, float blue)
+    {
+        float strength = float.IsFinite(menuTintStrength.Value)
+            ? Math.Clamp(menuTintStrength.Value, 0f, 1f) : 0f;
+        if (strength == 0) return new Color(red, green, blue, 1f);
+        string hex = string.IsNullOrWhiteSpace(menuSurfaceHex.Value) ? "A000FF" : menuSurfaceHex.Value;
+        if (!parsedColors.TryGetValue(hex, out Color tint))
+        {
+            try { tint = ParseColor(hex); }
+            catch (FormatException) { tint = new Color(.63f, 0f, 1f, 1f); }
+            if (parsedColors.Count > 64) parsedColors.Clear();
+            parsedColors[hex] = tint;
+        }
+        float amount = strength * .18f;
+        return new Color(Math.Clamp(red + (tint.r - .5f) * amount, 0f, .30f),
+            Math.Clamp(green + (tint.g - .5f) * amount, 0f, .30f),
+            Math.Clamp(blue + (tint.b - .5f) * amount, 0f, .30f), 1f);
+    }
+
     private void SaveProfile(string name, bool colorsOnly)
     {
         if (settingsProfiles == null) { profileNotice = "Profile folder is unavailable."; return; }
@@ -1250,9 +1297,12 @@ public sealed partial class Core
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Bool("RainbowNotes", rainbowNotes); Bool("RainbowFlames", rainbowFlames);
         Float("RainbowCyclesPerSecond", rainbowCyclesPerSecond);
+        Float("RainbowHueOffsetDegrees", rainbowHueOffset); Float("RainbowHueSpread", rainbowHueSpread);
+        Float("RainbowSaturation", rainbowSaturation); Float("RainbowContrast", rainbowContrast); Float("RainbowBrightness", rainbowBrightness);
         Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
         Text("ProgressColor", progressColor); Text("ScoreTextColor", scoreColor); Text("SongProgressColor", songProgressColor); Text("FpsTextColor", fpsTextColor);
         Text("MenuAccentColor", menuAccentHex);
+        Text("MenuSurfaceTintColor", menuSurfaceHex); Float("MenuTintStrength", menuTintStrength);
         if (colorsOnly)
         {
             Float("TextRed", textRed); Float("TextGreen", textGreen); Float("TextBlue", textBlue); Float("BackgroundOpacity", backgroundOpacity); Float("SongBackgroundOpacity", songOpacity);
@@ -1322,6 +1372,10 @@ public sealed partial class Core
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Bool("RainbowNotes", rainbowNotes); Bool("RainbowFlames", rainbowFlames);
         Float("RainbowCyclesPerSecond", rainbowCyclesPerSecond, .05f, .8f);
+        Float("RainbowHueOffsetDegrees", rainbowHueOffset, 0, 360); Float("RainbowHueSpread", rainbowHueSpread, 0, 2);
+        Float("RainbowSaturation", rainbowSaturation, 0, 1); Float("RainbowContrast", rainbowContrast, .5f, 1.5f);
+        Float("RainbowBrightness", rainbowBrightness, .3f, 1);
+        Float("MenuTintStrength", menuTintStrength, 0, 1);
         Float("SettingsMenuScale", settingsMenuScale, .85f, 1.4f);
         Float("SettingsWindowOffsetX", settingsWindowOffsetX, -4096, 4096); Float("SettingsWindowOffsetY", settingsWindowOffsetY, -4096, 4096);
         Float("ScoreHudScale", scoreHudScale, .5f, 2.5f); Float("InputViewerScale", inputViewerScale, .5f, 2.5f); Float("StarPowerHudScale", starPowerHudScale, .5f, 2.5f); Float("PracticeHudScale", practiceHudScale, .5f, 2.5f); Float("FpsHudScale", fpsHudScale, .5f, 2.5f);
@@ -1333,6 +1387,7 @@ public sealed partial class Core
         Hex("SongTextColor", songColor); Hex("FcColor", fcColor); Hex("PerfectFcColor", pfcColor); Hex("StarColor", starColor);
         Hex("ProgressColor", progressColor); Hex("ScoreTextColor", scoreColor); Hex("SongProgressColor", songProgressColor); Hex("FpsTextColor", fpsTextColor);
         Hex("MenuAccentColor", menuAccentHex);
+        Hex("MenuSurfaceTintColor", menuSurfaceHex);
         return invalid;
     }
 
@@ -1388,7 +1443,7 @@ public sealed partial class Core
         {
             if (hovered)
             {
-                GUI.backgroundColor = new Color(.10f, .11f, .15f, 1);
+                GUI.backgroundColor = MenuSurface(.10f, .11f, .15f);
                 GUI.Box(rect, "", menuFlatStyle);
             }
             menuActionStyle ??= new GUIStyle(GUI.skin.label)
@@ -1504,9 +1559,9 @@ public sealed partial class Core
             GUI.backgroundColor = Color.black;
             GUI.Box(new Rect(0, 0, Screen.width, Screen.height), "", menuFlatStyle);
             GUI.color = Color.white;
-            GUI.backgroundColor = new Color(.035f, .04f, .055f, 1);
+            GUI.backgroundColor = MenuSurface(.035f, .04f, .055f);
             GUI.Box(new Rect(x, y, width, height), "", menuFlatStyle);
-            GUI.backgroundColor = new Color(.05f, .055f, .075f, 1);
+            GUI.backgroundColor = MenuSurface(.05f, .055f, .075f);
             GUI.Box(new Rect(x, y, width, 68), "", menuFlatStyle);
             GUI.backgroundColor = MenuAccentColor();
             GUI.Box(new Rect(x, y, width, 4), "", menuFlatStyle);
@@ -1521,7 +1576,7 @@ public sealed partial class Core
             GUI.Label(new Rect(x + 24, y + 72, width - 48, 32), "Enter a value. Press Enter to apply or Escape to cancel.", menuPopupTextStyle);
 
             Rect input = new(x + 24, y + 108, width - 48, 48);
-            GUI.backgroundColor = new Color(.015f, .02f, .03f, 1);
+            GUI.backgroundColor = MenuSurface(.015f, .02f, .03f);
             GUI.Box(input, "", menuFlatStyle);
             menuPopupValueStyle ??= new GUIStyle(GUI.skin.label)
                 { fontSize = 18, alignment = TextAnchor.MiddleLeft };
@@ -1539,7 +1594,7 @@ public sealed partial class Core
             bool apply = PopupButton(new Rect(x + 24, buttonY, buttonWidth, 48), "Apply",
                 MenuAccentColor());
             bool cancel = PopupButton(new Rect(x + 44 + buttonWidth, buttonY, buttonWidth, 48), "Cancel",
-                new Color(.14f, .15f, .18f, 1));
+                MenuSurface(.14f, .15f, .18f));
             var e = Event.current;
             if (e.type == EventType.KeyDown)
             {
@@ -1658,7 +1713,9 @@ public sealed partial class Core
             try
             {
                 rainbowHighway.Update(HarmonyInstance, rainbowNotes.Value, rainbowFlames.Value,
-                    Il2Cpp.GameManager.field_Private_Static_GameManager_0, now, rainbowCyclesPerSecond.Value);
+                    Il2Cpp.GameManager.field_Private_Static_GameManager_0, now, rainbowCyclesPerSecond.Value,
+                    new RainbowColorOptions(rainbowHueOffset.Value, rainbowHueSpread.Value,
+                        rainbowSaturation.Value, rainbowContrast.Value, rainbowBrightness.Value));
             }
             finally { timings.End(9, rainbowTiming); }
         }
