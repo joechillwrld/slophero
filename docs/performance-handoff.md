@@ -5,7 +5,17 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
-## 0.4.138 current build
+## 0.4.139 current build
+
+Rainbow colors can now stop cycling at a predictable base hue, so hue
+rotation produces a fixed palette. Saturation and brightness can reach 200%.
+A separate default-off switch caps moving-rainbow palette work at 60 Hz. The
+four new raw captures contain mixed visual/scene-entry settings and do not
+isolate a steady-play gain from the 0.4.138 switches. See [the 0.4.139
+follow-up](performance-followup-2026-10-29d.md) for exact run mapping and
+limits.
+
+## 0.4.138 prior build
 
 Four separate default-off experiments cover ClonZones original fret
 renderers, inactive native bridge retention between scenes, inactive Rewired

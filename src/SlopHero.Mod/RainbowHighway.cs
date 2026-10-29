@@ -68,10 +68,11 @@ internal sealed class RainbowHighway
         || noteHookInstalled || flameUpdateHookInstalled;
 
     internal static float CycleRate(float configured) => float.IsFinite(configured)
-        ? Math.Clamp(configured, .05f, .8f) : .18f;
+        ? Math.Clamp(configured, 0f, .8f) : .18f;
 
-    internal static double PaletteInterval(float configured) =>
-        1.0 / Math.Clamp(CycleRate(configured) * 200.0, 60.0, 120.0);
+    internal static double PaletteInterval(float configured, bool capAt60Hz = false) =>
+        CycleRate(configured) == 0f ? 1.0 / 30.0
+            : 1.0 / Math.Clamp(CycleRate(configured) * 200.0, 60.0, capAt60Hz ? 60.0 : 120.0);
 
     internal void Prepare(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames)
     {
@@ -93,7 +94,7 @@ internal sealed class RainbowHighway
     }
 
     internal void Update(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames, GameManager? game, double now,
-        float cyclesPerSecond, RainbowColorOptions colorOptions, bool cacheActivePool)
+        float cyclesPerSecond, RainbowColorOptions colorOptions, bool cacheActivePool, bool capPaletteAt60Hz)
     {
         if (cacheActivePool != cacheActivePoolWasEnabled)
         {
@@ -136,7 +137,8 @@ internal sealed class RainbowHighway
         // Initialize a usable palette on the same pass that binds the new
         // ClonZones pool, so the first hit cannot inherit an all-zero tint.
         bool animate = now >= nextPass || flameDiscoveryDue;
-        // Palette updates run at 60–120 Hz while enabled. Skip the list,
+        // Moving palettes update at 60–120 Hz; a stopped palette needs only
+        // 30 Hz to admit newly active pooled notes. Skip the list,
         // discovery, and hook checks on intervening simulation Updates.
         if (!animate && !noteDiscoveryDue && !flameDiscoveryDue) return;
         float cycle = 0;
@@ -145,7 +147,7 @@ internal sealed class RainbowHighway
             // A 20 Hz tint made the colors visibly step against Clone Hero's
             // much faster render cadence. Scale sampling with hue speed while
             // bounding optional CPU work to 60–120 passes per second.
-            nextPass = now + PaletteInterval(cyclesPerSecond);
+            nextPass = now + PaletteInterval(cyclesPerSecond, capPaletteAt60Hz);
             // Integrate the previous rate through this sample, then adopt a
             // newly selected rate. Multiplying absolute uptime by the new
             // rate jumped to an unrelated hue when the slider moved.
@@ -155,15 +157,21 @@ internal sealed class RainbowHighway
                 huePhase = now * rate % 1.0;
                 hueSampled = true;
             }
+            else if (rate == 0f && previousCycleRate != 0f)
+            {
+                // A stopped palette should have a reproducible base hue so
+                // the rotation slider selects the same colors every time.
+                huePhase = 0;
+            }
             else huePhase = (huePhase + (now - lastHueSample) * previousCycleRate) % 1.0;
             lastHueSample = now;
             previousCycleRate = rate;
             cycle = (float)huePhase;
-            float offset = Math.Clamp(float.IsFinite(colorOptions.HueOffsetDegrees) ? colorOptions.HueOffsetDegrees : 0f, 0f, 360f) / 360f;
+            float offset = Math.Clamp(float.IsFinite(colorOptions.HueOffsetDegrees) ? colorOptions.HueOffsetDegrees : 0f, 0f, 355f) / 360f;
             float spread = Math.Clamp(float.IsFinite(colorOptions.HueSpread) ? colorOptions.HueSpread : 1f, 0f, 2f);
-            float saturation = Math.Clamp(float.IsFinite(colorOptions.Saturation) ? colorOptions.Saturation : .95f, 0f, 1f);
+            float saturation = Math.Clamp(float.IsFinite(colorOptions.Saturation) ? colorOptions.Saturation : .95f, 0f, 2f);
             float contrast = Math.Clamp(float.IsFinite(colorOptions.Contrast) ? colorOptions.Contrast : 1f, .5f, 1.5f);
-            float brightness = Math.Clamp(float.IsFinite(colorOptions.Brightness) ? colorOptions.Brightness : 1f, .3f, 1f);
+            float brightness = Math.Clamp(float.IsFinite(colorOptions.Brightness) ? colorOptions.Brightness : 1f, .3f, 2f);
             if (colorNotes && !notesFailed)
                 for (int i = 0; i < notePalette.Length; i++)
                     notePalette[i] = Rainbow(cycle + offset + i / (float)notePalette.Length * spread,
@@ -447,11 +455,20 @@ internal sealed class RainbowHighway
     private static Color Rainbow(float hue, float brightness, float saturation, float contrast)
     {
         hue -= MathF.Floor(hue);
-        var rgb = Color.HSVToRGB(hue, saturation, 1f);
+        var rgb = Color.HSVToRGB(hue, MathF.Min(saturation, 1f), 1f);
+        if (saturation > 1f)
+        {
+            // HSV is capped at full saturation. Above 100%, expand each
+            // channel away from its luminance so the extra range is real.
+            float grey = rgb.r * .2126f + rgb.g * .7152f + rgb.b * .0722f;
+            rgb.r = MathF.Max(0f, grey + (rgb.r - grey) * saturation);
+            rgb.g = MathF.Max(0f, grey + (rgb.g - grey) * saturation);
+            rgb.b = MathF.Max(0f, grey + (rgb.b - grey) * saturation);
+        }
         return new Color(
-            Math.Clamp((rgb.r - .5f) * contrast + .5f, 0f, 1f) * brightness,
-            Math.Clamp((rgb.g - .5f) * contrast + .5f, 0f, 1f) * brightness,
-            Math.Clamp((rgb.b - .5f) * contrast + .5f, 0f, 1f) * brightness,
+            Math.Clamp(((rgb.r - .5f) * contrast + .5f) * brightness, 0f, 2f),
+            Math.Clamp(((rgb.g - .5f) * contrast + .5f) * brightness, 0f, 2f),
+            Math.Clamp(((rgb.b - .5f) * contrast + .5f) * brightness, 0f, 2f),
             1f);
     }
 

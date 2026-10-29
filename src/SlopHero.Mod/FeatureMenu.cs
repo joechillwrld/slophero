@@ -52,6 +52,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> retainNativeBridgesBetweenScenes = null!;
     private MelonPreferences_Entry<bool> retainRewiredHooksBetweenScenes = null!;
     private MelonPreferences_Entry<bool> cacheRainbowActivePool = null!;
+    private MelonPreferences_Entry<bool> limitRainbowPalette60Hz = null!;
     private MelonPreferences_Entry<bool> rainbowNotes = null!, rainbowFlames = null!;
     private MelonPreferences_Entry<float> rainbowCyclesPerSecond = null!, rainbowHueOffset = null!, rainbowHueSpread = null!, rainbowSaturation = null!, rainbowContrast = null!, rainbowBrightness = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
@@ -218,6 +219,7 @@ public sealed partial class Core
         retainNativeBridgesBetweenScenes = preferences.CreateEntry("PerformanceRetainNativeBridgesBetweenScenes", false);
         retainRewiredHooksBetweenScenes = preferences.CreateEntry("PerformanceRetainRewiredHooksBetweenScenes", false);
         cacheRainbowActivePool = preferences.CreateEntry("PerformanceCacheRainbowActivePool", false);
+        limitRainbowPalette60Hz = preferences.CreateEntry("PerformanceLimitRainbowPalette60Hz", false);
         // Render-every-update consumed enough CPU to reduce simulation Updates
         // by roughly 35% in the user's four-run comparison. Retire any saved
         // value, including values written by older profiles.
@@ -336,7 +338,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.138", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.139", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -679,16 +681,18 @@ public sealed partial class Core
         Toggle(rainbowNotes, "Rainbow notes", x, y + 610);
         Toggle(rainbowFlames, "Rainbow fret flames", x, y + 650);
         float rate = RainbowHighway.CycleRate(rainbowCyclesPerSecond.Value);
-        GUI.Label(new Rect(x + 4, y + 700, 610, 28), $"Rainbow cycle: {1f / rate:0.0} seconds");
-        float selectedRate = MathF.Round(GUI.HorizontalSlider(new Rect(x + 8, y + 730, 530, 24), rate, .05f, .8f) * 100f) / 100f;
+        GUI.Label(new Rect(x + 4, y + 700, 610, 28), rate == 0f
+            ? "Rainbow cycle: stopped (hue rotation sets a fixed palette)"
+            : $"Rainbow cycle: {1f / rate:0.0} seconds");
+        float selectedRate = MathF.Round(GUI.HorizontalSlider(new Rect(x + 8, y + 730, 530, 24), rate, 0f, .8f) * 100f) / 100f;
         if (selectedRate != rainbowCyclesPerSecond.Value)
         { rainbowCyclesPerSecond.Value = selectedRate; preferencesDirty = true; }
-        FloatSlider(rainbowHueOffset, "Hue offset", x, y + 768, 0f, 360f, 5f, 1f, "°");
+        FloatSlider(rainbowHueOffset, "Hue rotation", x, y + 768, 0f, 355f, 5f, 1f, "°");
         FloatSlider(rainbowHueSpread, "Hue spread between lanes", x, y + 830, 0f, 2f, .05f, 100f, "%");
-        FloatSlider(rainbowSaturation, "Saturation", x, y + 892, 0f, 1f, .05f, 100f, "%");
+        FloatSlider(rainbowSaturation, "Saturation", x, y + 892, 0f, 2f, .05f, 100f, "%");
         FloatSlider(rainbowContrast, "Contrast", x, y + 954, .5f, 1.5f, .05f, 1f, "x");
-        FloatSlider(rainbowBrightness, "Brightness", x, y + 1016, .3f, 1f, .05f, 100f, "%");
-        GUI.Label(new Rect(x + 4, y + 1090, 610, 72), "Rainbow controls affect notes and flames together during a song. Zero hue spread gives every lane the same moving hue. Menu tint affects this settings window and its value popups. Normal colors return when rainbow is off.");
+        FloatSlider(rainbowBrightness, "Brightness", x, y + 1016, .3f, 2f, .05f, 100f, "%");
+        GUI.Label(new Rect(x + 4, y + 1090, 610, 72), "Set rainbow cycle fully left to stop it, then hue rotation selects a fixed palette. Saturation and brightness above 100% can clip or wash out additive flames. Menu tint affects this settings window and its value popups. Normal colors return when rainbow is off.");
     }
 
     private void FloatSlider(MelonPreferences_Entry<float> entry, string label, float x, float y,
@@ -748,9 +752,10 @@ public sealed partial class Core
         Toggle(retainNativeBridgesBetweenScenes, "Retain inactive native bridges between songs (experimental)", x, engineY + 710);
         Toggle(retainRewiredHooksBetweenScenes, "Retain inactive Rewired hooks between songs (experimental)", x, engineY + 750);
         Toggle(cacheRainbowActivePool, "Cache active rainbow-note pool (experimental)", x, engineY + 790);
-        GUI.Label(new Rect(x + 4, engineY + 838, 610, 138), "Default-off experiments. ClonZones' original fret path may change layering; it applies on the next Gameplay load. Retained native/Rewired hooks may reduce song-entry hitches, but leave pass-through hooks in menus. A native lifecycle error could crash the game. Rainbow pool membership checks run at 30 Hz with this option, so a newly shown note might briefly use its old color.");
+        Toggle(limitRainbowPalette60Hz, "Limit moving rainbow palette to 60 Hz (experimental)", x, engineY + 830);
+        GUI.Label(new Rect(x + 4, engineY + 878, 610, 138), "Default-off experiments. ClonZones' original fret path may change layering; it applies on the next Gameplay load. Retained native/Rewired hooks may reduce song-entry hitches, but leave pass-through hooks in menus. A native lifecycle error could crash the game. Rainbow pool membership checks run at 30 Hz with its option; a 60 Hz palette may look less smooth at high cycle speeds.");
 
-        float renderingY = y + 1830;
+        float renderingY = y + 1870;
         SectionHeader("3D rendering experiment", x, renderingY);
         Toggle(limitPlayerCameraFarClip, "Limit guitar-camera far clip in solo songs", x, renderingY + 30);
         Number("Guitar-camera far clip (units)", farClipDistance.Value, x, renderingY + 74, 40, 120,
@@ -1306,6 +1311,7 @@ public sealed partial class Core
             Bool("PerformanceRetainNativeBridgesBetweenScenes", retainNativeBridgesBetweenScenes);
             Bool("PerformanceRetainRewiredHooksBetweenScenes", retainRewiredHooksBetweenScenes);
             Bool("PerformanceCacheRainbowActivePool", cacheRainbowActivePool);
+            Bool("PerformanceLimitRainbowPalette60Hz", limitRainbowPalette60Hz);
             Bool("PerformanceHidePbPopup", hidePbPopup);
             Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
             Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1382,6 +1388,7 @@ public sealed partial class Core
         Bool("PerformanceRetainNativeBridgesBetweenScenes", retainNativeBridgesBetweenScenes);
         Bool("PerformanceRetainRewiredHooksBetweenScenes", retainRewiredHooksBetweenScenes);
         Bool("PerformanceCacheRainbowActivePool", cacheRainbowActivePool);
+        Bool("PerformanceLimitRainbowPalette60Hz", limitRainbowPalette60Hz);
         Bool("PerformanceHidePbPopup", hidePbPopup);
         Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
         Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1391,10 +1398,10 @@ public sealed partial class Core
             Bool("PerformanceFreezeLyricsBackgroundScroll", freezeComboSmokeScroll);
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Bool("RainbowNotes", rainbowNotes); Bool("RainbowFlames", rainbowFlames);
-        Float("RainbowCyclesPerSecond", rainbowCyclesPerSecond, .05f, .8f);
-        Float("RainbowHueOffsetDegrees", rainbowHueOffset, 0, 360); Float("RainbowHueSpread", rainbowHueSpread, 0, 2);
-        Float("RainbowSaturation", rainbowSaturation, 0, 1); Float("RainbowContrast", rainbowContrast, .5f, 1.5f);
-        Float("RainbowBrightness", rainbowBrightness, .3f, 1);
+        Float("RainbowCyclesPerSecond", rainbowCyclesPerSecond, 0f, .8f);
+        Float("RainbowHueOffsetDegrees", rainbowHueOffset, 0, 355); Float("RainbowHueSpread", rainbowHueSpread, 0, 2);
+        Float("RainbowSaturation", rainbowSaturation, 0, 2); Float("RainbowContrast", rainbowContrast, .5f, 1.5f);
+        Float("RainbowBrightness", rainbowBrightness, .3f, 2);
         Float("MenuTintStrength", menuTintStrength, 0, 1);
         Float("SettingsMenuScale", settingsMenuScale, .85f, 1.4f);
         Float("SettingsWindowOffsetX", settingsWindowOffsetX, -4096, 4096); Float("SettingsWindowOffsetY", settingsWindowOffsetY, -4096, 4096);
@@ -1728,7 +1735,8 @@ public sealed partial class Core
         }
         if (rainbowAnimationPending && now >= nextRainbowAnimationCheck)
         {
-            nextRainbowAnimationCheck = now + RainbowHighway.PaletteInterval(rainbowCyclesPerSecond.Value);
+            nextRainbowAnimationCheck = now + RainbowHighway.PaletteInterval(rainbowCyclesPerSecond.Value,
+                limitRainbowPalette60Hz.Value);
             long rainbowTiming = timings.Begin();
             try
             {
@@ -1736,7 +1744,7 @@ public sealed partial class Core
                     Il2Cpp.GameManager.field_Private_Static_GameManager_0, now, rainbowCyclesPerSecond.Value,
                     new RainbowColorOptions(rainbowHueOffset.Value, rainbowHueSpread.Value,
                         rainbowSaturation.Value, rainbowContrast.Value, rainbowBrightness.Value),
-                    cacheRainbowActivePool.Value);
+                    cacheRainbowActivePool.Value, limitRainbowPalette60Hz.Value);
             }
             finally { timings.End(9, rainbowTiming); }
         }

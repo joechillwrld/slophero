@@ -45,7 +45,10 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.138. It adds four separate default-off
+The latest packaged build is 0.4.139. It adds a stopped rainbow cycle for a
+fixed hue palette, saturation and brightness up to 200%, and a separate
+default-off 60 Hz moving-rainbow cap. The 0.4.138 four-run capture has mixed
+settings; see `docs/performance-followup-2026-10-29d.md`. Version 0.4.138 adds four separate default-off
 experiments: ClonZones original fret renderers, inactive native and Rewired
 hook retention across scenes, and a 30 Hz active rainbow-note pool scan.
 The first can change fret layering, the second can crash on a lifecycle
