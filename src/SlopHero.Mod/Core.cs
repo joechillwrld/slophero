@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.137", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.138", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -24,6 +24,7 @@ public sealed partial class Core : MelonMod
     private readonly CounterCanvasHud songCanvas = new(songMode: true);
     private readonly ClonZonesFlameTickGate clonZonesFlameTickGate = new();
     private readonly ClonZonesFlameSuppressor clonZonesFlameSuppressor = new();
+    private readonly ClonZonesOriginalFretRenderers clonZonesOriginalFretRenderers = new();
     private SettingsProfiles? settingsProfiles;
     private string[] profileNames = Array.Empty<string>();
     private int profileIndex;
@@ -115,12 +116,58 @@ public sealed partial class Core : MelonMod
         LoggerInstance.Msg("F8: SlopHero settings. Default: hold R to restart, hold P to practice the current section.");
     }
 
+    private void ResetNativeBridgesForScene()
+    {
+        if (!compatible || !retainNativeBridgesBetweenScenes.Value)
+        {
+            nativeSustainCache.Clear();
+            fretSortingOrderCache.Clear();
+            plainHeldSustains.Clear(HarmonyInstance);
+            return;
+        }
+        // Keep only bridges whose own feature remains selected. Their native
+        // flags route calls through to the original game methods while idle;
+        // the tables are cleared on reactivation and glow scene references
+        // are discarded before the outgoing objects are destroyed.
+        try
+        {
+            if (cacheRegularSustainWrites.Value) nativeSustainCache.SuspendForScene();
+            else nativeSustainCache.Clear();
+            if (cacheFretSortingWrites.Value) fretSortingOrderCache.SuspendForScene();
+            else fretSortingOrderCache.Clear();
+            if (hideHeldSustainGlow.Value) plainHeldSustains.SuspendForScene();
+            else plainHeldSustains.Clear(HarmonyInstance);
+        }
+        catch (Exception ex)
+        {
+            LoggerInstance.Warning($"Native bridge retention stopped; restoring original callsites: {ex.Message}");
+            nativeSustainCache.Clear();
+            fretSortingOrderCache.Clear();
+            plainHeldSustains.Clear(HarmonyInstance);
+        }
+    }
+
+    private void ResetRewiredHooksForScene()
+    {
+        if (!compatible || !retainRewiredHooksBetweenScenes.Value)
+        {
+            rewiredMousePolling.Clear(HarmonyInstance);
+            rewiredKeyboardPolling.Clear(HarmonyInstance);
+            return;
+        }
+        if (pauseRewiredMousePolling.Value) rewiredMousePolling.Disable();
+        else rewiredMousePolling.Clear(HarmonyInstance);
+        if (pauseRewiredKeyboardPolling.Value) rewiredKeyboardPolling.Disable();
+        else rewiredKeyboardPolling.Clear(HarmonyInstance);
+    }
+
     public override void OnSceneWasLoaded(int buildIndex, string sceneName)
     {
+        clonZonesOriginalFretRenderers.SelectForScene(useClonZonesOriginalFretRenderers.Value,
+            string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase));
         unityJobWorkerLimit.Clear();
         staticTmpScale.Clear();
-        rewiredMousePolling.Clear(HarmonyInstance);
-        rewiredKeyboardPolling.Clear(HarmonyInstance);
+        ResetRewiredHooksForScene();
         backgroundCamera.Clear();
         hudCameraBenchmark.Clear();
         guitarCameraBenchmark.Clear();
@@ -130,9 +177,7 @@ public sealed partial class Core : MelonMod
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Clear();
         inputViewerSuppression.Clear();
-        nativeSustainCache.Clear();
-        fretSortingOrderCache.Clear();
-        plainHeldSustains.Clear(HarmonyInstance);
+        ResetNativeBridgesForScene();
         optionalHudAnimations.Clear();
         optionalHudGame = null;
         optionalHudWaitingForResume = false;
@@ -242,9 +287,10 @@ public sealed partial class Core : MelonMod
 
     public override void OnSceneWasUnloaded(int buildIndex, string sceneName)
     {
+        if (string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase))
+            clonZonesOriginalFretRenderers.Restore();
         staticTmpScale.Clear();
-        rewiredMousePolling.Clear(HarmonyInstance);
-        rewiredKeyboardPolling.Clear(HarmonyInstance);
+        ResetRewiredHooksForScene();
         backgroundCamera.Clear();
         hudCameraBenchmark.Clear();
         guitarCameraBenchmark.Clear();
@@ -253,9 +299,7 @@ public sealed partial class Core : MelonMod
         staticMeterAttach.Clear();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Clear();
-        nativeSustainCache.Clear();
-        fretSortingOrderCache.Clear();
-        plainHeldSustains.Clear(HarmonyInstance);
+        ResetNativeBridgesForScene();
         optionalHudAnimations.Clear();
         optionalHudGame = null;
         optionalHudWaitingForResume = false;
@@ -827,6 +871,7 @@ public sealed partial class Core : MelonMod
         if (pause == null) { Notice("Could not find the game's restart handler."); return; }
         mouseUiGameplay.Disable();
         legacyMouseEvents.Disable();
+        rewiredMousePolling.Disable();
         rewiredKeyboardPolling.Disable();
         backgroundCamera.Restore();
         hudCameraBenchmark.Restore();
@@ -836,9 +881,7 @@ public sealed partial class Core : MelonMod
         staticMeterAttach.Clear();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Update(false, gameplay);
-        nativeSustainCache.Clear();
-        fretSortingOrderCache.Clear();
-        plainHeldSustains.Clear(HarmonyInstance);
+        ResetNativeBridgesForScene();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
         restartHold.RequireRelease();
@@ -860,6 +903,7 @@ public sealed partial class Core : MelonMod
         practiceWaitState = "";
         mouseUiGameplay.Disable();
         legacyMouseEvents.Disable();
+        rewiredMousePolling.Disable();
         rewiredKeyboardPolling.Disable();
         backgroundCamera.Restore();
         hudCameraBenchmark.Restore();
@@ -869,9 +913,7 @@ public sealed partial class Core : MelonMod
         staticMeterAttach.Clear();
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Update(false, gameplay);
-        nativeSustainCache.Clear();
-        fretSortingOrderCache.Clear();
-        plainHeldSustains.Clear(HarmonyInstance);
+        ResetNativeBridgesForScene();
         transition = true;
         transitionStarted = clock.Elapsed.TotalSeconds;
         restartHold.RequireRelease();
@@ -1241,6 +1283,7 @@ public sealed partial class Core : MelonMod
     public override void OnDeinitializeMelon()
     {
         ClearMenuArtwork();
+        clonZonesOriginalFretRenderers.Restore();
         mouseUiGameplay.Clear(HarmonyInstance);
         legacyMouseEvents.Clear();
         rewiredMousePolling.Clear(HarmonyInstance);

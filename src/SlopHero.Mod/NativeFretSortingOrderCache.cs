@@ -147,6 +147,9 @@ internal sealed class NativeFretSortingOrderCache
         failed = false;
     }
 
+    // The native table is cleared before every later activation.
+    internal void SuspendForScene() => Deactivate();
+
     private void Deactivate()
     {
         if (!active) return;

@@ -155,6 +155,16 @@ internal sealed class NativeHeldSustainGlowSuppressor
         if (allocation == IntPtr.Zero) failed = false;
     }
 
+    internal void SuspendForScene()
+    {
+        // Renderer wrappers belong to the outgoing scene. Keep only the
+        // inactive exact-build bridge, never its previous glow membership.
+        Deactivate();
+        warmedGlowRenderers.Clear();
+        nextWarm = 0;
+        if (table != IntPtr.Zero) ClearPointerTable();
+    }
+
     private static List<SpriteRenderer> FindGlowRenderers(GameManager game)
     {
         var results = new List<SpriteRenderer>();

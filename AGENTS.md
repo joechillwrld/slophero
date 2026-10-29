@@ -45,7 +45,13 @@ download link on the existing private `slophero-v1.1-alpha` branch; workspace
 artifacts have failed to download for them. Do not make the repository public.
 For a documentation-only change, update the docs without inventing a new
 binary version.
-The latest packaged build is 0.4.137. It adds rainbow hue spread/offset,
+The latest packaged build is 0.4.138. It adds four separate default-off
+experiments: ClonZones original fret renderers, inactive native and Rewired
+hook retention across scenes, and a 30 Hz active rainbow-note pool scan.
+The first can change fret layering, the second can crash on a lifecycle
+error, and the fourth can briefly lag tint on newly shown notes. No FPS
+gain is measured; see `docs/performance-followup-2026-10-29c.md`.
+Version 0.4.137 adds rainbow hue spread/offset,
 saturation, contrast, and brightness, plus a settings-menu surface tint;
 combo-smoke discovery uses direct prefab paths and the default-off meter
 check reuses its comparison buffers. The user's 0.4.136 on capture is only

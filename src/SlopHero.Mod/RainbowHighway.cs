@@ -45,6 +45,7 @@ internal sealed class RainbowHighway
     private static RainbowHighway? active;
     private readonly Dictionary<IntPtr, SpriteState> notes = new();
     private readonly List<NoteGroup> noteGroups = new();
+    private readonly List<NoteGroup> activeNoteGroups = new();
     private readonly Dictionary<IntPtr, FlameState> flamesByAnimator = new();
     private readonly Dictionary<IntPtr, int> flamePhases = new();
     private readonly ClonZonesFlameBridge clonZonesFlames = new();
@@ -57,6 +58,8 @@ internal sealed class RainbowHighway
     private bool noteHookFailed, flameHookFailed, applyingOwnColor, notesDiscovered, notesActive;
     private bool notesFailed, flamesFailed;
     private double nextPass, nextNotesDiscovery, nextFlamesDiscovery;
+    private double nextActiveGroupScan;
+    private bool cacheActivePoolWasEnabled;
     private double huePhase, lastHueSample;
     private float previousCycleRate;
     private bool hueSampled;
@@ -90,8 +93,14 @@ internal sealed class RainbowHighway
     }
 
     internal void Update(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames, GameManager? game, double now,
-        float cyclesPerSecond, RainbowColorOptions colorOptions)
+        float cyclesPerSecond, RainbowColorOptions colorOptions, bool cacheActivePool)
     {
+        if (cacheActivePool != cacheActivePoolWasEnabled)
+        {
+            cacheActivePoolWasEnabled = cacheActivePool;
+            nextActiveGroupScan = 0;
+            activeNoteGroups.Clear();
+        }
         if (!colorNotes) RestoreNotes();
         else if (!notesActive)
         {
@@ -205,11 +214,22 @@ internal sealed class RainbowHighway
             try
             {
                 applyingOwnColor = true;
-                foreach (var group in noteGroups)
+                if (cacheActivePool && now >= nextActiveGroupScan)
+                {
+                    activeNoteGroups.Clear();
+                    foreach (var group in noteGroups)
+                        if (group.Object.activeInHierarchy) activeNoteGroups.Add(group);
+                    nextActiveGroupScan = now + 1.0 / 30.0;
+                }
+                foreach (var group in cacheActivePool ? activeNoteGroups : noteGroups)
                 {
                     // The 2,000 sprites belong to 500 pooled containers. One
                     // parent activity check avoids three redundant hierarchy
-                    // walks for each inactive note on every tint pass.
+                    // walks for each inactive note. With the opt-in cache,
+                    // the full membership scan runs only at 30 Hz while the
+                    // visible palette continues at its normal cadence.
+                    // Cached groups may have deactivated since the last scan;
+                    // checking this short list also avoids tinting hidden art.
                     if (!group.Object.activeInHierarchy) continue;
                     foreach (var state in group.Sprites)
                         if (state.Renderer != null && state.Renderer.enabled && state.Renderer.sprite != null)
@@ -367,6 +387,7 @@ internal sealed class RainbowHighway
         if (added != 0)
         {
             notesDiscovered = true;
+            nextActiveGroupScan = 0;
             MelonLogger.Msg($"Rainbow notes tracked {notes.Count} pooled sprites once for this scene, including inactive slots.");
         }
     }
@@ -459,6 +480,8 @@ internal sealed class RainbowHighway
             {
                 notes.Clear();
                 noteGroups.Clear();
+                activeNoteGroups.Clear();
+                nextActiveGroupScan = 0;
                 notesDiscovered = false;
                 nextNotesDiscovery = 0;
             }
@@ -483,6 +506,8 @@ internal sealed class RainbowHighway
         {
             notes.Clear();
             noteGroups.Clear();
+            activeNoteGroups.Clear();
+            nextActiveGroupScan = 0;
             notesDiscovered = false;
             nextNotesDiscovery = 0;
         }

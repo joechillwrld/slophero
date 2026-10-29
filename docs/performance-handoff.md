@@ -5,7 +5,17 @@ chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in
 [presentmon-baseline-2026-10-23.md](presentmon-baseline-2026-10-23.md).
 
-## 0.4.137 current build
+## 0.4.138 current build
+
+Four separate default-off experiments cover ClonZones original fret
+renderers, inactive native bridge retention between scenes, inactive Rewired
+hook retention between scenes, and a 30 Hz active-pool scan while rainbow
+notes are selected. Their risks, exact-build evidence, and combined test
+steps are in [the 0.4.138 follow-up](performance-followup-2026-10-29c.md).
+No FPS gain is measured yet. Keep the 0.4.137 on/off capture duration
+limitation in view.
+
+## 0.4.137 prior build
 
 Rainbow hue offset/spread, saturation, contrast, and brightness are now
 customizable. The settings menu has a separate surface tint and strength;

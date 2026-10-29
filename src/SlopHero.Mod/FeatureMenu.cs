@@ -48,6 +48,10 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> cacheRegularSustainWrites = null!;
     private MelonPreferences_Entry<bool> cacheFretSortingWrites = null!;
     private MelonPreferences_Entry<bool> limitClonZonesFlameTicks = null!;
+    private MelonPreferences_Entry<bool> useClonZonesOriginalFretRenderers = null!;
+    private MelonPreferences_Entry<bool> retainNativeBridgesBetweenScenes = null!;
+    private MelonPreferences_Entry<bool> retainRewiredHooksBetweenScenes = null!;
+    private MelonPreferences_Entry<bool> cacheRainbowActivePool = null!;
     private MelonPreferences_Entry<bool> rainbowNotes = null!, rainbowFlames = null!;
     private MelonPreferences_Entry<float> rainbowCyclesPerSecond = null!, rainbowHueOffset = null!, rainbowHueSpread = null!, rainbowSaturation = null!, rainbowContrast = null!, rainbowBrightness = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
@@ -210,6 +214,10 @@ public sealed partial class Core
         cacheRegularSustainWrites = preferences.CreateEntry("PerformanceCacheRegularSustainNative", false);
         cacheFretSortingWrites = preferences.CreateEntry("PerformanceCacheFretSortingWrites", false);
         limitClonZonesFlameTicks = preferences.CreateEntry("PerformanceLimitClonZonesFlameTicks", false);
+        useClonZonesOriginalFretRenderers = preferences.CreateEntry("PerformanceClonZonesOriginalFretRenderers", false);
+        retainNativeBridgesBetweenScenes = preferences.CreateEntry("PerformanceRetainNativeBridgesBetweenScenes", false);
+        retainRewiredHooksBetweenScenes = preferences.CreateEntry("PerformanceRetainRewiredHooksBetweenScenes", false);
+        cacheRainbowActivePool = preferences.CreateEntry("PerformanceCacheRainbowActivePool", false);
         // Render-every-update consumed enough CPU to reduce simulation Updates
         // by roughly 35% in the user's four-run comparison. Retire any saved
         // value, including values written by older profiles.
@@ -328,7 +336,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.137", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.138", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -393,7 +401,7 @@ public sealed partial class Core
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 4 => 1230, 6 => 2240, _ => 500 };
+        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 4 => 1230, 6 => 2500, _ => 500 };
         Rect viewport = new(frameX + sidebarWidth + 12, frameY + 132, 680, menuHeight - 146);
         Rect content = new(0, 0, 656, contentHeight);
         settingsScrollPosition = GUI.BeginScrollView(viewport, settingsScrollPosition, content);
@@ -736,9 +744,13 @@ public sealed partial class Core
         Toggle(cacheFretSortingWrites, "Skip repeated fret sorting-order writes (experimental)", x, engineY + 550);
         Toggle(limitClonZonesFlameTicks, "Trim blank ClonZones flames / cap polls (experimental)", x, engineY + 590);
         Toggle(pauseStaticMeterAttach, "Pause stable SP bar / rock meter attachment scripts (experimental)", x, engineY + 630);
-        GUI.Label(new Rect(x + 4, engineY + 678, 610, 108), "Default-off experiments. The two native caches showed no FPS gain in your four comparison runs. ClonZones flame checks can lag by up to 4 ms. The meter script test checks camera and target changes at 20 Hz, so its visuals could briefly lag; scoring and input are untouched.");
+        Toggle(useClonZonesOriginalFretRenderers, "Use original ClonZones fret renderers next song (experimental)", x, engineY + 670);
+        Toggle(retainNativeBridgesBetweenScenes, "Retain inactive native bridges between songs (experimental)", x, engineY + 710);
+        Toggle(retainRewiredHooksBetweenScenes, "Retain inactive Rewired hooks between songs (experimental)", x, engineY + 750);
+        Toggle(cacheRainbowActivePool, "Cache active rainbow-note pool (experimental)", x, engineY + 790);
+        GUI.Label(new Rect(x + 4, engineY + 838, 610, 138), "Default-off experiments. ClonZones' original fret path may change layering; it applies on the next Gameplay load. Retained native/Rewired hooks may reduce song-entry hitches, but leave pass-through hooks in menus. A native lifecycle error could crash the game. Rainbow pool membership checks run at 30 Hz with this option, so a newly shown note might briefly use its old color.");
 
-        float renderingY = y + 1600;
+        float renderingY = y + 1830;
         SectionHeader("3D rendering experiment", x, renderingY);
         Toggle(limitPlayerCameraFarClip, "Limit guitar-camera far clip in solo songs", x, renderingY + 30);
         Number("Guitar-camera far clip (units)", farClipDistance.Value, x, renderingY + 74, 40, 120,
@@ -1290,6 +1302,10 @@ public sealed partial class Core
             Bool("PerformanceCacheRegularSustainNative", cacheRegularSustainWrites);
             Bool("PerformanceCacheFretSortingWrites", cacheFretSortingWrites);
             Bool("PerformanceLimitClonZonesFlameTicks", limitClonZonesFlameTicks);
+            Bool("PerformanceClonZonesOriginalFretRenderers", useClonZonesOriginalFretRenderers);
+            Bool("PerformanceRetainNativeBridgesBetweenScenes", retainNativeBridgesBetweenScenes);
+            Bool("PerformanceRetainRewiredHooksBetweenScenes", retainRewiredHooksBetweenScenes);
+            Bool("PerformanceCacheRainbowActivePool", cacheRainbowActivePool);
             Bool("PerformanceHidePbPopup", hidePbPopup);
             Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
             Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1362,6 +1378,10 @@ public sealed partial class Core
         Bool("PerformanceCacheRegularSustainNative", cacheRegularSustainWrites);
         Bool("PerformanceCacheFretSortingWrites", cacheFretSortingWrites);
         Bool("PerformanceLimitClonZonesFlameTicks", limitClonZonesFlameTicks);
+        Bool("PerformanceClonZonesOriginalFretRenderers", useClonZonesOriginalFretRenderers);
+        Bool("PerformanceRetainNativeBridgesBetweenScenes", retainNativeBridgesBetweenScenes);
+        Bool("PerformanceRetainRewiredHooksBetweenScenes", retainRewiredHooksBetweenScenes);
+        Bool("PerformanceCacheRainbowActivePool", cacheRainbowActivePool);
         Bool("PerformanceHidePbPopup", hidePbPopup);
         Bool("PerformanceHideStarPowerSideGlows", hideStarPowerSideGlows);
         Bool("PerformancePreserveNetworkTickRemainder", preserveNetworkTickRemainder);
@@ -1715,7 +1735,8 @@ public sealed partial class Core
                 rainbowHighway.Update(HarmonyInstance, rainbowNotes.Value, rainbowFlames.Value,
                     Il2Cpp.GameManager.field_Private_Static_GameManager_0, now, rainbowCyclesPerSecond.Value,
                     new RainbowColorOptions(rainbowHueOffset.Value, rainbowHueSpread.Value,
-                        rainbowSaturation.Value, rainbowContrast.Value, rainbowBrightness.Value));
+                        rainbowSaturation.Value, rainbowContrast.Value, rainbowBrightness.Value),
+                    cacheRainbowActivePool.Value);
             }
             finally { timings.End(9, rainbowTiming); }
         }

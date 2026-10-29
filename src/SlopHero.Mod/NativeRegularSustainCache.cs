@@ -103,6 +103,7 @@ internal sealed class NativeRegularSustainCache
         try
         {
             Marshal.Copy(new byte[CacheBytes + 16], 0, table, CacheBytes + 16);
+            System.Threading.Thread.MemoryBarrier();
             Marshal.WriteByte(flag, 1);
             enabled = true;
             MelonLogger.Msg("Sloptifine native regular-sustain cache active for this song.");
@@ -119,11 +120,16 @@ internal sealed class NativeRegularSustainCache
     internal void Disable()
     {
         if (!enabled) return;
-        enabled = false;
         Marshal.WriteByte(flag, 0);
+        System.Threading.Thread.MemoryBarrier();
+        enabled = false;
         long saved = Marshal.ReadInt64(skipped);
         MelonLogger.Msg($"Sloptifine native regular-sustain cache skipped {saved} repeat property-block sequence(s).");
     }
+
+    // Keep the exact-build detour allocated while its disabled flag routes
+    // every call to the original setter. Activation clears its cache table.
+    internal void SuspendForScene() => Disable();
 
     internal void Clear()
     {
