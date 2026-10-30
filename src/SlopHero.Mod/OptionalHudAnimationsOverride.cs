@@ -66,12 +66,12 @@ internal sealed class OptionalHudAnimationsOverride
             RestoreGlows();
             ResetGlowReferences();
         }
-        bool findPb = hidePb && pbCanvas == null && now >= nextPbDiscovery;
+        bool findPb = hidePb && pbCanvas == null && game != null && now >= nextPbDiscovery;
         bool findGlows = hideGlows && glowRoot == IntPtr.Zero && game != null && now >= nextGlowDiscovery;
         if (!hidePb) RestorePb();
         else
         {
-            if (findPb) DiscoverPb(now);
+            if (findPb) DiscoverPb(game!, now);
             if (pbCanvas != null && pbAnimator != null && (!pbSuppressed || reconcile || forceReapply))
             {
                 if (pbCanvas.enabled) pbCanvas.enabled = false;
@@ -121,22 +121,23 @@ internal sealed class OptionalHudAnimationsOverride
         nextGlowDiscovery = 0;
     }
 
-    private void DiscoverPb(double now)
+    private void DiscoverPb(GameManager game, double now)
     {
         nextPbDiscovery = now + 1;
-        // Both this display and the side glows use UnityEngine.Animator. The
-        // game also has an unrelated custom Il2Cpp.Animator sprite script;
-        // resolving that type would never find these visual targets.
-        // The serialized Gameplay display is active and has the Canvas and
-        // Unity animator on the same object.
-        var display = UnityEngine.Object.FindObjectOfType<HighScoreDisplay>();
-        bool inGameplay = display != null && display.gameObject.scene.name == "Gameplay";
-        var canvas = inGameplay ? display!.GetComponent<Canvas>() : null;
-        var animator = inGameplay ? display!.GetComponent<UnityAnimator>() : null;
+        // The current scene serializes PB Notification below the score font.
+        // The old scene-wide HighScoreDisplay lookup excludes inactive
+        // components, and the supplied log never found it. Resolve the exact
+        // score branch instead; this also avoids a global search each second.
+        var score = game.scoreManager?.scoreFont?.transform;
+        var notification = score?.name == "Score" && score.gameObject.scene.name == "Gameplay"
+            ? score.Find("PB Notification") : null;
+        bool inGameplay = notification != null && notification.gameObject.scene.name == "Gameplay";
+        var canvas = inGameplay ? notification!.GetComponent<Canvas>() : null;
+        var animator = inGameplay ? notification!.GetComponent<UnityAnimator>() : null;
         if (canvas == null || animator == null)
         {
             ReportMissing(ref pbDiscoveryMisses, "personal-best popup",
-                pbDiscoveryMisses == 2 ? $"Gameplay display={inGameplay}; Canvas={canvas != null}; Unity Animator={animator != null}" : "");
+                pbDiscoveryMisses == 2 ? $"Gameplay notification={inGameplay}; Canvas={canvas != null}; Unity Animator={animator != null}" : "");
             return;
         }
         pbDiscoveryMisses = 0;

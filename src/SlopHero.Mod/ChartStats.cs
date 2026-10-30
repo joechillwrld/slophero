@@ -11,6 +11,48 @@ internal sealed class ChartStats
     private long resolvedHeads, rangeStart, rangeEnd;
     private double lastSongTime = double.NegativeInfinity;
     private int lastHits;
+    private IntPtr outroEnginePointer, outroNotesPointer;
+    private int outroCursor, outroComponents;
+    private double outroLastSongTime = double.NegativeInfinity, lastPlayableTailEnd;
+    private bool outroTimingValid = true;
+
+    internal bool AllPlayableNotesDone(Engine engine, GameManager game)
+    {
+        // Accuracy excludes disjoint child heads, but a child can carry a
+        // longer tail. The skip gate checks every chart component separately.
+        var notes = engine.prop_List_1_ObjectPublicObInObDoSiDoUIInBoInUnique_0;
+        if (engine.Pointer != outroEnginePointer || notes.Pointer != outroNotesPointer
+            || game.songTime < outroLastSongTime - .05 || outroCursor > notes.Count)
+        {
+            outroEnginePointer = engine.Pointer;
+            outroNotesPointer = notes.Pointer;
+            outroCursor = outroComponents = 0;
+            lastPlayableTailEnd = 0;
+            outroTimingValid = true;
+        }
+        outroLastSongTime = game.songTime;
+        for (int budget = 4096; outroCursor < notes.Count && budget > 0; budget--)
+        {
+            var note = notes[outroCursor];
+            if (note == null) { outroTimingValid = false; break; }
+            uint flags = (uint)note.field_Public_EnumNPublicSealedvaNoChDiExChHoStTaSoUnique_0;
+            ushort state = (ushort)note.field_Public_EnumNPublicSealedvaNoHiMiDyIsWa8vWaUnique_0;
+            // A disjoint child does not have its own scoring decision, but
+            // its tail still contributes to the last playable moment.
+            if (ChartNote.CountsTowardAccuracy(flags) && !ChartNote.IsResolved(state)) break;
+            double noteTime = note.field_Public_Double_0;
+            double sustainLength = note.field_Public_Double_1;
+            if (!double.IsFinite(noteTime) || !double.IsFinite(sustainLength)
+                || noteTime < 0 || sustainLength < 0 || noteTime > game.songLength + 5
+                || sustainLength > game.songLength + 5)
+                outroTimingValid = false;
+            else lastPlayableTailEnd = Math.Max(lastPlayableTailEnd, noteTime + sustainLength);
+            outroComponents++;
+            outroCursor++;
+        }
+        return outroTimingValid && outroComponents > 0 && outroCursor == notes.Count
+            && game.songTime >= lastPlayableTailEnd + .25;
+    }
 
     public LiveStats Read(Engine engine, GameManager game)
     {

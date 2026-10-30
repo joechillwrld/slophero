@@ -513,7 +513,11 @@ internal sealed class RainbowHighway
 
     private static void SetNoteRgb(SpriteState state, Color color)
     {
-        var current = state.Displayed;
+        // Native game and skin writes can bypass the managed color setter.
+        // Comparing only our last requested tint left a recycled scrolling
+        // note at its vanilla color until some later event wrote through the
+        // hook. Reconcile the renderer that is actually on screen.
+        var current = state.Renderer.color;
         if (current.r == color.r && current.g == color.g && current.b == color.b) return;
         color.a = current.a;
         state.Renderer.color = color;

@@ -50,6 +50,8 @@ internal sealed class CounterCanvasHud
             if (root == null) Create();
             if (root == null || panelRect == null || background == null || label == null)
                 throw new InvalidOperationException("Canvas HUD components were not created.");
+            if (!songMode && CounterFont.TextMeshProFont is { } selectedFont && label.font != selectedFont)
+                label.font = selectedFont;
 
             int size = Math.Clamp(fontSize, 14, 48);
             int screenWidth = Screen.width, screenHeight = Screen.height;

@@ -594,9 +594,15 @@ internal sealed class NativeHudLayout
             // Tinting TMP_Text.color affects the slash and both numbers. Rich
             // text scopes the color to the first number instead.
             var current = text.text ?? "";
+            if (enabled && current == fpsStyledText && text.color == Color.white) continue;
             var plain = current == fpsStyledText ? fpsPlainText : current;
             if (enabled)
             {
+                // FrameRate also writes a threshold color on the TMP label.
+                // TMP multiplies that base tint with the inline color, so a
+                // green base can turn a requested red FPS number nearly black.
+                // Neutralize only while the custom number color is active.
+                if (text.color != Color.white) text.color = Color.white;
                 var styled = TintFirstNumber(plain, color);
                 if (current != styled) text.text = styled;
                 fpsPlainText = plain;
@@ -605,6 +611,7 @@ internal sealed class NativeHudLayout
             else
             {
                 if (current != plain) text.text = plain;
+                if (text.color != fpsTmpOriginalColors[i]) text.color = fpsTmpOriginalColors[i];
                 fpsPlainText = fpsStyledText = "";
             }
         }
@@ -617,6 +624,14 @@ internal sealed class NativeHudLayout
             target.a = current.a;
             if (current != target) text.color = target;
         }
+    }
+
+    // Reassert after FrameRate.Update has written its threshold tint on a
+    // rendered frame. The 20 Hz layout pass alone can leave a brief default-
+    // colored flash each time the game's half-second FPS interval expires.
+    internal void RefreshFpsColor()
+    {
+        if (lastFpsTint) ApplyFpsColor(true, lastFpsColor);
     }
 
     private static string TintFirstNumber(string value, Color color)

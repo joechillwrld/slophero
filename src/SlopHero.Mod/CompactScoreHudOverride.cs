@@ -1,5 +1,6 @@
 using Il2Cpp;
 using MelonLoader;
+using SlopHero.Core;
 using UnityEngine;
 
 namespace SlopHero.Mod;
@@ -27,12 +28,10 @@ internal sealed class CompactScoreHudOverride
             var comboFont = manager?.comboFont;
             if (scoreFont == null || comboFont == null || !scoreFont.isActiveAndEnabled
                 || !comboFont.isActiveAndEnabled) return false;
-            // This field occupies the old SpriteFont.lastAmount slot, directly
-            // after maxValue in the current generated class. Negative means
-            // the font has not emitted its first value yet.
-            score = scoreFont.field_Private_Int32_0;
-            combo = comboFont.field_Private_Int32_0;
-            return score >= 0 && combo >= 0 && score <= scoreFont.maxValue && combo <= comboFont.maxValue;
+            // Read the digits the game actually drew. The private lastAmount
+            // field was identified from an older build and can move in IL2CPP;
+            // using it kept the replacement inactive while native art showed.
+            return TryReadDisplayed(scoreFont, out score) && TryReadDisplayed(comboFont, out combo);
         }
         catch { return false; }
     }
@@ -65,9 +64,7 @@ internal sealed class CompactScoreHudOverride
         var manager = game.scoreManager;
         var score = manager?.scoreFont?.transform;
         var combo = manager?.comboFont?.transform;
-        if (!TryRead(game, out int scoreValue, out int comboValue)
-            || !MatchesLastDigit(manager?.scoreFont, scoreValue)
-            || !MatchesLastDigit(manager?.comboFont, comboValue)) return false;
+        if (!TryRead(game, out _, out _)) return false;
         if (score == null || combo == null || score.name != "Score" || combo.name != "Combo"
             || score.parent == null || combo.parent == null
             || score.parent.Pointer != combo.parent.Pointer || score.parent.name != "HUD"
@@ -90,18 +87,34 @@ internal sealed class CompactScoreHudOverride
         return true;
     }
 
-    private static bool MatchesLastDigit(SpriteFont? font, int amount)
+    private static bool TryReadDisplayed(SpriteFont font, out int amount)
     {
-        // Guard the older-source lastAmount mapping against a changed current
-        // build. The least-significant glyph must agree with the cached int
-        // before any native score renderer is hidden.
-        var digits = font?.Sprites;
-        var glyphs = font?.fontSprites;
+        amount = 0;
+        var digits = font.Sprites;
+        var glyphs = font.fontSprites;
         if (digits == null || glyphs == null || digits.Length == 0 || glyphs.Length < 10) return false;
-        var first = digits[0];
-        var expected = glyphs[amount % 10];
-        return first != null && expected != null && first.sprite != null
-            && first.sprite.Pointer == expected.Pointer;
+        if (digits.Length > 32) return false;
+        Span<int> slots = stackalloc int[digits.Length];
+        // SpriteFont stores the least significant digit first. Comma slots
+        // consume an array entry but no decimal place.
+        for (int slot = 0; slot < digits.Length; slot++)
+        {
+            var renderer = digits[slot];
+            if (renderer == null) return false;
+            var sprite = renderer.sprite;
+            if (sprite == null) { slots[slot] = -1; continue; }
+            int digit = -1;
+            for (int i = 0; i < 10; i++)
+                if (glyphs[i] != null && glyphs[i].Pointer == sprite.Pointer) { digit = i; break; }
+            if (digit < 0)
+            {
+                if (font.drawCommas && glyphs.Length > 10 && glyphs[10] != null
+                    && glyphs[10].Pointer == sprite.Pointer) { slots[slot] = 10; continue; }
+                return false;
+            }
+            slots[slot] = digit;
+        }
+        return DisplayedSpriteNumber.TryRead(slots, out amount);
     }
 
     internal void Restore()

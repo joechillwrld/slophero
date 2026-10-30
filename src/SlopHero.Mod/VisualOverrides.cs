@@ -105,12 +105,17 @@ internal sealed class VisualOverrides
         var starCountBackgroundPointer = starCountBackground?.Pointer ?? IntPtr.Zero;
         var progressBar = star.progressBar;
         var progressEnd = star.progressBarEnd;
+        // The unfilled track is a separate renderer under the Star branch.
+        // Tinting every remaining child made it inherit the selected star
+        // color, so the empty span appeared as a darker version of the fill.
+        var progressBackground = star.transform.Find("StarProgressBG");
         var faces = new List<SpriteRenderer>();
         foreach (var renderer in Sprites(gameObject))
         {
             if (renderer == null || renderer.Pointer == starCount || renderer.Pointer == starCountBackgroundPointer) continue;
             if (Under(renderer.transform, starCountBackground?.transform)) continue;
             if (Under(renderer.transform, progressBar) || Under(renderer.transform, progressEnd)) continue;
+            if (Under(renderer.transform, progressBackground)) continue;
             faces.Add(renderer);
         }
         result = faces.ToArray();

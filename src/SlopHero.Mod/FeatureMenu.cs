@@ -21,6 +21,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> hideSides = null!, hideStrings = null!, hideBeats = null!, tintFc = null!, tintScore = null!, lockSpeed = null!;
     private MelonPreferences_Entry<bool> pauseHiddenBeatlineUpdates = null!;
     private MelonPreferences_Entry<bool> disableAprilFools = null!;
+    private MelonPreferences_Entry<bool> muteGhostBreakSound = null!;
     private MelonPreferences_Entry<bool> customizeFpsColor = null!;
     private MelonPreferences_Entry<bool> disableHitParticles = null!, disableSustainParticles = null!, disableFretEffects = null!, disableFretLightningOnly = null!;
     private MelonPreferences_Entry<bool> disableStarProgressParticles = null!;
@@ -54,6 +55,8 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> cacheRainbowActivePool = null!;
     private MelonPreferences_Entry<bool> limitRainbowPalette60Hz = null!;
     private MelonPreferences_Entry<bool> rainbowNotes = null!, rainbowFlames = null!;
+    private MelonPreferences_Entry<bool> randomizeColorPalette = null!;
+    private MelonPreferences_Entry<float> randomHueMin = null!, randomHueMax = null!, randomSaturationMin = null!, randomSaturationMax = null!, randomBrightnessMin = null!, randomBrightnessMax = null!;
     private MelonPreferences_Entry<float> rainbowCyclesPerSecond = null!, rainbowHueOffset = null!, rainbowHueSpread = null!, rainbowNoteVariety = null!, rainbowSaturation = null!, rainbowContrast = null!, rainbowBrightness = null!;
     private MelonPreferences_Entry<string> fpsTextColor = null!;
     private MelonPreferences_Entry<float> settingsMenuScale = null!, settingsWindowOffsetX = null!, settingsWindowOffsetY = null!;
@@ -87,7 +90,6 @@ public sealed partial class Core
     private readonly StaticMeterAttachOverride staticMeterAttach = new();
     private readonly InputViewerSuppression inputViewerSuppression = new();
     private readonly CompactScoreHudOverride compactScoreHudOverride = new();
-    private string? compactHudStatsSource;
     private string compactHudText = "";
     private int compactHudScore = -1, compactHudCombo = -1;
     private readonly NetworkTickRemainderOverride networkTickRemainder = new();
@@ -104,6 +106,7 @@ public sealed partial class Core
     private Texture2D? menuArtworkTexture;
     private bool menuArtworkLoadAttempted;
     private int settingsPage;
+    private bool showAdvancedPerformance;
     private bool settingsWindowDragging;
     private Vector2 settingsWindowDragMouse, settingsWindowDragOrigin;
     private Vector2 settingsScrollPosition;
@@ -174,6 +177,7 @@ public sealed partial class Core
         hideBeats = preferences.CreateEntry("HideBeatlines", false);
         pauseHiddenBeatlineUpdates = preferences.CreateEntry("PerformancePauseHiddenBeatlineUpdates", false);
         disableAprilFools = preferences.CreateEntry("DisableAprilFoolsContent", true);
+        muteGhostBreakSound = preferences.CreateEntry("MuteGhostComboBreakSound", false);
         tintFc = preferences.CreateEntry("CustomizeFcRings", false);
         tintScore = preferences.CreateEntry("CustomizeScoreColors", false);
         lockSpeed = preferences.CreateEntry("ConstantPracticeNoteSpeed", false);
@@ -238,6 +242,13 @@ public sealed partial class Core
         rainbowNotes = preferences.CreateEntry("RainbowNotes", false);
         rainbowFlames = preferences.CreateEntry("RainbowFlames", false);
         rainbowCyclesPerSecond = preferences.CreateEntry("RainbowCyclesPerSecond", .18f);
+        randomizeColorPalette = preferences.CreateEntry("RandomizeColorPaletteEachAttempt", false);
+        randomHueMin = preferences.CreateEntry("RandomPaletteHueMin", 0f);
+        randomHueMax = preferences.CreateEntry("RandomPaletteHueMax", 360f);
+        randomSaturationMin = preferences.CreateEntry("RandomPaletteSaturationMin", .8f);
+        randomSaturationMax = preferences.CreateEntry("RandomPaletteSaturationMax", 1.2f);
+        randomBrightnessMin = preferences.CreateEntry("RandomPaletteBrightnessMin", .8f);
+        randomBrightnessMax = preferences.CreateEntry("RandomPaletteBrightnessMax", 1.2f);
         rainbowHueOffset = preferences.CreateEntry("RainbowHueOffsetDegrees", 0f);
         rainbowHueSpread = preferences.CreateEntry("RainbowHueSpread", 1f);
         rainbowNoteVariety = preferences.CreateEntry("RainbowNoteVariety", 0f);
@@ -410,7 +421,7 @@ public sealed partial class Core
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        float contentHeight = settingsPage switch { 1 => 540, 2 => 1480, 3 => 540, 4 => 1310, 6 => 2580, _ => 500 };
+        float contentHeight = settingsPage switch { 0 => 850, 1 => 910, 2 => 1480, 3 => 680, 4 => 1580, 6 => showAdvancedPerformance ? 2670 : 990, _ => 500 };
         Rect viewport = new(frameX + sidebarWidth + 12, frameY + 132, 680, menuHeight - 146);
         Rect content = new(0, 0, 656, contentHeight);
         settingsScrollPosition = GUI.BeginScrollView(viewport, settingsScrollPosition, content);
@@ -586,6 +597,46 @@ public sealed partial class Core
         }
         GUI.Label(new Rect(x + 4, y + 356, 610, 44), "Type 10–5000 on the game's speed row; * means pending. Pause or press Enter to apply.");
         GUI.Label(new Rect(x + 4, y + 404, 610, 44), "Timings are written to Latest.log. Close this menu and play.");
+        SectionHeader("Auto-restart for the selected song", x, y + 458);
+        if (activeAttemptKey == null || autoRestartRules == null)
+        {
+            GUI.Label(new Rect(x + 4, y + 490, 610, 48), "Open this menu during a song to set its separate restart rules.");
+        }
+        else
+        {
+            var rule = autoRestartRules.Get(activeAttemptKey);
+            GUI.Label(new Rect(x + 4, y + 490, 610, 30), "0 disables a limit. Rules apply only to offline solo Quickplay.");
+            Number("Restart at misses", rule.MissLimit, x, y + 526, 0, 999,
+                v => SaveAutoRestartRule(rule with { MissLimit = (int)Math.Round(v) }));
+            Number("Restart at ghost inputs", rule.GhostLimit, x, y + 568, 0, 999,
+                v => SaveAutoRestartRule(rule with { GhostLimit = (int)Math.Round(v) }));
+            Number("Restart on a miss before section (0 = off)", (rule.NoMissBeforeSection ?? -1) + 1,
+                x, y + 610, 0, 999, v => SaveAutoRestartRule(rule with
+                { NoMissBeforeSection = v < 1 ? null : (int)Math.Round(v) - 1 }));
+            if (GUI.Button(new Rect(x + 548, y + 610, 84, 36), "Use now"))
+            {
+                var currentGame = Il2Cpp.GameManager.field_Private_Static_GameManager_0;
+                if (currentGame != null && currentGame.currentSection >= 0)
+                    SaveAutoRestartRule(rule with { NoMissBeforeSection = currentGame.currentSection });
+                else Notice("The current song section is unavailable.");
+            }
+            GUI.Label(new Rect(x + 4, y + 654, 610, 50), "Section number starts at 1. Saved separately for each song; no rule runs in practice or online play.");
+        }
+        string outroLabel = outroSkipMode.Value switch { 1 => "Prompt: press End", 2 => "Automatic", _ => "Off" };
+        if (GUI.Button(new Rect(x, y + 718, 632, 36), "Blank outro skip (experimental): " + outroLabel))
+        {
+            outroSkipMode.Value = (outroSkipMode.Value + 1) % 3;
+            preferencesDirty = true;
+        }
+        GUI.Label(new Rect(x + 4, y + 760, 610, 46),
+            "Only offline solo Quickplay with a blank outro. Both modes wait until every chart head and sustain tail is done.");
+    }
+
+    private void SaveAutoRestartRule(AutoRestartRule rule)
+    {
+        if (activeAttemptKey == null || autoRestartRules == null) return;
+        try { autoRestartRules.Set(activeAttemptKey, rule); }
+        catch (Exception ex) { Notice($"Could not save auto-restart rule: {ex.Message}"); }
     }
 
     private void DrawCounterSettings(float x, float y)
@@ -596,8 +647,33 @@ public sealed partial class Core
         Toggle(showHit, "Hit percentage", x, y + 114);
         Toggle(showGhosts, "Ghost inputs", x, y + 156);
         Toggle(showBest, "Best streak", x, y + 198);
-        SectionHeader("Appearance and placement", x, y + 246);
-        Appearance(x, y + 274, false);
+        Toggle(showAttempts, "Show song and practice-section attempts", x, y + 240);
+        Toggle(saveAttempts, "Auto-save full-song attempts by song", x, y + 282);
+        Toggle(saveGlobalAttempts, "Auto-save total across all songs", x, y + 324);
+        Toggle(showTotalAttempts, "Show saved total across all songs", x, y + 366);
+        if (GUI.Button(new Rect(x, y + 408, 430, 36), "Counter font: " + counterFontName.Value))
+            Edit("Installed font family", counterFontName.Value, name => {
+                if (string.IsNullOrWhiteSpace(name)) throw new FormatException("Enter a font family name.");
+                counterFontName.Value = name.Trim(); CounterFont.Configure(counterFontName.Value);
+            });
+        if (GUI.Button(new Rect(x + 440, y + 408, 172, 36), "Next installed font"))
+        {
+            string? next = CounterFont.NextInstalledFamily(counterFontName.Value);
+            if (next == null) Notice("Installed font list is unavailable in this game build.");
+            else
+            {
+                counterFontName.Value = next;
+                CounterFont.Configure(next);
+                preferencesDirty = true;
+            }
+        }
+        SectionHeader("Appearance and placement", x, y + 456);
+        Appearance(x, y + 484, false);
+        SectionHeader("Separate compact score + combo position", x, y + 746);
+        Number("Compact score X", compactScoreX.Value, x, y + 774, 0, Screen.width,
+            v => compactScoreX.Value = (int)v);
+        Number("Compact score Y", compactScoreY.Value, x, y + 816, 0, Screen.height,
+            v => compactScoreY.Value = (int)v);
     }
 
     private void DrawHudSettings(float x, float y)
@@ -668,6 +744,11 @@ public sealed partial class Core
         Toggle(hideStarPowerSideGlows, "Hide Star Power side glows during songs", x, y + 330);
         Toggle(hidePbPopup, "Hide personal-best popup during songs", x, y + 372);
         GUI.Label(new Rect(x + 4, y + 420, 610, 84), "Experimental; default off. Side-glow branches deactivate during active songs, online too, and restore on pause or song exit; their animation may restart. The Star Power controller, score, and notes stay active.");
+        if (GUI.Button(new Rect(x, y + 520, 540, 36), "Capture highway thumbnail with notes"))
+            highwayThumbnailPending = true;
+        Toggle(muteGhostBreakSound, "Mute ghost-triggered combo-break sound", x, y + 568);
+        GUI.Label(new Rect(x + 4, y + 610, 610, 42),
+            "Solo play only. Ordinary missed-note sounds are kept; sound filtering is disabled if its game hook fails.");
     }
 
     private void DrawColorSettings(float x, float y)
@@ -679,6 +760,7 @@ public sealed partial class Core
         Hex(starColor, "Stars", x, y + 192); Hex(progressColor, "Star progress bar", x, y + 232);
         Hex(scoreColor, "Score / accuracy text", x, y + 272);
         Hex(songProgressColor, "Song progress bar", x, y + 312);
+        Toggle(randomizeColorPalette, "Randomize custom palette each attempt", x, y + 348);
         SectionHeader("Menu theme", x, y + 384);
         Hex(menuAccentHex, "Menu accent", x, y + 414);
         Hex(menuSurfaceHex, "Menu surface tint", x, y + 454);
@@ -701,6 +783,17 @@ public sealed partial class Core
         FloatSlider(rainbowContrast, "Contrast", x, y + 1016, .5f, 1.5f, .05f, 1f, "x");
         FloatSlider(rainbowBrightness, "Brightness", x, y + 1078, .3f, 2f, .05f, 100f, "%");
         GUI.Label(new Rect(x + 4, y + 1150, 610, 88), "Variety gives each pooled note a stable hue offset; zero keeps lane colors. Set rainbow cycle fully left to stop it, then hue rotation selects a fixed palette. Colored note art can limit the displayed hues. Menu tint affects this settings window and its value popups.");
+        SectionHeader("Per-attempt palette ranges", x, y + 1248);
+        Number("Hue shift minimum (°)", randomHueMin.Value, x, y + 1278, 0, 360, v => randomHueMin.Value = v);
+        Number("Hue shift maximum (°)", randomHueMax.Value, x, y + 1320, 0, 360, v => randomHueMax.Value = v);
+        Number("Saturation minimum (%)", randomSaturationMin.Value * 100, x, y + 1362, 50, 150,
+            v => randomSaturationMin.Value = v / 100);
+        Number("Saturation maximum (%)", randomSaturationMax.Value * 100, x, y + 1404, 50, 150,
+            v => randomSaturationMax.Value = v / 100);
+        Number("Brightness minimum (%)", randomBrightnessMin.Value * 100, x, y + 1446, 50, 150,
+            v => randomBrightnessMin.Value = v / 100);
+        Number("Brightness maximum (%)", randomBrightnessMax.Value * 100, x, y + 1488, 50, 150,
+            v => randomBrightnessMax.Value = v / 100);
     }
 
     private void FloatSlider(MelonPreferences_Entry<float> entry, string label, float x, float y,
@@ -738,9 +831,23 @@ public sealed partial class Core
         Toggle(skipBackgroundCamera, "Skip background camera and hidden video in solo songs", x, servicesY + 230);
         Toggle(hideInputViewerDuringSong, "Hide input viewer during active songs", x, servicesY + 270);
         Toggle(compactScoreHud, "Compact score + combo HUD (solo experiment)", x, servicesY + 310);
-        GUI.Label(new Rect(x + 4, servicesY + 354, 610, 56), "Input-viewer hiding works online too. Compact score is default off and solo-only; it preserves the numbers but moves them into the counter HUD, which may update up to 50 ms later. Both restore on pause or settings.");
+        GUI.Label(new Rect(x + 4, servicesY + 354, 610, 56), "Input-viewer hiding works online too. Compact score is default off and solo-only; it replaces native score/combo graphics with a separate movable Canvas, which may update up to 50 ms later. Both restore on pause or settings.");
 
-        float engineY = y + 850;
+        if (GUI.Button(new Rect(x, y + 850, 632, 38), showAdvancedPerformance
+                ? "Hide advanced performance experiments ▲"
+                : "Show advanced performance experiments ▼"))
+        {
+            showAdvancedPerformance = !showAdvancedPerformance;
+            settingsScrollPosition = Vector2.zero;
+        }
+        if (!showAdvancedPerformance)
+        {
+            GUI.Label(new Rect(x + 4, y + 896, 610, 54),
+                "Optional engine, camera, and networking experiments are grouped here. Each setting keeps its current value when this section is hidden.");
+            return;
+        }
+
+        float engineY = y + 906;
         SectionHeader("Engine and scheduler experiments", x, engineY);
         Toggle(skipGameplayMouseUi, "Skip mouse UI raycasts during gameplay", x, engineY + 30);
         Toggle(skipLegacyMouseEvents, "Skip legacy camera mouse events during gameplay", x, engineY + 70);
@@ -765,7 +872,7 @@ public sealed partial class Core
         Toggle(limitRainbowPalette60Hz, "Limit moving rainbow palette to 60 Hz (experimental)", x, engineY + 830);
         GUI.Label(new Rect(x + 4, engineY + 878, 610, 138), "Default-off experiments. ClonZones' original fret path may change layering; it applies on the next Gameplay load. Retained native/Rewired hooks may reduce song-entry hitches, but leave pass-through hooks in menus. A native lifecycle error could crash the game. Rainbow pool membership checks run at 30 Hz with its option; a 60 Hz palette may look less smooth at high cycle speeds.");
 
-        float renderingY = y + 1950;
+        float renderingY = y + 2006;
         SectionHeader("3D rendering experiment", x, renderingY);
         Toggle(limitPlayerCameraFarClip, "Limit guitar-camera far clip in solo songs", x, renderingY + 30);
         Number("Guitar-camera far clip (units)", farClipDistance.Value, x, renderingY + 74, 40, 120,
@@ -826,7 +933,7 @@ public sealed partial class Core
                 nextStats = 0;
                 if (ReferenceEquals(entry, showHud) && !entry.Value)
                 {
-                    if (!compactScoreHudOverride.IsActive) counterCanvas.Hide();
+                    counterCanvas.Hide();
                     statsText = "";
                 }
                 if (ReferenceEquals(entry, showSong) && !entry.Value)
@@ -1277,9 +1384,12 @@ public sealed partial class Core
         if (!colorsOnly)
         {
             Text("RestartButton", restartButton); Text("PracticeButton", practiceButton); Float("HoldSeconds", holdSeconds);
+            Int("OutroSkipMode", outroSkipMode);
             Int("HudX", hudX); Int("HudY", hudY); Int("FontSize", fontSize); Bool("ShowHud", showHud);
+            Int("CompactScoreHudX", compactScoreX); Int("CompactScoreHudY", compactScoreY);
+            Text("CounterFontName", counterFontName);
             Float("BackgroundOpacity", backgroundOpacity); Float("TextRed", textRed); Float("TextGreen", textGreen); Float("TextBlue", textBlue);
-            Bool("ShowMisses", showMisses); Bool("ShowHitPercentage", showHit); Bool("ShowGhosts", showGhosts); Bool("ShowBestStreak", showBest);
+            Bool("ShowMisses", showMisses); Bool("ShowHitPercentage", showHit); Bool("ShowGhosts", showGhosts); Bool("ShowBestStreak", showBest); Bool("ShowAttempts", showAttempts); Bool("SaveAttempts", saveAttempts); Bool("SaveGlobalAttempts", saveGlobalAttempts); Bool("ShowTotalAttempts", showTotalAttempts);
             Bool("ShowSongHud", showSong); Bool("ShowSongTitle", showTitle); Bool("ShowArtist", showArtist); Bool("ShowCharter", showCharter); Bool("ShowChartSpeed", showSpeed);
             Int("SongHudX", songX); Int("SongHudY", songY); Int("SongFontSize", songFont); Float("SongBackgroundOpacity", songOpacity);
             Float("PracticeHudOffsetX", practiceHudX); Float("PracticeHudOffsetY", practiceHudY); Float("FpsHudOffsetX", fpsHudX); Float("FpsHudOffsetY", fpsHudY);
@@ -1288,6 +1398,7 @@ public sealed partial class Core
             Bool("HideHighwaySides", hideSides); Bool("HideFretStrings", hideStrings); Bool("HideBeatlines", hideBeats); Bool("ConstantPracticeNoteSpeed", lockSpeed);
             Bool("PerformancePauseHiddenBeatlineUpdates", pauseHiddenBeatlineUpdates);
             Bool("DisableAprilFoolsContent", disableAprilFools);
+            Bool("MuteGhostComboBreakSound", muteGhostBreakSound);
             Bool("PerformanceDisableHitParticles", disableHitParticles); Bool("PerformanceDisableSustainParticles", disableSustainParticles);
             Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceDisableFretLightningOnly", disableFretLightningOnly); Bool("PerformanceStopMidiInput", stopMidiInput); Bool("PerformanceDisableMidiForSession", disableMidiForSession);
             Bool("PerformanceDisableStarProgressParticles", disableStarProgressParticles);
@@ -1329,6 +1440,10 @@ public sealed partial class Core
         }
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Bool("RainbowNotes", rainbowNotes); Bool("RainbowFlames", rainbowFlames);
+        Bool("RandomizeColorPaletteEachAttempt", randomizeColorPalette);
+        Float("RandomPaletteHueMin", randomHueMin); Float("RandomPaletteHueMax", randomHueMax);
+        Float("RandomPaletteSaturationMin", randomSaturationMin); Float("RandomPaletteSaturationMax", randomSaturationMax);
+        Float("RandomPaletteBrightnessMin", randomBrightnessMin); Float("RandomPaletteBrightnessMax", randomBrightnessMax);
         Float("RainbowCyclesPerSecond", rainbowCyclesPerSecond);
         Float("RainbowHueOffsetDegrees", rainbowHueOffset); Float("RainbowHueSpread", rainbowHueSpread);
         Float("RainbowNoteVariety", rainbowNoteVariety);
@@ -1359,15 +1474,21 @@ public sealed partial class Core
         { if (!values.TryGetValue(key, out var s)) return; if (ValidBinding(s)) entry.Value = s; else invalid++; }
 
         Binding("RestartButton", restartButton); Binding("PracticeButton", practiceButton); Float("HoldSeconds", holdSeconds, .25f, 3f);
+        Int("OutroSkipMode", outroSkipMode, 0, 2);
         Int("HudX", hudX, 0, Math.Max(0, Screen.width)); Int("HudY", hudY, 0, Math.Max(0, Screen.height)); Int("FontSize", fontSize, 14, 48); Bool("ShowHud", showHud);
+        Int("CompactScoreHudX", compactScoreX, 0, Math.Max(0, Screen.width));
+        Int("CompactScoreHudY", compactScoreY, 0, Math.Max(0, Screen.height));
         Float("BackgroundOpacity", backgroundOpacity, 0, 1); Float("TextRed", textRed, 0, 1); Float("TextGreen", textGreen, 0, 1); Float("TextBlue", textBlue, 0, 1);
-        Bool("ShowMisses", showMisses); Bool("ShowHitPercentage", showHit); Bool("ShowGhosts", showGhosts); Bool("ShowBestStreak", showBest);
+        Bool("ShowMisses", showMisses); Bool("ShowHitPercentage", showHit); Bool("ShowGhosts", showGhosts); Bool("ShowBestStreak", showBest); Bool("ShowAttempts", showAttempts); Bool("SaveAttempts", saveAttempts); Bool("SaveGlobalAttempts", saveGlobalAttempts); Bool("ShowTotalAttempts", showTotalAttempts);
+        if (values.TryGetValue("CounterFontName", out var family) && !string.IsNullOrWhiteSpace(family))
+        { counterFontName.Value = family.Trim(); CounterFont.Configure(counterFontName.Value); }
         Bool("ShowSongHud", showSong); Bool("ShowSongTitle", showTitle); Bool("ShowArtist", showArtist); Bool("ShowCharter", showCharter); Bool("ShowChartSpeed", showSpeed);
         Int("SongHudX", songX, 0, Math.Max(0, Screen.width)); Int("SongHudY", songY, 0, Math.Max(0, Screen.height)); Int("SongFontSize", songFont, 14, 48); Float("SongBackgroundOpacity", songOpacity, 0, 1);
         Float("PracticeHudOffsetX", practiceHudX, -1500, 1500); Float("PracticeHudOffsetY", practiceHudY, -1500, 1500); Float("FpsHudOffsetX", fpsHudX, -1500, 1500); Float("FpsHudOffsetY", fpsHudY, -1500, 1500);
         Bool("HideHighwaySides", hideSides); Bool("HideFretStrings", hideStrings); Bool("HideBeatlines", hideBeats); Bool("ConstantPracticeNoteSpeed", lockSpeed);
         Bool("PerformancePauseHiddenBeatlineUpdates", pauseHiddenBeatlineUpdates);
         Bool("DisableAprilFoolsContent", disableAprilFools);
+        Bool("MuteGhostComboBreakSound", muteGhostBreakSound);
         Bool("PerformanceDisableHitParticles", disableHitParticles); Bool("PerformanceDisableSustainParticles", disableSustainParticles);
         Bool("PerformanceDisableFretEffects", disableFretEffects); Bool("PerformanceDisableFretLightningOnly", disableFretLightningOnly); Bool("PerformanceStopMidiInput", stopMidiInput); Bool("PerformanceDisableMidiForSession", disableMidiForSession);
         Bool("PerformanceDisableStarProgressParticles", disableStarProgressParticles);
@@ -1411,6 +1532,10 @@ public sealed partial class Core
             Bool("PerformanceFreezeLyricsBackgroundScroll", freezeComboSmokeScroll);
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Bool("RainbowNotes", rainbowNotes); Bool("RainbowFlames", rainbowFlames);
+        Bool("RandomizeColorPaletteEachAttempt", randomizeColorPalette);
+        Float("RandomPaletteHueMin", randomHueMin, 0, 360); Float("RandomPaletteHueMax", randomHueMax, 0, 360);
+        Float("RandomPaletteSaturationMin", randomSaturationMin, .5f, 1.5f); Float("RandomPaletteSaturationMax", randomSaturationMax, .5f, 1.5f);
+        Float("RandomPaletteBrightnessMin", randomBrightnessMin, .5f, 1.5f); Float("RandomPaletteBrightnessMax", randomBrightnessMax, .5f, 1.5f);
         Float("RainbowCyclesPerSecond", rainbowCyclesPerSecond, 0f, .8f);
         Float("RainbowHueOffsetDegrees", rainbowHueOffset, 0, 355); Float("RainbowHueSpread", rainbowHueSpread, 0, 2);
         Float("RainbowNoteVariety", rainbowNoteVariety, 0, 1);
@@ -1506,6 +1631,21 @@ public sealed partial class Core
         Color c; try { c = ParseColor(entry.Value); } catch (FormatException) { c = Color.white; }
         Preview(new Rect(x + 560, y + 4, 56, 28), c);
     }
+    private Color RotateAttemptHue(Color color)
+    {
+        if (!randomizeColorPalette.Value) return color;
+        Color.RGBToHSV(color, out float hue, out float saturation, out float brightness);
+        var rotated = Color.HSVToRGB((hue + attemptHueRotation / 360f) % 1f,
+            Math.Clamp(saturation * attemptSaturationMultiplier, 0f, 1f),
+            Math.Clamp(brightness * attemptBrightnessMultiplier, 0f, 1f));
+        rotated.a = color.a;
+        return rotated;
+    }
+
+    private static float SamplePaletteRange(float minimum, float maximum, float lowerBound, float upperBound)
+        => PaletteRange.Sample(minimum, maximum, lowerBound, upperBound,
+            System.Random.Shared.NextSingle());
+
     internal static Color ParseColor(string s)
     {
         s = s.Trim().TrimStart('#');
@@ -1757,13 +1897,19 @@ public sealed partial class Core
             {
                 rainbowHighway.Update(HarmonyInstance, rainbowNotes.Value, rainbowFlames.Value,
                     Il2Cpp.GameManager.field_Private_Static_GameManager_0, now, rainbowCyclesPerSecond.Value,
-                    new RainbowColorOptions(rainbowHueOffset.Value, rainbowHueSpread.Value, rainbowNoteVariety.Value,
-                        rainbowSaturation.Value, rainbowContrast.Value, rainbowBrightness.Value),
+                    new RainbowColorOptions((rainbowHueOffset.Value + (randomizeColorPalette.Value ? attemptHueRotation : 0f)) % 360f,
+                        rainbowHueSpread.Value, rainbowNoteVariety.Value,
+                        rainbowSaturation.Value * (randomizeColorPalette.Value ? attemptSaturationMultiplier : 1f),
+                        rainbowContrast.Value,
+                        rainbowBrightness.Value * (randomizeColorPalette.Value ? attemptBrightnessMultiplier : 1f)),
                     cacheRainbowActivePool.Value, limitRainbowPalette60Hz.Value);
             }
             finally { timings.End(9, rainbowTiming); }
         }
         HandleOptionalHudResume(now);
+        if (customizeFpsColor.Value && nativeHudActive && !nativeHudError
+            && OnDemandRendering.willCurrentFrameRender)
+            nativeHud.RefreshFpsColor();
         if (now < nextOverridePass) return;
         nextOverridePass = now + .05;
         // This shares the existing 20 Hz override cadence. A separate timer
@@ -1790,38 +1936,55 @@ public sealed partial class Core
         int score = 0, combo = 0;
         bool compactValuesValid = compactEligible
             && CompactScoreHudOverride.TryRead(compactGame, out score, out combo);
-        if (useCanvasCounterHud.Value || compactScoreHudOverride.IsActive || compactValuesValid || counterCanvas.HasObjects)
+        if (useCanvasCounterHud.Value || counterCanvas.HasObjects
+            || compactScoreHudOverride.IsActive || compactValuesValid || scoreCanvas.HasObjects)
         {
             long canvasTiming = timings.Begin();
             try
             {
-                string text = showHud.Value ? statsText : "";
-                if (compactValuesValid)
+                if (useCanvasCounterHud.Value || counterCanvas.HasObjects)
                 {
-                    if (compactHudStatsSource != text || compactHudScore != score || compactHudCombo != combo)
-                    {
-                        compactHudStatsSource = text;
-                        compactHudScore = score;
-                        compactHudCombo = combo;
-                        compactHudText = string.IsNullOrEmpty(text)
-                            ? $"Score: {score:N0}\nCombo: {combo:N0}"
-                            : $"Score: {score:N0}\nCombo: {combo:N0}\n{text}";
-                    }
-                    text = compactHudText;
+                    string? counterError = counterCanvas.Refresh(useCanvasCounterHud.Value,
+                        showHud.Value && !string.IsNullOrEmpty(statsText) && !settingsOpen && !moveHud && resizeTarget < 0,
+                        statsText, hudX.Value, hudY.Value, fontSize.Value,
+                        new Color(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1),
+                        backgroundOpacity.Value);
+                    if (counterError != null)
+                        LoggerInstance.Warning($"Canvas counter HUD failed; using the original renderer: {counterError}");
                 }
-                string? error = counterCanvas.Refresh(useCanvasCounterHud.Value || compactValuesValid,
-                    (showHud.Value || compactValuesValid) && !settingsOpen && !moveHud && resizeTarget < 0,
-                    text, hudX.Value, hudY.Value, fontSize.Value,
-                    new Color(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1),
-                    backgroundOpacity.Value);
-                if (error != null)
-                    LoggerInstance.Warning($"Canvas counter HUD failed; using the original renderer: {error}");
+                if (compactValuesValid && (compactHudScore != score || compactHudCombo != combo))
+                {
+                    compactHudScore = score;
+                    compactHudCombo = combo;
+                    compactHudText = $"Score: {score:N0}\nCombo: {combo:N0}";
+                }
+                if (compactValuesValid || scoreCanvas.HasObjects)
+                {
+                    string? scoreError = scoreCanvas.Refresh(compactValuesValid,
+                        compactValuesValid && !settingsOpen && !moveHud && resizeTarget < 0,
+                        compactHudText, compactScoreX.Value, compactScoreY.Value, fontSize.Value,
+                        new Color(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1),
+                        backgroundOpacity.Value);
+                    if (scoreError != null)
+                        LoggerInstance.Warning($"Compact score Canvas failed; native graphics restored: {scoreError}");
+                }
                 compactScoreHudOverride.Update(compactScoreHud.Value, compactValuesValid,
-                    counterCanvas.Visible, compactGame);
+                    scoreCanvas.Visible, compactGame);
+                if (!compactScoreHudOverride.IsActive) scoreCanvas.Hide();
             }
             finally { timings.End(7, canvasTiming); }
         }
         else if (compactScoreHudOverride.IsActive) compactScoreHudOverride.Restore();
+        if (compactEligible && !compactScoreHudOverride.IsActive)
+        {
+            if (compactScoreUnreadySince == 0) compactScoreUnreadySince = now;
+            else if (!compactScoreUnreadyLogged && now - compactScoreUnreadySince >= 2)
+            {
+                compactScoreUnreadyLogged = true;
+                LoggerInstance.Warning("Compact score HUD was requested but its native digits, exact HUD hierarchy, or replacement Canvas were not ready; native score graphics remain visible.");
+            }
+        }
+        else compactScoreUnreadySince = 0;
         if (useCanvasSongHud.Value || songCanvas.HasObjects)
         {
             try
@@ -1999,13 +2162,14 @@ public sealed partial class Core
             {
                 long ringTiming = timings.Begin();
                 rings.Update(game, tintFc.Value,
-                    tintFc.Value ? Read(fcColor) : Color.white,
-                    tintFc.Value ? Read(pfcColor) : Color.white);
+                    tintFc.Value ? RotateAttemptHue(Read(fcColor)) : Color.white,
+                    tintFc.Value ? RotateAttemptHue(Read(pfcColor)) : Color.white);
                 timings.End(1, ringTiming);
             }
             long visualTiming = timings.Begin();
             visuals.Apply(game, hideSides.Value, hideStrings.Value, hideBeats.Value, pauseHiddenBeats,
-                tintScore.Value, Read(starColor), Read(progressColor), Read(scoreColor), Read(songProgressColor), lockSpeed.Value,
+                tintScore.Value, RotateAttemptHue(Read(starColor)), RotateAttemptHue(Read(progressColor)),
+                RotateAttemptHue(Read(scoreColor)), RotateAttemptHue(Read(songProgressColor)), lockSpeed.Value,
                 now, timings);
             timings.End(2, visualTiming);
         }

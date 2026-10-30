@@ -22,6 +22,109 @@ Check(RainbowNoteVariation.PaletteIndex(2, 0, 1f) == RainbowNoteVariation.Palett
     "Note variety is stable for a pool slot and differs across slots");
 Check(Enumerable.Range(0, 60).Select(slot => RainbowNoteVariation.PaletteIndex(2, slot, 1f)).Distinct().Count() == 60,
     "Full note variety covers the complete hue palette");
+Check(DisplayedSpriteNumber.TryRead(new[] { 0, -1, -1 }, out int displayedScore) && displayedScore == 0,
+    "Compact score reads the native zero glyph");
+Check(DisplayedSpriteNumber.TryRead(new[] { 5, 4, 3, 10, 2, 1, -1 }, out displayedScore)
+    && displayedScore == 12345, "Compact score reads native digit and comma slots");
+Check(!DisplayedSpriteNumber.TryRead(new[] { 5, 11 }, out _),
+    "Compact score rejects an unknown font glyph");
+Check(!DisplayedSpriteNumber.TryRead(new[] { 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9 }, out _),
+    "Compact score rejects values outside the supported integer range");
+Check(GhostSoundDecision.SuppressLoseMultiplier(2, 3, 0, 0),
+    "Only a new ghost with no chart miss can silence the multiplier sound");
+Check(!GhostSoundDecision.SuppressLoseMultiplier(2, 2, 0, 1),
+    "An ordinary missed note keeps its multiplier sound");
+Check(!GhostSoundDecision.SuppressLoseMultiplier(2, 3, 0, 1),
+    "A simultaneous ghost and missed note keeps the sound");
+Check(PaletteRange.Sample(300, 60, 0, 360, .5f) == 180,
+    "Reversed palette limits still sample inside their range");
+Check(PaletteRange.Sample(float.NaN, 2, .5f, 1.5f, 1) == 1.5f,
+    "Invalid or out-of-range palette limits cannot leave supported bounds");
+var restartRules = new AutoRestartRule(3, 2, 4);
+Check(restartRules.Evaluate(0, 0, 1) == AutoRestartReason.None, "Auto-restart waits below all limits");
+Check(restartRules.Evaluate(1, 0, 1) == AutoRestartReason.EarlyMiss,
+    "A miss before the selected section requests restart");
+Check(restartRules.Evaluate(3, 0, 5) == AutoRestartReason.MissLimit,
+    "Miss threshold remains active after the selected section");
+Check(restartRules.Evaluate(0, 2, 5) == AutoRestartReason.GhostLimit,
+    "Ghost threshold is independent of misses");
+Check(new AutoRestartRule(0, 0, null).Evaluate(5, 5, 1) == AutoRestartReason.None,
+    "All auto-restart rules can be disabled");
+string rulesFile = Path.Combine(Path.GetTempPath(), "SlopHero-rules-" + Guid.NewGuid().ToString("N"), "rules.json");
+try
+{
+    var rules = new AutoRestartRuleStore(rulesFile);
+    rules.Set("chart A", restartRules);
+    var restored = new AutoRestartRuleStore(rulesFile);
+    Check(restored.Get("chart A") == restartRules && restored.Get("chart B").Evaluate(9, 9, 1) == AutoRestartReason.None,
+        "Per-song auto-restart rules survive reload without applying to other songs");
+}
+finally { if (Directory.Exists(Path.GetDirectoryName(rulesFile))) Directory.Delete(Path.GetDirectoryName(rulesFile)!, true); }
+var attempts = new SongAttemptCounter();
+attempts.Observe("chart A", 1, true, false, -1);
+attempts.Observe("chart A", 1, true, false, -1);
+Check(attempts.SongCount("chart A") == 1 && attempts.AttemptSequence == 1,
+    "One playing scene counts as one song attempt and one palette seed");
+attempts.Observe("chart A", 2, true, false, -1);
+Check(attempts.SongCount("chart A") == 2 && attempts.AttemptSequence == 2,
+    "Restarted song counts as another attempt and palette seed");
+attempts.Observe("chart A", 3, true, true, 4);
+Check(attempts.SongCount("chart A") == 2 && attempts.SectionCount("chart A", 4) == 1
+    && attempts.ActiveSection == 4, "Practice section attempts are separate from full-song attempts");
+attempts.Observe("chart B", 4, true, false, -1);
+Check(attempts.SongCount("chart B") == 1 && attempts.SongCount("chart A") == 2,
+    "Session attempt counts remain separate per chart");
+var pauseAttempts = new SongAttemptCounter();
+pauseAttempts.Observe("chart A", 5, true, false, -1, songTime: 10);
+pauseAttempts.Observe("chart A", 5, false, false, -1, songTime: 10);
+pauseAttempts.Observe(null, 0, false, false, -1);
+pauseAttempts.Observe("chart A", 5, true, false, -1, songTime: 10.2);
+Check(pauseAttempts.SongCount("chart A") == 1,
+    "Resuming after a pause does not count another song attempt");
+pauseAttempts.Observe("chart A", 5, true, false, -1, songTime: 32);
+pauseAttempts.Observe("chart A", 5, true, false, -1, songTime: 0);
+Check(pauseAttempts.SongCount("chart A") == 2,
+    "A substantial in-scene rewind counts a restarted song");
+pauseAttempts.Observe("chart A", 6, true, true, 2, songTime: 25);
+pauseAttempts.Observe("chart A", 6, false, true, 2, songTime: 25);
+pauseAttempts.Observe("chart A", 6, true, true, 2, songTime: 25.1);
+pauseAttempts.Observe("chart A", 6, true, true, 2, songTime: 40);
+pauseAttempts.Observe("chart A", 6, true, true, 2, songTime: 25);
+Check(pauseAttempts.SectionCount("chart A", 2) == 2,
+    "Practice loops count once per rewind without counting a pause");
+string attemptFile = Path.Combine(Path.GetTempPath(), "SlopHero-attempts-" + Guid.NewGuid().ToString("N"), "Attempts.json");
+try
+{
+    var savedAttempts = new SongAttemptCounter();
+    savedAttempts.ConfigurePersistence(attemptFile);
+    savedAttempts.Observe("chart A", 1, true, false, -1, saveFullSong: true);
+    savedAttempts.Observe("chart A", 2, true, true, 3, saveFullSong: true);
+    savedAttempts.Observe("chart B", 3, true, false, -1, saveFullSong: true);
+    var reloaded = new SongAttemptCounter();
+    reloaded.ConfigurePersistence(attemptFile);
+    Check(reloaded.SavedSongCount("chart A") == 1 && reloaded.SavedSongCount("chart B") == 1
+        && reloaded.SavedTotalCount == 2 && reloaded.SectionCount("chart A", 3) == 0,
+        "Saved full-song counts survive reload while practice counts remain session-only");
+    savedAttempts.Observe("chart C", 4, true, false, -1, saveFullSong: true, saveGlobalTotal: false);
+    savedAttempts.Observe("chart D", 5, true, false, -1, saveGlobalTotal: true);
+    var independent = new SongAttemptCounter();
+    independent.ConfigurePersistence(attemptFile);
+    Check(independent.SavedSongCount("chart C") == 1 && independent.SavedSongCount("chart D") == 0
+        && independent.SavedTotalCount == 3,
+        "Per-song and global auto-save can be selected independently");
+    string legacyFile = Path.Combine(Path.GetDirectoryName(attemptFile)!, "legacy.json");
+    File.WriteAllText(legacyFile, "{\"chart A\":2,\"chart B\":1}");
+    var legacy = new SongAttemptCounter();
+    legacy.ConfigurePersistence(legacyFile);
+    Check(legacy.SavedSongCount("chart A") == 2 && legacy.SavedTotalCount == 3,
+        "Older per-song attempt files migrate with their original total");
+    File.WriteAllText(attemptFile, "invalid JSON");
+    var damaged = new SongAttemptCounter();
+    damaged.ConfigurePersistence(attemptFile);
+    Check(damaged.PersistenceError != null && File.ReadAllText(attemptFile) == "invalid JSON",
+        "Unreadable saved counts are preserved instead of overwritten");
+}
+finally { if (Directory.Exists(Path.GetDirectoryName(attemptFile))) Directory.Delete(Path.GetDirectoryName(attemptFile)!, true); }
 var hold = new HoldTrigger();
 Check(!hold.Update(true, true, 0, .75), "Initial press");
 Check(!hold.Update(true, true, .5, .75), "Short hold");

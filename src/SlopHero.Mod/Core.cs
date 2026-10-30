@@ -19,8 +19,25 @@ public sealed partial class Core : MelonMod
     private readonly ShortcutPollingGate shortcutPolling = new();
     private bool lastRestartShortcutPressed, lastPracticeShortcutPressed;
     private readonly ChartStats statsReader = new();
+    private readonly GhostBreakSoundOverride ghostBreakSound = new();
+    private readonly SongAttemptCounter attempts = new();
+    private AutoRestartRuleStore? autoRestartRules;
+    private string? activeAttemptKey;
+    private IntPtr cachedAttemptSongPointer;
+    private string? cachedAttemptSongKey;
+    private double nextAutoRestartCheck;
+    private bool autoRestartRequested;
+    private long lastColorAttemptSequence;
+    private float attemptHueRotation, attemptSaturationMultiplier = 1f, attemptBrightnessMultiplier = 1f;
+    private bool highwayThumbnailPending;
+    private double compactScoreUnreadySince;
+    private bool compactScoreUnreadyLogged;
+    private MelonPreferences_Entry<int> outroSkipMode = null!;
+    private bool outroPromptVisible, outroSkipRequested, outroSkipFailed;
+    private double outroEligibleSince, nextOutroCheck, outroSkipRequestedAt, originalSongLength;
     private readonly NativeHudLayout nativeHud = new();
     private readonly CounterCanvasHud counterCanvas = new();
+    private readonly CounterCanvasHud scoreCanvas = new();
     private readonly CounterCanvasHud songCanvas = new(songMode: true);
     private readonly ClonZonesFlameTickGate clonZonesFlameTickGate = new();
     private readonly ClonZonesFlameSuppressor clonZonesFlameSuppressor = new();
@@ -36,7 +53,9 @@ public sealed partial class Core : MelonMod
     private MelonPreferences_Entry<float> holdSeconds = null!;
     private MelonPreferences_Entry<float> backgroundOpacity = null!, textRed = null!, textGreen = null!, textBlue = null!;
     private MelonPreferences_Entry<int> hudX = null!, hudY = null!, fontSize = null!;
-    private MelonPreferences_Entry<bool> showHud = null!;
+    private MelonPreferences_Entry<int> compactScoreX = null!, compactScoreY = null!;
+    private MelonPreferences_Entry<bool> showHud = null!, showAttempts = null!, saveAttempts = null!, saveGlobalAttempts = null!, showTotalAttempts = null!;
+    private MelonPreferences_Entry<string> counterFontName = null!;
     private bool compatible, gameplay, gameplayInitialized, practiceModeActive, settingsOpen, transition, practiceFailed;
     private bool moveHud, hudDragging, preferencesDirty, cursorOverridden, savedCursorVisible;
     private int nativeMoveTarget;
@@ -83,8 +102,17 @@ public sealed partial class Core : MelonMod
         holdSeconds = preferences.CreateEntry("HoldSeconds", .75f);
         hudX = preferences.CreateEntry("HudX", 24);
         hudY = preferences.CreateEntry("HudY", 110);
+        compactScoreX = preferences.CreateEntry("CompactScoreHudX", 24);
+        compactScoreY = preferences.CreateEntry("CompactScoreHudY", 24);
         fontSize = preferences.CreateEntry("FontSize", 24);
         showHud = preferences.CreateEntry("ShowHud", true);
+        showAttempts = preferences.CreateEntry("ShowAttempts", false);
+        saveAttempts = preferences.CreateEntry("SaveAttempts", false);
+        saveGlobalAttempts = preferences.CreateEntry("SaveGlobalAttempts", saveAttempts.Value);
+        showTotalAttempts = preferences.CreateEntry("ShowTotalAttempts", false);
+        counterFontName = preferences.CreateEntry("CounterFontName", "Segoe UI");
+        outroSkipMode = preferences.CreateEntry("OutroSkipMode", 0);
+        CounterFont.Configure(counterFontName.Value);
         backgroundOpacity = preferences.CreateEntry("BackgroundOpacity", .65f);
         textRed = preferences.CreateEntry("TextRed", 1f);
         textGreen = preferences.CreateEntry("TextGreen", 1f);
@@ -97,6 +125,11 @@ public sealed partial class Core : MelonMod
             preferences.SaveToFile();
         }
         InitializeFeatures();
+        attempts.ConfigurePersistence(Path.Combine(MelonEnvironment.UserDataDirectory, "SlopHero", "Attempts.json"));
+        if (attempts.PersistenceError != null)
+            LoggerInstance.Warning($"Saved attempt counts unavailable: {attempts.PersistenceError}");
+        try { autoRestartRules = new AutoRestartRuleStore(Path.Combine(MelonEnvironment.UserDataDirectory, "SlopHero", "AutoRestartRules.json")); }
+        catch (Exception ex) { LoggerInstance.Warning($"Per-song auto-restart rules unavailable: {ex.Message}"); }
         try
         {
             settingsProfiles = new SettingsProfiles(MelonEnvironment.UserDataDirectory);
@@ -113,6 +146,7 @@ public sealed partial class Core : MelonMod
             legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
         }
         else LoggerInstance.Warning(status);
+        LoggerInstance.Msg("SlopHero next-update development branch; release package remains 0.4.141.");
         LoggerInstance.Msg("F8: SlopHero settings. Default: hold R to restart, hold P to practice the current section.");
     }
 
@@ -178,6 +212,7 @@ public sealed partial class Core : MelonMod
         clonZonesFlameSuppressor.Clear();
         inputViewerSuppression.Clear();
         compactScoreHudOverride.Clear();
+        ghostBreakSound.Clear(HarmonyInstance);
         ResetNativeBridgesForScene();
         optionalHudAnimations.Clear();
         optionalHudGame = null;
@@ -194,6 +229,7 @@ public sealed partial class Core : MelonMod
         gameplay = string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase);
         statsText = songText = "";
         counterCanvas.Clear();
+        scoreCanvas.Clear();
         songCanvas.Clear();
         cheatScanner.Clear(HarmonyInstance);
         gameplayUiEventError = false;
@@ -249,6 +285,14 @@ public sealed partial class Core : MelonMod
         nextGameStateRefresh = 0;
         finalStatsRefreshUntil = 0;
         lastStatsSongPlaying = false;
+        cachedAttemptSongPointer = IntPtr.Zero;
+        cachedAttemptSongKey = null;
+        autoRestartRequested = false;
+        nextAutoRestartCheck = 0;
+        compactScoreUnreadySince = 0;
+        compactScoreUnreadyLogged = false;
+        outroPromptVisible = outroSkipRequested = outroSkipFailed = false;
+        outroEligibleSince = nextOutroCheck = outroSkipRequestedAt = originalSongLength = 0;
         localStatsPlayer = IntPtr.Zero;
         nextOverridePass = 0;
         restartHold.RequireRelease();
@@ -299,6 +343,7 @@ public sealed partial class Core : MelonMod
         rainbowHighway.Clear();
         staticMeterAttach.Clear();
         compactScoreHudOverride.Clear();
+        ghostBreakSound.Clear(HarmonyInstance);
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Clear();
         ResetNativeBridgesForScene();
@@ -309,6 +354,7 @@ public sealed partial class Core : MelonMod
         staticTmpScaleError = false;
         SongSpeedControl.ResetMenuCache();
         counterCanvas.Clear();
+        scoreCanvas.Clear();
         songCanvas.Clear();
         cheatScanner.Clear(HarmonyInstance);
         gameplayUiEventError = false;
@@ -566,7 +612,41 @@ public sealed partial class Core : MelonMod
             nextGameStateRefresh = now + .05;
             var game = gameplay && gameplayInitialized ? GameManager.field_Private_Static_GameManager_0 : null;
             bool ready = game != null && game.songLoaded && game.playersInit && game.globalVariables != null;
+            if (highwayThumbnailPending)
+            {
+                highwayThumbnailPending = false;
+                try
+                {
+                    if (!ready) throw new InvalidOperationException("Start a song before capturing a highway image.");
+                    string path = HighwayThumbnailGrabber.Capture(game!, MelonEnvironment.UserDataDirectory);
+                    LoggerInstance.Msg($"Saved highway thumbnail: {path}");
+                    Notice("Highway thumbnail saved in UserData/SlopHero/Thumbnails.");
+                }
+                catch (Exception ex) { Notice($"Highway thumbnail failed: {ex.Message}"); }
+            }
             bool songPlaying = ready && game!.isSongPlaying;
+            var attemptSong = ready ? game!.globalVariables!.currentSongEntry : null;
+            if (attemptSong == null) cachedAttemptSongPointer = IntPtr.Zero;
+            if (attemptSong != null && attemptSong.Pointer != cachedAttemptSongPointer)
+            {
+                cachedAttemptSongPointer = attemptSong.Pointer;
+                cachedAttemptSongKey = !string.IsNullOrWhiteSpace(attemptSong.folderPath)
+                    ? attemptSong.folderPath.ToUpperInvariant()
+                    : string.Join("\u001f", attemptSong.Name_StrippedTags ?? "",
+                        attemptSong.Artist_StrippedTags ?? "", attemptSong.Charter_StrippedTags ?? "");
+            }
+            string? attemptKey = attemptSong == null ? null : cachedAttemptSongKey;
+            activeAttemptKey = attemptKey;
+            attempts.Observe(attemptKey, game?.Pointer ?? IntPtr.Zero, songPlaying,
+                ready && game!.globalVariables!.isPracticeEnabled, ready ? game!.currentSection : -1,
+                saveAttempts.Value, ready ? game!.songTime : double.NaN, saveGlobalAttempts.Value);
+            if (attempts.AttemptSequence != lastColorAttemptSequence)
+            {
+                lastColorAttemptSequence = attempts.AttemptSequence;
+                attemptHueRotation = SamplePaletteRange(randomHueMin.Value, randomHueMax.Value, 0f, 360f);
+                attemptSaturationMultiplier = SamplePaletteRange(randomSaturationMin.Value, randomSaturationMax.Value, .5f, 1.5f);
+                attemptBrightnessMultiplier = SamplePaletteRange(randomBrightnessMin.Value, randomBrightnessMax.Value, .5f, 1.5f);
+            }
             if (ready && focused && (!songPlaying || game!.isPaused || settingsOpen) && !transition)
             {
                 plainHeldSustains.Warm(hideHeldSustainGlow.Value, game, now);
@@ -620,6 +700,33 @@ public sealed partial class Core : MelonMod
             bool online = IsOnline(now);
             bool isOfflineSolo = (activeSoloContext || shortcutCandidate || workerLimitCandidate) && !online;
             offlineSoloOptimizationActive = activeSoloContext && !online;
+            ghostBreakSound.Update(HarmonyInstance, muteGhostBreakSound.Value,
+                shortcutCandidate && isOfflineSolo, game);
+            if (shortcutCandidate && isOfflineSolo && !autoRestartRequested && game!.playerObjects != null
+                && autoRestartRules != null && attemptKey != null && now >= nextAutoRestartCheck)
+            {
+                nextAutoRestartCheck = now + .1;
+                var rule = autoRestartRules.Get(attemptKey);
+                if (rule.MissLimit > 0 || rule.GhostLimit > 0 || rule.NoMissBeforeSection != null)
+                {
+                    var local = game.playerObjects.FirstOrDefault(p => p != null && p.enabled
+                        && p.TryCast<GuitarPlayer>() != null && p.engine != null
+                        && p.player != null && p.player.field_Public_Player_0 != null);
+                    if (local != null)
+                    {
+                        LiveStats live = statsReader.Read(local.engine, game);
+                        var reason = rule.Evaluate(live.Misses, live.GhostInputs, game.currentSection);
+                        if (reason != AutoRestartReason.None && game.pauseMenu?.GetComponent<PauseMenu>() != null)
+                        {
+                            autoRestartRequested = true;
+                            LoggerInstance.Msg($"Auto-restart triggered by {reason} for this song.");
+                            BeginRestart(game);
+                            return;
+                        }
+                    }
+                }
+            }
+            UpdateOutroSkip(game, shortcutCandidate && isOfflineSolo, now);
             // These paths are local UI/visual work. They can be skipped during
             // any active chart, including online play, without touching note,
             // controller, or network simulation updates.
@@ -774,7 +881,8 @@ public sealed partial class Core : MelonMod
                 }
                 bool detailedCounters = countersVisible && (showMisses.Value || showHit.Value || showGhosts.Value);
                 bool streakVisible = countersVisible && showBest.Value;
-                if (detailedCounters || streakVisible)
+                bool attemptsVisible = countersVisible && showAttempts.Value;
+                if (detailedCounters || streakVisible || attemptsVisible)
                 {
                     // Scan chart notes only for counter data that is actually
                     // displayed. The song-info HUD doesn't depend on a player.
@@ -816,6 +924,19 @@ public sealed partial class Core : MelonMod
                         }
                         if (showGhosts.Value) lines.Add($"Ghosts: {stats.GhostInputs}");
                         if (showBest.Value) lines.Add($"Best streak: {player.engine.field_Public_Int32_5}");
+                        if (showAttempts.Value && attemptKey != null)
+                        {
+                            if (practiceModeActive)
+                                lines.Add($"Section attempts: {attempts.SectionCount(attemptKey, attempts.ActiveSection)}");
+                            else
+                            {
+                                lines.Add($"Song attempts: {attempts.SongCount(attemptKey)} this session"
+                                    + (saveAttempts.Value || attempts.SavedSongCount(attemptKey) > 0
+                                        ? $" / {attempts.SavedSongCount(attemptKey)} saved" : ""));
+                                if (showTotalAttempts.Value)
+                                    lines.Add($"All songs: {attempts.SavedTotalCount} saved attempts");
+                            }
+                        }
                         statsText = string.Join("\n", lines);
                     }
                 }
@@ -850,6 +971,7 @@ public sealed partial class Core : MelonMod
             rainbowHighway.Clear();
             staticMeterAttach.Clear();
             compactScoreHudOverride.Clear();
+            ghostBreakSound.Clear(HarmonyInstance);
             clonZonesFlameTickGate.Clear();
             clonZonesFlameSuppressor.Update(false, gameplay);
             nativeSustainCache.Clear();
@@ -991,6 +1113,71 @@ public sealed partial class Core : MelonMod
         }
     }
 
+    private void UpdateOutroSkip(GameManager? game, bool offlineSolo, double now)
+    {
+        if (outroSkipRequested)
+        {
+            if (game != null && (game.isSongOver || now - outroSkipRequestedAt > 2))
+            {
+                try { game.songLength = originalSongLength; }
+                catch (Exception ex) { LoggerInstance.Warning($"Outro length restoration failed: {ex.Message}"); }
+                if (!game.isSongOver)
+                {
+                    outroSkipFailed = true;
+                    Notice("Outro skip did not finish; original song length restored.");
+                }
+                outroSkipRequested = false;
+            }
+            return;
+        }
+        bool allowed = !outroSkipFailed && outroSkipMode.Value is 1 or 2 && offlineSolo && game != null
+            && game.playerObjects != null && game.songLength - game.songTime > 3;
+        if (!allowed)
+        {
+            outroPromptVisible = false;
+            outroEligibleSince = 0;
+            return;
+        }
+        if (now < nextOutroCheck) return;
+        nextOutroCheck = now + .2;
+        var local = game!.playerObjects!.FirstOrDefault(p => p != null && p.enabled
+            && p.TryCast<GuitarPlayer>() != null && p.engine != null
+            && p.player != null && p.player.field_Public_Player_0 != null);
+        if (local == null) { outroPromptVisible = false; return; }
+        bool eligible = statsReader.AllPlayableNotesDone(local.engine, game);
+        if (!eligible)
+        {
+            outroPromptVisible = false;
+            outroEligibleSince = 0;
+            return;
+        }
+        if (outroEligibleSince == 0) outroEligibleSince = now;
+        outroPromptVisible = outroSkipMode.Value == 1;
+        if ((outroSkipMode.Value == 1 && Input.GetKey(KeyCode.End))
+            || (outroSkipMode.Value == 2 && now - outroEligibleSince >= .5))
+        {
+            // The older source's Update ends playback when songTime reaches
+            // songLength. Shorten that bound for one transition, then restore
+            // it once this build reports the song over (or after a timeout).
+            originalSongLength = game.songLength;
+            try
+            {
+                game.songLength = Math.Max(0, game.songTime - .001);
+                outroSkipRequestedAt = now;
+                outroSkipRequested = true;
+                outroPromptVisible = false;
+                LoggerInstance.Msg("Outro skip requested after all playable chart heads and sustain tails finished.");
+            }
+            catch (Exception ex)
+            {
+                try { game.songLength = originalSongLength; } catch { }
+                outroSkipFailed = true;
+                outroPromptVisible = false;
+                Notice($"Outro skip could not start: {ex.Message}");
+            }
+        }
+    }
+
     private void Notice(string message)
     {
         status = message;
@@ -1030,7 +1217,7 @@ public sealed partial class Core : MelonMod
             && (!showHud.Value || string.IsNullOrEmpty(statsText) || counterCanvas.Visible)
             && (!showSong.Value || string.IsNullOrEmpty(songText) || songCanvas.Visible)
             && !settingsOpen && !moveHud && resizeTarget < 0 && nativeMoveTarget == 0
-            && noticeUntil <= 0) return;
+            && noticeUntil <= 0 && !outroPromptVisible) return;
         if (timings.Active && Event.current.type == EventType.Repaint)
             timings.SampleRepaint();
         // Passive HUDs need only the repaint event. Keep full event processing
@@ -1038,18 +1225,19 @@ public sealed partial class Core : MelonMod
         bool resizeEditing = resizeTarget >= 0;
         if (!settingsOpen && !moveHud && !resizeEditing && Event.current.type != EventType.Repaint) return;
         if (counterCanvas.Visible && (settingsOpen || moveHud || resizeEditing || !gameplay
-            || (!showHud.Value && !compactScoreHudOverride.IsActive)
-            || (string.IsNullOrEmpty(statsText) && !compactScoreHudOverride.IsActive)))
+            || !showHud.Value || string.IsNullOrEmpty(statsText)))
         {
-            compactScoreHudOverride.Restore();
             counterCanvas.Hide();
         }
+        if (scoreCanvas.Visible && (settingsOpen || moveHud || resizeEditing || !gameplay))
+        { compactScoreHudOverride.Restore(); scoreCanvas.Hide(); }
         if (songCanvas.Visible && (!showSong.Value || settingsOpen || moveHud || resizeEditing
             || !gameplay || string.IsNullOrEmpty(songText))) songCanvas.Hide();
         bool noticeVisible = !compatible || (noticeUntil > 0 && clock.Elapsed.TotalSeconds < noticeUntil);
         bool counterHudVisible = !counterCanvas.Visible && showHud.Value && gameplay && !string.IsNullOrEmpty(statsText);
         bool songHudVisible = !songCanvas.Visible && showSong.Value && gameplay && !string.IsNullOrEmpty(songText);
-        if (!settingsOpen && !moveHud && !resizeEditing && !noticeVisible && !counterHudVisible && !songHudVisible) return;
+        if (!settingsOpen && !moveHud && !resizeEditing && !noticeVisible && !counterHudVisible && !songHudVisible
+            && !outroPromptVisible) return;
         long timingStart = timings.Begin();
         Color previousColor = GUI.color;
         GUI.color = Color.white;
@@ -1087,6 +1275,9 @@ public sealed partial class Core : MelonMod
             if (resizeEditing) DrawResizeHandles();
             if (noticeVisible)
                 GUI.Box(new Rect(20, Screen.height - 60, Math.Max(300, Screen.width - 40), 44), status);
+            if (outroPromptVisible && !settingsOpen)
+                GUI.Box(new Rect(Math.Max(20, (Screen.width - 430) / 2), Screen.height - 110, 430, 38),
+                    "Notes are done — hold End to finish this song");
             if (moveHud && nativeMoveTarget == 0)
                 GUI.Box(new Rect(20, Screen.height - 110, Math.Max(300, Screen.width - 40), 44),
                     "Drag the HUD anywhere. F8 returns to settings; Escape finishes. Position saves when released.");
@@ -1305,6 +1496,7 @@ public sealed partial class Core : MelonMod
         rainbowHighway.Clear();
         staticMeterAttach.Clear();
         compactScoreHudOverride.Clear();
+        ghostBreakSound.Clear(HarmonyInstance);
         clonZonesFlameTickGate.Clear();
         clonZonesFlameSuppressor.Clear();
         nativeSustainCache.Clear();
@@ -1325,6 +1517,7 @@ public sealed partial class Core : MelonMod
         starProgressParticles.Clear();
         comboSmokeScroll.Clear();
         counterCanvas.Clear();
+        scoreCanvas.Clear();
         songCanvas.Clear();
         cheatScanner.Clear(HarmonyInstance);
         optionalServices.Restore();

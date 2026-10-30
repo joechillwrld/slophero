@@ -10,6 +10,41 @@ internal static class CounterFont
     private static bool attempted;
     private static Font? unityFont;
     private static TMP_FontAsset? textMeshProFont;
+    private static string requestedFamily = "Segoe UI";
+    private static readonly Dictionary<string, (Font Font, TMP_FontAsset? Tmp)> cache =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static string[]? installedFamilies;
+
+    internal static string? NextInstalledFamily(string current)
+    {
+        if (installedFamilies == null)
+        {
+            try
+            {
+                installedFamilies = Font.GetOSInstalledFontNames()
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+            }
+            catch (Exception ex)
+            {
+                installedFamilies = Array.Empty<string>();
+                MelonLogger.Warning($"Installed font enumeration unavailable: {ex.Message}");
+            }
+        }
+        if (installedFamilies.Length == 0) return null;
+        int index = Array.FindIndex(installedFamilies,
+            name => string.Equals(name, current, StringComparison.OrdinalIgnoreCase));
+        return installedFamilies[(index + 1) % installedFamilies.Length];
+    }
+
+    internal static void Configure(string? family)
+    {
+        string next = string.IsNullOrWhiteSpace(family) ? "Segoe UI" : family.Trim();
+        if (string.Equals(next, requestedFamily, StringComparison.OrdinalIgnoreCase)) return;
+        requestedFamily = next;
+        attempted = false;
+    }
 
     internal static Font? UnityFont
     {
@@ -25,11 +60,15 @@ internal static class CounterFont
     {
         if (attempted) return;
         attempted = true;
+        if (cache.TryGetValue(requestedFamily, out var cached))
+        {
+            unityFont = cached.Font;
+            textMeshProFont = cached.Tmp;
+            return;
+        }
         try
         {
-            // Segoe UI gives the compact counters a cleaner, more legible face
-            // on the supported Windows game build. Arial remains a fallback.
-            unityFont = Font.CreateDynamicFontFromOSFont("Segoe UI", 48);
+            unityFont = Font.CreateDynamicFontFromOSFont(requestedFamily, 48);
             if (unityFont == null) unityFont = Font.CreateDynamicFontFromOSFont("Arial", 48);
             if (unityFont == null) return;
 
@@ -45,6 +84,7 @@ internal static class CounterFont
                 }
             }
             catch { /* The IMGUI counters can still use the OS font directly. */ }
+            cache[requestedFamily] = (unityFont, textMeshProFont);
         }
         catch (Exception ex)
         {
