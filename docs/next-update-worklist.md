@@ -1,6 +1,6 @@
 # Next update worklist (working branch, no release yet)
 
-The requested target is the complete list below before another SlopHero build is packaged or shared. The latest release remains 0.4.141. Local compilation and Core checks are development validation only. Preserve the current v1.1.0.6142 compatibility fingerprint, existing features, note timing, 1000 Hz instrument polling, audio sync, profiles, and online play.
+The requested target is the complete current-update list below before a final SlopHero update is shared. The latest validated build remains 0.4.141. Version 0.4.142 is a private test package requested for Windows validation; its features and performance are not yet verified. Preserve the current v1.1.0.6142 compatibility fingerprint, existing features, note timing, 1000 Hz instrument polling, audio sync, profiles, and online play.
 
 Work in fix → feature → investigation cycles. Current progress:
 
@@ -17,4 +17,4 @@ Work in fix → feature → investigation cycles. Current progress:
 | UI | Menu cleanup | The long engine/camera/network experiment list is collapsed by default behind one button on Performance, leaving common visual and HUD switches visible. Windows layout review remains pending. |
 | Performance | Further heavy improvements | The repeatedly failed personal-best popup lookup now resolves the exact score branch instead of searching the whole scene for an inactive display; Windows activation still needs confirmation. Heavy presented-frame gains remain pending matched PresentMon and native-path work. The supplied log has 29 nonzero regular-sustain cache skip reports and 145 zero reports; match active periods to captures before assessing benefit. |
 
-The supplied ZIP references and exact game binary/metadata now exist locally in ignored `references/`; their compatibility hashes match `BuildGuard`. A local mod compile has zero warnings/errors. The cloud machine cannot run the Windows game, so live visuals, gameplay transitions, audio behavior and presented-frame gains still require a Windows check. Do not package the next version until the remaining current-update list is implemented and those checks are resolved.
+The supplied ZIP references and exact game binary/metadata now exist locally in ignored `references/`; their compatibility hashes match `BuildGuard`. A local mod compile has zero warnings/errors. The cloud machine cannot run the Windows game, so live visuals, gameplay transitions, audio behavior and presented-frame gains still require a Windows check. The 0.4.142 ZIP is a private test package, not the final validated update.
