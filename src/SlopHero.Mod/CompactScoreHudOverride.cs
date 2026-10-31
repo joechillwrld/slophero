@@ -13,7 +13,7 @@ namespace SlopHero.Mod;
 internal sealed class CompactScoreHudOverride
 {
     private readonly record struct SpriteState(SpriteRenderer Renderer, bool Enabled);
-    private readonly List<SpriteState> sprites = new(23);
+    private readonly List<SpriteState> sprites = new(35);
     private bool failed;
 
     internal bool IsActive => sprites.Count != 0;
@@ -87,19 +87,30 @@ internal sealed class CompactScoreHudOverride
             || score.parent.parent == null || score.parent.parent.name != "HUDCam") return false;
         var scoreSprites = score.GetComponentsInChildren<SpriteRenderer>(true);
         var comboSprites = combo.GetComponentsInChildren<SpriteRenderer>(true);
-        // Exact current Gameplay scene: 15 score and 8 combo sprites. If a
+        var star = score.parent.Find("Star");
+        var songProgress = score.parent.Find("Song Progress");
+        if (star == null || songProgress == null) return false;
+        var starSprites = star.GetComponentsInChildren<SpriteRenderer>(true);
+        var progressSprites = songProgress.GetComponentsInChildren<SpriteRenderer>(true);
+        // Exact current Gameplay scene: 15 score, 8 combo, 8 star, and 4
+        // song-progress sprites. If a
         // skin/mod changes the structure, keep the native display intact.
-        if (scoreSprites.Length != 15 || comboSprites.Length != 8) return false;
+        if (scoreSprites.Length != 15 || comboSprites.Length != 8
+            || starSprites.Length != 8 || progressSprites.Length != 4) return false;
         foreach (var renderer in scoreSprites)
             if (renderer != null) sprites.Add(new SpriteState(renderer, renderer.enabled));
         foreach (var renderer in comboSprites)
             if (renderer != null) sprites.Add(new SpriteState(renderer, renderer.enabled));
-        if (sprites.Count != 23)
+        foreach (var renderer in starSprites)
+            if (renderer != null) sprites.Add(new SpriteState(renderer, renderer.enabled));
+        foreach (var renderer in progressSprites)
+            if (renderer != null) sprites.Add(new SpriteState(renderer, renderer.enabled));
+        if (sprites.Count != 35)
         {
             sprites.Clear();
             return false;
         }
-        MelonLogger.Msg("Compact score HUD replaced 23 native score/combo renderers with Canvas text for this solo song.");
+        MelonLogger.Msg("Compact score HUD hid 35 score/combo/star/progress renderers for this solo song.");
         return true;
     }
 

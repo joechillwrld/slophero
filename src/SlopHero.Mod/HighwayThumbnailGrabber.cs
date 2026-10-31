@@ -38,8 +38,14 @@ internal static class HighwayThumbnailGrabber
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.Render();
             RenderTexture.active = target;
-            image = new Texture2D(width, height, TextureFormat.RGB24, false);
-            image.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+            // The player camera fills the screen even though the playable
+            // highway occupies only its center. Keep the notes and fretboard
+            // while cropping the broad empty margins from the PNG.
+            int cropWidth = Math.Max(1, (int)(width * .5f));
+            int cropHeight = Math.Max(1, (int)(height * .8f));
+            int cropX = (width - cropWidth) / 2;
+            image = new Texture2D(cropWidth, cropHeight, TextureFormat.RGB24, false);
+            image.ReadPixels(new Rect(cropX, 0, cropWidth, cropHeight), 0, 0);
             image.Apply();
             var png = image.EncodeToPNG();
             if (png == null || png.Length == 0) throw new InvalidOperationException("PNG encoding returned no image.");

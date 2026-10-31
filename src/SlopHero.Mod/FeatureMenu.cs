@@ -356,7 +356,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.143 test", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.144 test", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -1912,6 +1912,8 @@ public sealed partial class Core
             }
             finally { timings.End(9, rainbowTiming); }
         }
+        if (rainbowAnimationPending && OnDemandRendering.willCurrentFrameRender)
+            rainbowHighway.ReassertNotesForRender();
         HandleOptionalHudResume(now);
         if (customizeFpsColor.Value && nativeHudActive && !nativeHudError
             && OnDemandRendering.willCurrentFrameRender)

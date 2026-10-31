@@ -16,6 +16,7 @@ internal static class CounterFont
     internal static void Configure(string? family)
     {
         requestedFamily = string.IsNullOrWhiteSpace(family) ? "Default" : family.Trim();
+        available.Clear();
         nextScanTime = 0;
         warned = false;
     }
@@ -37,9 +38,9 @@ internal static class CounterFont
         get
         {
             if (string.Equals(requestedFamily, "Default", StringComparison.OrdinalIgnoreCase)) return null;
-            if (available.TryGetValue(requestedFamily, out var font)) return font;
-            RefreshAvailable();
-            if (available.TryGetValue(requestedFamily, out font)) return font;
+            if (available.TryGetValue(requestedFamily, out var font) && font != null) return font;
+            RefreshAvailable(force: true);
+            if (available.TryGetValue(requestedFamily, out font) && font != null) return font;
             if (!warned)
             {
                 warned = true;
@@ -56,6 +57,7 @@ internal static class CounterFont
         nextScanTime = now + 2f;
         try
         {
+            available.Clear();
             foreach (var text in UnityEngine.Object.FindObjectsOfType<TextMeshProUGUI>())
             {
                 if (text == null || text.font == null || string.IsNullOrWhiteSpace(text.font.name)) continue;

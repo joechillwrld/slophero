@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.143", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.144", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -150,7 +150,7 @@ public sealed partial class Core : MelonMod
             legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
         }
         else LoggerInstance.Warning(status);
-        LoggerInstance.Msg("SlopHero 0.4.143 private test build; performance work and Windows validation remain in progress.");
+        LoggerInstance.Msg("SlopHero 0.4.144 private test build; performance work and Windows validation remain in progress.");
         LoggerInstance.Msg("F8: SlopHero settings. Default: hold R to restart, hold P to practice the current section.");
     }
 
@@ -1141,7 +1141,7 @@ public sealed partial class Core : MelonMod
             return;
         }
         bool allowed = !outroSkipFailed && outroSkipMode.Value is 1 or 2 && offlineSolo && game != null
-            && game.playerObjects != null && game.songLength - game.songTime > 3;
+            && game.playerObjects != null && game.songLength - game.songTime > .5;
         if (!allowed)
         {
             outroPromptVisible = false;
@@ -1325,8 +1325,8 @@ public sealed partial class Core : MelonMod
     {
         if (moveHud && moveSong) { DrawSongHud(true); return; }
         hudStyle ??= CreateHudStyle();
-        if (CounterFont.UnityFont is { } counterFont && hudStyle.font != counterFont)
-            hudStyle.font = counterFont;
+        var counterFont = CounterFont.UnityFont;
+        if (hudStyle.font != counterFont) hudStyle.font = counterFont;
         int size = Math.Clamp(fontSize.Value, 14, 48);
         Color color = new(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1);
         if (styledHudFont != size) { hudStyle.fontSize = size; styledHudFont = size; }

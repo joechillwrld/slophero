@@ -35,11 +35,9 @@ internal sealed class ChartStats
         {
             var note = notes[outroCursor];
             if (note == null) { outroTimingValid = false; break; }
-            uint flags = (uint)note.field_Public_EnumNPublicSealedvaNoChDiExChHoStTaSoUnique_0;
-            ushort state = (ushort)note.field_Public_EnumNPublicSealedvaNoHiMiDyIsWa8vWaUnique_0;
-            // A disjoint child does not have its own scoring decision, but
-            // its tail still contributes to the last playable moment.
-            if (ChartNote.CountsTowardAccuracy(flags) && !ChartNote.IsResolved(state)) break;
+            // Every chart component contributes its tail, including disjoint
+            // children. Judgment flags can remain unresolved after the final
+            // playable moment, so they must not block an otherwise safe skip.
             double noteTime = note.field_Public_Double_0;
             double sustainLength = note.field_Public_Double_1;
             if (!double.IsFinite(noteTime) || !double.IsFinite(sustainLength)

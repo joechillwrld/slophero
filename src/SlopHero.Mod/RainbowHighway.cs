@@ -77,6 +77,48 @@ internal sealed class RainbowHighway
     internal bool HasOverrides => notesActive || flames.Count != 0 || clonZonesFlames.IsActive
         || noteHookInstalled || flameUpdateHookInstalled;
 
+    // GuitarNoteContainer.SetState is stripped from this game build. The
+    // native note path can overwrite a tint between palette passes, so put
+    // the current palette back on visible notes before each rendered frame.
+    internal void ReassertNotesForRender()
+    {
+        if (!notesActive || notesFailed || noteHookInstalled || !notePaletteValid || noteGroups.Count == 0) return;
+        try
+        {
+            applyingOwnColor = true;
+            foreach (var group in noteGroups)
+            {
+                if (!group.Object.activeInHierarchy) continue;
+                if (group.Body is { Renderer: { } body } bodyState)
+                {
+                    var current = body.color;
+                    var previous = bodyState.Displayed;
+                    if (current.r != previous.r || current.g != previous.g || current.b != previous.b)
+                    {
+                        bodyState.Original = current;
+                        if (TryResolveLane(current, out int lanePhase)) group.Phase = lanePhase;
+                    }
+                }
+                var tint = NoteColor(group);
+                foreach (var state in group.Sprites)
+                    if (state.Renderer != null && state.Renderer.enabled && state.Renderer.sprite != null)
+                    {
+                        var current = state.Renderer.color;
+                        if (current.r != state.Displayed.r || current.g != state.Displayed.g
+                            || current.b != state.Displayed.b) state.Original = current;
+                        SetNoteRgb(state, tint);
+                    }
+            }
+        }
+        catch (Exception ex)
+        {
+            RestoreNotes();
+            notesFailed = true;
+            MelonLogger.Warning($"Rainbow render-frame tint stopped: {ex.Message}");
+        }
+        finally { applyingOwnColor = false; }
+    }
+
     internal static float CycleRate(float configured) => float.IsFinite(configured)
         ? Math.Clamp(configured, 0f, .8f) : .18f;
 
@@ -91,7 +133,7 @@ internal sealed class RainbowHighway
         catch (Exception ex)
         {
             noteHookFailed = true;
-            MelonLogger.Warning($"Rainbow note color hook could not install; periodic tinting will remain as fallback: {ex.Message}");
+            MelonLogger.Warning($"Rainbow note color hook could not install; rendered-frame tinting will remain as fallback: {ex.Message}");
         }
         if (colorFlames && flames.Count != 0 && clonZonesFlames.TryEnable(harmony)) return;
         if (colorFlames && flames.Count != 0 && !flameHookFailed && !flameUpdateHookInstalled)
