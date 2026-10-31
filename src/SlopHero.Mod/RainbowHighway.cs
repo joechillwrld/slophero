@@ -55,6 +55,7 @@ internal sealed class RainbowHighway
     private readonly Dictionary<IntPtr, FlameState> flamesByAnimator = new();
     private readonly Dictionary<IntPtr, int> flamePhases = new();
     private readonly ClonZonesFlameBridge clonZonesFlames = new();
+    private readonly NativeRainbowColorBridge nativeColorBridge = new();
     private readonly List<FlameState> flames = new();
     private readonly Color[] notePalette = new Color[12];
     private readonly Color[] variedNotePalette = new Color[60];
@@ -78,6 +79,7 @@ internal sealed class RainbowHighway
     private bool lastPaletteClonZones, paletteValid, notePaletteValid, flamePaletteValid;
 
     internal bool HasOverrides => notesActive || flames.Count != 0 || clonZonesFlames.IsActive
+        || nativeColorBridge.IsActive
         || noteHookInstalled || flameUpdateHookInstalled;
 
     // GuitarNoteContainer.SetState is stripped from this game build. The
@@ -129,8 +131,9 @@ internal sealed class RainbowHighway
         CycleRate(configured) == 0f ? 1.0 / 30.0
             : 1.0 / Math.Clamp(CycleRate(configured) * 200.0, 60.0, capAt60Hz ? 60.0 : 120.0);
 
-    internal void Prepare(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames)
+    internal void Prepare(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames, bool nativeColorFix)
     {
+        nativeColorBridge.SetEnabled(colorNotes && nativeColorFix && notes.Count != 0, this);
         if (colorNotes && notes.Count != 0 && !cameraCallbackInstalled && !cameraCallbackFailed)
             try
             {
@@ -168,7 +171,8 @@ internal sealed class RainbowHighway
     }
 
     internal void Update(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames, GameManager? game, double now,
-        float cyclesPerSecond, RainbowColorOptions colorOptions, bool cacheActivePool, bool capPaletteAt60Hz)
+        float cyclesPerSecond, RainbowColorOptions colorOptions, bool cacheActivePool, bool capPaletteAt60Hz,
+        bool nativeColorFix)
     {
         if (cacheActivePool != cacheActivePoolWasEnabled)
         {
@@ -314,7 +318,7 @@ internal sealed class RainbowHighway
         // Avoid global setter/update hooks until the actual target objects are
         // known. The flame postfix reapplies the tint after the game's own
         // Animator update, which was overwriting the previous periodic color.
-        Prepare(harmony, colorNotes && notes.Count != 0, colorFlames && flames.Count != 0);
+        Prepare(harmony, colorNotes && notes.Count != 0, colorFlames && flames.Count != 0, nativeColorFix);
         if (!animate) return;
 
         if (colorNotes && !notesFailed)
@@ -446,7 +450,20 @@ internal sealed class RainbowHighway
         if (owner == null || !owner.notesActive || owner.notesFailed || owner.applyingOwnColor) return;
         var pointer = __instance.Pointer;
         if (!owner.notes.TryGetValue(pointer, out var note)) return;
-        var tint = owner.NoteColor(note.Group);
+        owner.RewriteIncomingNoteColor(note, ref value);
+    }
+
+    internal bool TryRewriteNativeNoteColor(IntPtr renderer, ref Color value)
+    {
+        if (!notesActive || notesFailed || applyingOwnColor
+            || !notes.TryGetValue(renderer, out var note)) return false;
+        RewriteIncomingNoteColor(note, ref value);
+        return true;
+    }
+
+    private void RewriteIncomingNoteColor(SpriteState note, ref Color value)
+    {
+        var tint = NoteColor(note.Group);
         // The game's SetState reads the already-tinted RGB back just to
         // change alpha. Do not mistake that write for a new vanilla color.
         var displayed = note.Displayed;
@@ -457,7 +474,7 @@ internal sealed class RainbowHighway
         {
             note.Original = value;
             if (note.IsBody && TryResolveLane(value, out int phase)) note.Group.Phase = phase;
-            tint = owner.NoteColor(note.Group);
+            tint = NoteColor(note.Group);
         }
         value.r = tint.r; value.g = tint.g; value.b = tint.b;
         note.Displayed = value;
@@ -632,6 +649,7 @@ internal sealed class RainbowHighway
 
     private void RestoreNotes(bool forgetSceneCache = false)
     {
+        nativeColorBridge.Disable();
         if (cameraCallbackInstalled)
         {
             try { if (cameraCallback != null) Camera.onPreRender -= cameraCallback; }
@@ -751,6 +769,7 @@ internal sealed class RainbowHighway
     internal void Clear()
     {
         RestoreNotes(forgetSceneCache: true);
+        nativeColorBridge.Clear();
         RestoreFlames();
         notesActive = false;
         noteHookFailed = flameHookFailed = false;

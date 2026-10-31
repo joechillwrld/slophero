@@ -1,5 +1,9 @@
 # Sloptifine current handoff
 
+## 0.4.148 optional native rainbow-color experiment
+
+The exact supplied GameAssembly SHA-256 is `12bc21e5a88a2fc9abc259d5d67f24835145eabca6c3f863b075ba37ad75f197`. Its note-head state function at RVA `0x353210` calls the native `SpriteRenderer.color=` wrapper at RVA `0x2884F00` from four sites (`0x353431`, `0x3534E9`, `0x3535A1`, `0x353659`). The wrapper takes a renderer pointer and a pointer to four floats; disassembly and file-byte checks confirm the ABI and call targets. Version 0.4.148 adds a **default-off** native detour that forwards every call to the wrapper's cached UnityPlayer internal setter and substitutes RGB only for tracked note sprite pointers. It preserves alpha and leaves all other renderer calls unchanged. The detour is constructed without applying it until the cached original internal call is known; if the original is absent or outside UnityPlayer, it stays off. The existing camera tint stays as a fallback. This avoids the IL2CPP byref method trampoline that broke note rendering in 0.4.146, but it still needs a Windows visual, crash, and performance check before being treated as a fix. The option is at the bottom of Highway colors, `Experimental native rainbow-note color fix`.
+
 ## 0.4.147 emergency correction
 
 The user reported that 0.4.146 removed scrolling notes entirely during play. The zipped 175 MB `Latest.log` confirms 285,478 `Il2CppInterop` native-to-managed trampoline `NullReferenceException`s in the patched byref `GuitarNoteContainer` method, beginning as the first notes enter. Its seven obfuscated note-writer postfix hooks and related render-pool shortcut are reverted in 0.4.147. The 0.4.145 camera fallback remains, so rainbow flicker is unresolved. A safer future lead is the generated `GuitarNoteRenderer.Method_Protected_Virtual_Color_UInt16_0` return path, but it has not been verified as the note color writer; do not ship another native trampoline hook without proof.

@@ -55,6 +55,7 @@ public sealed partial class Core
     private MelonPreferences_Entry<bool> cacheRainbowActivePool = null!;
     private MelonPreferences_Entry<bool> limitRainbowPalette60Hz = null!;
     private MelonPreferences_Entry<bool> rainbowNotes = null!, rainbowFlames = null!;
+    private MelonPreferences_Entry<bool> experimentalNativeRainbowNotes = null!;
     private MelonPreferences_Entry<bool> randomizeColorPalette = null!;
     private MelonPreferences_Entry<float> randomHueMin = null!, randomHueMax = null!, randomSaturationMin = null!, randomSaturationMax = null!, randomBrightnessMin = null!, randomBrightnessMax = null!;
     private MelonPreferences_Entry<float> rainbowCyclesPerSecond = null!, rainbowHueOffset = null!, rainbowHueSpread = null!, rainbowNoteVariety = null!, rainbowSaturation = null!, rainbowContrast = null!, rainbowBrightness = null!;
@@ -244,6 +245,7 @@ public sealed partial class Core
             preferences.SaveToFile();
         }
         rainbowNotes = preferences.CreateEntry("RainbowNotes", false);
+        experimentalNativeRainbowNotes = preferences.CreateEntry("ExperimentalNativeRainbowNotes", false);
         rainbowFlames = preferences.CreateEntry("RainbowFlames", false);
         rainbowCyclesPerSecond = preferences.CreateEntry("RainbowCyclesPerSecond", .18f);
         randomizeColorPalette = preferences.CreateEntry("RandomizeColorPaletteEachAttempt", false);
@@ -360,7 +362,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.147 test", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.148 test", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -425,7 +427,7 @@ public sealed partial class Core
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        float contentHeight = settingsPage switch { 0 => 850, 1 => 1220, 2 => 1480, 3 => 680, 4 => 1580, 6 => showAdvancedPerformance ? 2670 : 990, _ => 500 };
+        float contentHeight = settingsPage switch { 0 => 850, 1 => 1220, 2 => 1480, 3 => 680, 4 => 1650, 6 => showAdvancedPerformance ? 2670 : 990, _ => 500 };
         Rect viewport = new(frameX + sidebarWidth + 12, frameY + 132, 680, menuHeight - 146);
         Rect content = new(0, 0, 656, contentHeight);
         settingsScrollPosition = GUI.BeginScrollView(viewport, settingsScrollPosition, content);
@@ -814,6 +816,7 @@ public sealed partial class Core
             v => randomBrightnessMin.Value = v / 100);
         Number("Brightness maximum (%)", randomBrightnessMax.Value * 100, x, y + 1488, 50, 150,
             v => randomBrightnessMax.Value = v / 100);
+        Toggle(experimentalNativeRainbowNotes, "Experimental native rainbow-note color fix", x, y + 1540);
     }
 
     private void FloatSlider(MelonPreferences_Entry<float> entry, string label, float x, float y,
@@ -1463,6 +1466,7 @@ public sealed partial class Core
         }
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Bool("RainbowNotes", rainbowNotes); Bool("RainbowFlames", rainbowFlames);
+        Bool("ExperimentalNativeRainbowNotes", experimentalNativeRainbowNotes);
         Bool("RandomizeColorPaletteEachAttempt", randomizeColorPalette);
         Float("RandomPaletteHueMin", randomHueMin); Float("RandomPaletteHueMax", randomHueMax);
         Float("RandomPaletteSaturationMin", randomSaturationMin); Float("RandomPaletteSaturationMax", randomSaturationMax);
@@ -1558,6 +1562,7 @@ public sealed partial class Core
             Bool("PerformanceFreezeLyricsBackgroundScroll", freezeComboSmokeScroll);
         Bool("CustomizeFcRings", tintFc); Bool("CustomizeScoreColors", tintScore); Bool("CustomizeFpsColor", customizeFpsColor);
         Bool("RainbowNotes", rainbowNotes); Bool("RainbowFlames", rainbowFlames);
+        Bool("ExperimentalNativeRainbowNotes", experimentalNativeRainbowNotes);
         Bool("RandomizeColorPaletteEachAttempt", randomizeColorPalette);
         Float("RandomPaletteHueMin", randomHueMin, 0, 360); Float("RandomPaletteHueMax", randomHueMax, 0, 360);
         Float("RandomPaletteSaturationMin", randomSaturationMin, .5f, 1.5f); Float("RandomPaletteSaturationMax", randomSaturationMax, .5f, 1.5f);
@@ -1928,7 +1933,8 @@ public sealed partial class Core
                         rainbowSaturation.Value * (randomizeColorPalette.Value ? attemptSaturationMultiplier : 1f),
                         rainbowContrast.Value,
                         rainbowBrightness.Value * (randomizeColorPalette.Value ? attemptBrightnessMultiplier : 1f)),
-                    cacheRainbowActivePool.Value, limitRainbowPalette60Hz.Value);
+                    cacheRainbowActivePool.Value, limitRainbowPalette60Hz.Value,
+                    experimentalNativeRainbowNotes.Value);
             }
             finally { timings.End(9, rainbowTiming); }
         }
