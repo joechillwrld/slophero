@@ -14,11 +14,13 @@ internal sealed class ChartStats
     private double lastSongTime = double.NegativeInfinity;
     private int lastHits;
     private IntPtr outroEnginePointer, outroNotesPointer;
-    private int outroCursor, outroComponents;
+    private int outroCursor, outroComponents, outroPlayableComponents, outroBeyondSong;
     private double outroLastSongTime = double.NegativeInfinity, lastPlayableTailEnd;
     private bool outroTimingValid = true;
     internal double LastPlayableTailEnd => lastPlayableTailEnd;
     internal int OutroScannedComponents => outroComponents;
+    internal int OutroPlayableComponents => outroPlayableComponents;
+    internal int OutroBeyondSong => outroBeyondSong;
     internal bool OutroTimingValid => outroTimingValid;
 
     internal bool AllPlayableNotesDone(Engine engine, GameManager game)
@@ -31,7 +33,7 @@ internal sealed class ChartStats
         {
             outroEnginePointer = engine.Pointer;
             outroNotesPointer = notes.Pointer;
-            outroCursor = outroComponents = 0;
+            outroCursor = outroComponents = outroPlayableComponents = outroBeyondSong = 0;
             lastPlayableTailEnd = 0;
             outroTimingValid = true;
         }
@@ -48,11 +50,22 @@ internal sealed class ChartStats
             if (!double.IsFinite(noteTime) || !double.IsFinite(sustainLength)
                 || sustainLength < 0)
                 outroTimingValid = false;
-            else lastPlayableTailEnd = Math.Max(lastPlayableTailEnd, noteTime + sustainLength);
+            else if (noteTime > game.songLength)
+                // Chart entries after the game's song-end bound can never be
+                // judged or displayed. They must not hold the outro gate shut.
+                outroBeyondSong++;
+            else
+            {
+                outroPlayableComponents++;
+                // A sustain that reaches the song-end bound leaves no blank
+                // outro to skip; keep the gate closed until normal song end.
+                lastPlayableTailEnd = Math.Max(lastPlayableTailEnd,
+                    Math.Min(noteTime + sustainLength, game.songLength));
+            }
             outroComponents++;
             outroCursor++;
         }
-        return outroTimingValid && outroComponents > 0 && outroCursor == notes.Count
+        return outroTimingValid && outroPlayableComponents > 0 && outroCursor == notes.Count
             && game.songTime >= lastPlayableTailEnd + .25;
     }
 
