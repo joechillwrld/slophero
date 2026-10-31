@@ -356,7 +356,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.144 test", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.145 test", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -627,6 +627,7 @@ public sealed partial class Core
         {
             outroSkipMode.Value = (outroSkipMode.Value + 1) % 3;
             preferencesDirty = true;
+            LoggerInstance.Msg($"Blank outro skip mode set to {outroSkipMode.Value} (0=off, 1=prompt, 2=automatic).");
         }
         GUI.Label(new Rect(x + 4, y + 760, 610, 46),
             "Only offline solo Quickplay with a blank outro. Both modes wait until every chart head and sustain tail is done.");
@@ -1947,18 +1948,21 @@ public sealed partial class Core
         int score = 0, combo = 0;
         bool compactValuesValid = compactEligible
             && CompactScoreHudOverride.TryRead(compactGame, out score, out combo);
+        bool previewCounterFont = settingsOpen && settingsPage == 1;
         bool selectedCounterFont = CounterFont.TextMeshProFont != null;
-        if (useCanvasCounterHud.Value || selectedCounterFont || counterCanvas.HasObjects
+        if (useCanvasCounterHud.Value || selectedCounterFont || previewCounterFont || counterCanvas.HasObjects
             || compactScoreHudOverride.IsActive || compactValuesValid || scoreCanvas.HasObjects)
         {
             long canvasTiming = timings.Begin();
             try
             {
-                if (useCanvasCounterHud.Value || selectedCounterFont || counterCanvas.HasObjects)
+                if (useCanvasCounterHud.Value || selectedCounterFont || previewCounterFont || counterCanvas.HasObjects)
                 {
-                    string? counterError = counterCanvas.Refresh(useCanvasCounterHud.Value || selectedCounterFont,
-                        showHud.Value && !string.IsNullOrEmpty(statsText) && !settingsOpen && !moveHud && resizeTarget < 0,
-                        statsText, hudX.Value, hudY.Value, fontSize.Value,
+                    string counterDisplay = previewCounterFont ? "Aa Bb 123\nMisses: 12\nGhosts: 3" : statsText;
+                    string? counterError = counterCanvas.Refresh(useCanvasCounterHud.Value || selectedCounterFont || previewCounterFont,
+                        previewCounterFont || (showHud.Value && !string.IsNullOrEmpty(statsText)
+                            && !settingsOpen && !moveHud && resizeTarget < 0),
+                        counterDisplay, hudX.Value, hudY.Value, fontSize.Value,
                         new Color(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1),
                         backgroundOpacity.Value);
                     if (counterError != null)

@@ -168,6 +168,8 @@ Check(!ChartNote.CountsTowardAccuracy(6 | 16), "Disjoint chord child omitted");
 Check(!ChartNote.IsResolved(0) && !ChartNote.IsMissed(0), "Future note omitted");
 Check(ChartNote.IsResolved(1) && !ChartNote.IsMissed(1), "Hit head resolved");
 Check(ChartNote.IsResolved(2) && ChartNote.IsMissed(2), "Missed head resolved");
+Check(ChartNote.IsMissedWithoutHit(2) && !ChartNote.IsMissedWithoutHit(3),
+    "A late accepted hit removes a practice-section miss");
 Check(!ChartNote.IsResolved(4 | 8 | 16), "Dynamics and sustain flags are not head outcomes");
 const float networkTickInterval = 1f / 30f;
 Check(Math.Abs(NetworkTickRemainder.PreserveFraction(.035f, networkTickInterval) - (.035f % networkTickInterval)) < .000001f,

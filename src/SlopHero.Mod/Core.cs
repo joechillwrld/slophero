@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.144", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.145", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -35,6 +35,7 @@ public sealed partial class Core : MelonMod
     private MelonPreferences_Entry<int> outroSkipMode = null!;
     private bool outroPromptVisible, outroSkipRequested, outroSkipFailed;
     private double outroEligibleSince, nextOutroCheck, outroSkipRequestedAt, originalSongLength;
+    private double nextOutroDiagnostic;
     private readonly NativeHudLayout nativeHud = new();
     private readonly CounterCanvasHud counterCanvas = new();
     private readonly CounterCanvasHud scoreCanvas = new();
@@ -150,7 +151,7 @@ public sealed partial class Core : MelonMod
             legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
         }
         else LoggerInstance.Warning(status);
-        LoggerInstance.Msg("SlopHero 0.4.144 private test build; performance work and Windows validation remain in progress.");
+        LoggerInstance.Msg("SlopHero 0.4.145 private test build; performance work and Windows validation remain in progress.");
         LoggerInstance.Msg("F8: SlopHero settings. Default: hold R to restart, hold P to practice the current section.");
     }
 
@@ -297,7 +298,7 @@ public sealed partial class Core : MelonMod
         compactScoreUnreadySince = 0;
         compactScoreUnreadyLogged = false;
         outroPromptVisible = outroSkipRequested = outroSkipFailed = false;
-        outroEligibleSince = nextOutroCheck = outroSkipRequestedAt = originalSongLength = 0;
+        outroEligibleSince = nextOutroCheck = outroSkipRequestedAt = originalSongLength = nextOutroDiagnostic = 0;
         localStatsPlayer = IntPtr.Zero;
         nextOverridePass = 0;
         restartHold.RequireRelease();
@@ -736,7 +737,14 @@ public sealed partial class Core : MelonMod
                     }
                 }
             }
-            UpdateOutroSkip(game, shortcutCandidate && isOfflineSolo, now);
+            // At the blank outro the game's isSongPlaying flag or coroutine
+            // count may change. The final chart-tail check provides the
+            // playable-note safety gate, so do not reuse the restart gate.
+            bool outroCandidate = ready && !transition && !settingsOpen && !moveHud
+                && resizeTarget < 0 && focused && !game!.isPaused && !game.isSongOver
+                && game.actualPlayerCount == 1 && (int)game.globalVariables!.gameMode == 0
+                && !practiceModeActive && !game.globalVariables.isPlayingSetlist && !online;
+            UpdateOutroSkip(game, outroCandidate, now);
             // These paths are local UI/visual work. They can be skipped during
             // any active chart, including online play, without touching note,
             // controller, or network simulation updates.
@@ -1144,6 +1152,12 @@ public sealed partial class Core : MelonMod
             && game.playerObjects != null && game.songLength - game.songTime > .5;
         if (!allowed)
         {
+            if (outroSkipMode.Value is 1 or 2 && game != null
+                && game.songLength - game.songTime < 10 && now >= nextOutroDiagnostic)
+            {
+                nextOutroDiagnostic = now + 1;
+                LoggerInstance.Msg($"Outro gate waiting: solo={offlineSolo}, remaining={game.songLength - game.songTime:0.00}s.");
+            }
             outroPromptVisible = false;
             outroEligibleSince = 0;
             return;
@@ -1155,6 +1169,11 @@ public sealed partial class Core : MelonMod
             && p.player != null && p.player.field_Public_Player_0 != null);
         if (local == null) { outroPromptVisible = false; return; }
         bool eligible = statsReader.AllPlayableNotesDone(local.engine, game);
+        if (game.songLength - game.songTime < 10 && now >= nextOutroDiagnostic)
+        {
+            nextOutroDiagnostic = now + 1;
+            LoggerInstance.Msg($"Outro gate: mode={outroSkipMode.Value}, chart={statsReader.OutroScannedComponents}, valid={statsReader.OutroTimingValid}, tail={statsReader.LastPlayableTailEnd:0.00}s, song={game.songTime:0.00}s, remaining={game.songLength - game.songTime:0.00}s, ready={eligible}.");
+        }
         if (!eligible)
         {
             outroPromptVisible = false;

@@ -16,7 +16,8 @@ internal static class CounterFont
     internal static void Configure(string? family)
     {
         requestedFamily = string.IsNullOrWhiteSpace(family) ? "Default" : family.Trim();
-        available.Clear();
+        // Keep the font the selector just found. A paused game's labels may
+        // disappear from FindObjectsOfType until the song is restarted.
         nextScanTime = 0;
         warned = false;
     }

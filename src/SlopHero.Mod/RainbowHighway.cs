@@ -1,6 +1,7 @@
 using System.Reflection;
 using HarmonyLib;
 using Il2Cpp;
+using Il2CppInterop.Runtime;
 using MelonLoader;
 using SlopHero.Core;
 using UnityEngine;
@@ -61,6 +62,8 @@ internal sealed class RainbowHighway
     private MethodInfo? noteColorSetter, noteStateMethod, flameAnimatorUpdate;
     private HarmonyLib.Harmony? noteHarmony, flameHarmony;
     private bool noteHookInstalled, flameUpdateHookInstalled;
+    private bool cameraCallbackInstalled, cameraCallbackFailed, cameraCallbackLogged;
+    private Camera.CameraCallback? cameraCallback;
     private bool noteHookFailed, flameHookFailed, applyingOwnColor, notesDiscovered, notesActive;
     private bool notesFailed, flamesFailed;
     private double nextPass, nextNotesDiscovery, nextFlamesDiscovery;
@@ -82,7 +85,7 @@ internal sealed class RainbowHighway
     // the current palette back on visible notes before each rendered frame.
     internal void ReassertNotesForRender()
     {
-        if (!notesActive || notesFailed || noteHookInstalled || !notePaletteValid || noteGroups.Count == 0) return;
+        if (!notesActive || notesFailed || !notePaletteValid || noteGroups.Count == 0) return;
         try
         {
             applyingOwnColor = true;
@@ -128,12 +131,19 @@ internal sealed class RainbowHighway
 
     internal void Prepare(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames)
     {
-        if (colorNotes && notes.Count != 0 && !noteHookFailed && !noteHookInstalled)
-            try { InstallNoteColorHook(harmony); }
-        catch (Exception ex)
+        if (colorNotes && notes.Count != 0 && !cameraCallbackInstalled && !cameraCallbackFailed)
+            try
+            {
+                cameraCallback ??= DelegateSupport.ConvertDelegate<Camera.CameraCallback>(
+                    new Action<Camera>(OnCameraPreRender));
+                Camera.onPreRender += cameraCallback;
+                cameraCallbackInstalled = true;
+                MelonLogger.Msg("Rainbow notes will reassert tint at the player camera's pre-render callback.");
+            }
+            catch (Exception ex)
         {
-            noteHookFailed = true;
-            MelonLogger.Warning($"Rainbow note color hook could not install; rendered-frame tinting will remain as fallback: {ex.Message}");
+            cameraCallbackFailed = true;
+            MelonLogger.Warning($"Rainbow camera callback could not install; late-update tinting remains as fallback: {ex.Message}");
         }
         if (colorFlames && flames.Count != 0 && clonZonesFlames.TryEnable(harmony)) return;
         if (colorFlames && flames.Count != 0 && !flameHookFailed && !flameUpdateHookInstalled)
@@ -143,6 +153,18 @@ internal sealed class RainbowHighway
                 flameHookFailed = true;
                 MelonLogger.Warning($"Rainbow flame update hook could not install; periodic tinting will remain as fallback: {ex.Message}");
             }
+    }
+
+    private void OnCameraPreRender(Camera camera)
+    {
+        if (camera == null || camera.gameObject.name != "PlayerCamera"
+            || (camera.cullingMask & 512) == 0) return;
+        if (!cameraCallbackLogged)
+        {
+            cameraCallbackLogged = true;
+            MelonLogger.Msg("Rainbow notes reached the player camera's pre-render callback.");
+        }
+        ReassertNotesForRender();
     }
 
     internal void Update(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames, GameManager? game, double now,
@@ -610,6 +632,13 @@ internal sealed class RainbowHighway
 
     private void RestoreNotes(bool forgetSceneCache = false)
     {
+        if (cameraCallbackInstalled)
+        {
+            try { if (cameraCallback != null) Camera.onPreRender -= cameraCallback; }
+            catch (Exception ex) { MelonLogger.Warning($"Rainbow camera callback cleanup failed: {ex.Message}"); }
+            cameraCallbackInstalled = false;
+            cameraCallbackLogged = false;
+        }
         if (!notesActive && !notesFailed && !noteHookInstalled)
         {
             if (forgetSceneCache)
@@ -725,6 +754,7 @@ internal sealed class RainbowHighway
         RestoreFlames();
         notesActive = false;
         noteHookFailed = flameHookFailed = false;
+        cameraCallbackFailed = false;
         nextPass = nextNotesDiscovery = nextFlamesDiscovery = 0;
         huePhase = lastHueSample = 0;
         previousCycleRate = 0;

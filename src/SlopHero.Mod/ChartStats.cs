@@ -9,12 +9,17 @@ internal sealed class ChartStats
     private IntPtr enginePointer, notesPointer;
     private int cursor;
     private long resolvedHeads, rangeStart, rangeEnd;
+    private long practiceMissedHeads;
+    private readonly List<int> recentPracticeMisses = new();
     private double lastSongTime = double.NegativeInfinity;
     private int lastHits;
     private IntPtr outroEnginePointer, outroNotesPointer;
     private int outroCursor, outroComponents;
     private double outroLastSongTime = double.NegativeInfinity, lastPlayableTailEnd;
     private bool outroTimingValid = true;
+    internal double LastPlayableTailEnd => lastPlayableTailEnd;
+    internal int OutroScannedComponents => outroComponents;
+    internal bool OutroTimingValid => outroTimingValid;
 
     internal bool AllPlayableNotesDone(Engine engine, GameManager game)
     {
@@ -41,8 +46,7 @@ internal sealed class ChartStats
             double noteTime = note.field_Public_Double_0;
             double sustainLength = note.field_Public_Double_1;
             if (!double.IsFinite(noteTime) || !double.IsFinite(sustainLength)
-                || noteTime < 0 || sustainLength < 0 || noteTime > game.songLength + 5
-                || sustainLength > game.songLength + 5)
+                || sustainLength < 0)
                 outroTimingValid = false;
             else lastPlayableTailEnd = Math.Max(lastPlayableTailEnd, noteTime + sustainLength);
             outroComponents++;
@@ -70,6 +74,8 @@ internal sealed class ChartStats
             cursor = practice ? OrderedNoteSearch.LowerBound(count, start,
                 i => notes[i]?.field_Public_Int64_0 ?? long.MinValue) : 0;
             resolvedHeads = 0;
+            practiceMissedHeads = 0;
+            recentPracticeMisses.Clear();
             enginePointer = engine.Pointer;
             notesPointer = notes.Pointer;
             rangeStart = start;
@@ -77,6 +83,25 @@ internal sealed class ChartStats
         }
         lastSongTime = game.songTime;
         lastHits = hits;
+        if (practice)
+        {
+            // The native hit count can include heads outside this section.
+            // Revisit recently missed heads because a late accepted hit can
+            // correct the game's earlier missed state.
+            for (int i = recentPracticeMisses.Count - 1; i >= 0; i--)
+            {
+                var note = notes[recentPracticeMisses[i]];
+                if (note == null) { recentPracticeMisses.RemoveAt(i); continue; }
+                ushort state = (ushort)note.field_Public_EnumNPublicSealedvaNoHiMiDyIsWa8vWaUnique_0;
+                if (ChartNote.IsHit(state))
+                {
+                    practiceMissedHeads--;
+                    recentPracticeMisses.RemoveAt(i);
+                }
+                else if (note.field_Public_Double_0 < game.songTime - 2)
+                    recentPracticeMisses.RemoveAt(i);
+            }
+        }
         // Chart is in time order. Process each resolved head once; unresolved
         // future notes wait for the next refresh. Bound catch-up after a seek.
         for (int budget = 4096; cursor < count && budget > 0; budget--)
@@ -91,6 +116,11 @@ internal sealed class ChartStats
             // Disjoint child heads are omitted by the game's results denominator.
             if (!ChartNote.CountsTowardAccuracy(flags)) { cursor++; continue; }
             if (!ChartNote.IsResolved(state)) break;
+            if (practice && ChartNote.IsMissedWithoutHit(state))
+            {
+                practiceMissedHeads++;
+                recentPracticeMisses.Add(cursor);
+            }
             // Count each judged head once. A note can first be marked missed
             // and then accepted as a late hit; the native hit counter reflects
             // that correction, while a cached miss decision would not.
@@ -100,6 +130,8 @@ internal sealed class ChartStats
         // The game's results screen computes misses as eligible heads minus
         // native hits. Use judged heads here so future notes stay excluded.
         // The ghost counter is the same native field PracticeUI reads.
-        return LiveStats.FromResolvedHeads(hits, resolvedHeads, engine.field_Public_Int32_17);
+        long sectionHits = resolvedHeads - practiceMissedHeads;
+        return LiveStats.FromResolvedHeads(practice ? sectionHits : hits,
+            resolvedHeads, engine.field_Public_Int32_17);
     }
 }
