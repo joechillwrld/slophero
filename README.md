@@ -1,11 +1,11 @@
-# SlopHero 0.4.149 private test
+# SlopHero 0.4.150 private test
 
 **Sloptifine** is the name for SlopHero's performance work: reversible
 experiments judged by measurements. Gameplay timing, online play, and the
 1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.149 is
+build, compiled against its loader and generated assemblies. Version 0.4.150 is
 a private test build for the next update. It uses fonts loaded by the game,
 separate compact score/combo HUD, per-attempt palette ranges, guarded blank-outro
 skip, highway thumbnail capture, ghost-only sound filter, per-song auto-restart,
@@ -15,9 +15,10 @@ combo, song time, and stars, and restores the pre-0.4.146 note rendering after
 that test made scrolling notes disappear. The outro gate ignores chart notes
 past the game's song end. A separate default-off experimental native rainbow
 color bridge now intercepts the setter used by four exact note-color callsites. This
-revision identifies ClonZones note lanes from its head sprites and excludes empty
-chart entries and already-missed sustain tails from the blank-outro gate. Both
-changes need a Windows play test.
+revision adds a rainbow note lane-source setting: Automatic detects ClonZones
+sprites and otherwise uses Clone Hero game colors; players can force either
+source. It also excludes empty chart entries and already-missed sustain tails
+from the blank-outro gate. These changes need a Windows play test.
 The visual, audio, transition,
 and performance changes need Windows validation before a final update. See the
 [test checklist](docs/next-update-windows-validation.md). Version 0.4.141
@@ -383,7 +384,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.149 private test](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.149-alpha.zip?raw=1)
+[Download SlopHero v0.4.150 private test](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.150-alpha.zip?raw=1)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.

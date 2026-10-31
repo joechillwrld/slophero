@@ -1,5 +1,9 @@
 # Sloptifine current handoff
 
+## 0.4.150 rainbow lane-source selector
+
+The user noted that SlopHero players may not run ClonZones. The Colors page now exposes Automatic (default), Clone Hero game colors, and ClonZones head sprites. Automatic uses game body colors until a ClonZones-authored head is observed, then avoids hidden body colors even when a generic Star Power head lacks a lane name. Game colors forces the vanilla path; ClonZones forces the sprite path. The setting is saved and included in profiles. All modes still need live visual checks; the native rainbow bridge remains a separate default-off experiment.
+
 ## 0.4.149 outro and ClonZones note-lane correction
 
 The 0.4.148 Windows log (`sediment://file_00000000dd7081f587b24da0a124e50e`, locally `/workspace/attachments/f71a21db-1530-4e5e-8ac1-57f49f3d923c/Latest.log`) confirms the optional native rainbow bridge activated and recolored a note setter call, yet the user still saw heavy flicker. At song time 26.13 s the full-song outro gate scanned 765 components, considered all 765 playable, and held on a tail at 36.02 s, equal to the game's song end. The user confirms the visible chart ends well before 36 s and the remaining audio is blank silence. Version 0.4.149 excludes empty-mask chart entries and missed sustain tails from the safe skip bound; it keeps future heads and hit/unresolved sustain tails. Diagnostic lines now include the last head and blocking component index. In-game transition remains unverified.

@@ -12,6 +12,8 @@ namespace SlopHero.Mod;
 internal readonly record struct RainbowColorOptions(
     float HueOffsetDegrees, float HueSpread, float NoteVariety, float Saturation, float Contrast, float Brightness);
 
+internal enum RainbowNoteLaneSource { Automatic, GameColors, ClonZonesSprites }
+
 /// <summary>Optional guitar colors; the setter hook exists only while a rainbow option is on.</summary>
 internal sealed class RainbowHighway
 {
@@ -67,6 +69,8 @@ internal sealed class RainbowHighway
     private bool noteHookInstalled, flameUpdateHookInstalled;
     private bool cameraCallbackInstalled, cameraCallbackFailed, cameraCallbackLogged;
     private bool headLaneLogged;
+    private bool clonZonesHeadSeen;
+    private RainbowNoteLaneSource laneSource = (RainbowNoteLaneSource)(-1);
     private Camera.CameraCallback? cameraCallback;
     private bool noteHookFailed, flameHookFailed, applyingOwnColor, notesDiscovered, notesActive;
     private bool notesFailed, flamesFailed;
@@ -97,7 +101,7 @@ internal sealed class RainbowHighway
             foreach (var group in noteGroups)
             {
                 if (!group.Object.activeInHierarchy) continue;
-                if (!TryResolveHeadLane(group) && group.Body is { Renderer: { } body } bodyState)
+                if (!TryResolveHeadLane(group) && UseBodyLane && group.Body is { Renderer: { } body } bodyState)
                 {
                     var current = body.color;
                     var previous = bodyState.Displayed;
@@ -175,8 +179,14 @@ internal sealed class RainbowHighway
 
     internal void Update(HarmonyLib.Harmony harmony, bool colorNotes, bool colorFlames, GameManager? game, double now,
         float cyclesPerSecond, RainbowColorOptions colorOptions, bool cacheActivePool, bool capPaletteAt60Hz,
-        bool nativeColorFix)
+        bool nativeColorFix, int configuredLaneSource)
     {
+        var selectedLaneSource = (RainbowNoteLaneSource)Math.Clamp(configuredLaneSource, 0, 2);
+        if (laneSource != selectedLaneSource)
+        {
+            laneSource = selectedLaneSource;
+            MelonLogger.Msg($"Rainbow note lane source: {laneSource}.");
+        }
         if (cacheActivePool != cacheActivePoolWasEnabled)
         {
             cacheActivePoolWasEnabled = cacheActivePool;
@@ -478,7 +488,7 @@ internal sealed class RainbowHighway
         else
         {
             note.Original = value;
-            if (note.IsBody && !TryResolveHeadLane(note.Group)
+            if (note.IsBody && !TryResolveHeadLane(note.Group) && UseBodyLane
                 && TryResolveLane(value, out int phase)) note.Group.Phase = phase;
             tint = NoteColor(note.Group);
         }
@@ -494,7 +504,8 @@ internal sealed class RainbowHighway
         try
         {
             owner.applyingOwnColor = true;
-            if (group.Body?.Renderer is { } body
+            if (!owner.TryResolveHeadLane(group) && owner.UseBodyLane
+                && group.Body?.Renderer is { } body
                 && TryResolveLane(body.color, out int lanePhase)) group.Phase = lanePhase;
             foreach (var state in group.Sprites)
             {
@@ -577,6 +588,7 @@ internal sealed class RainbowHighway
 
     private bool TryResolveHeadLane(NoteGroup group)
     {
+        if (laneSource == RainbowNoteLaneSource.GameColors) return false;
         var sprite = group.Head?.Renderer?.sprite;
         if (sprite == null) return false;
         IntPtr pointer = sprite.Pointer;
@@ -594,6 +606,7 @@ internal sealed class RainbowHighway
             headSpritePhases[pointer] = phase;
         }
         if (phase < 0) return false;
+        clonZonesHeadSeen = true;
         if (!headLaneLogged)
         {
             headLaneLogged = true;
@@ -602,6 +615,9 @@ internal sealed class RainbowHighway
         group.Phase = phase;
         return true;
     }
+
+    private bool UseBodyLane => laneSource == RainbowNoteLaneSource.GameColors
+        || (laneSource == RainbowNoteLaneSource.Automatic && !clonZonesHeadSeen);
 
     private Color NoteColor(NoteGroup group) => noteVariety > 0f
         ? variedNotePalette[RainbowNoteVariation.PaletteIndex(group.Phase, group.PoolSlot, noteVariety)]
@@ -699,6 +715,7 @@ internal sealed class RainbowHighway
                 notes.Clear();
                 headSpritePhases.Clear();
                 headLaneLogged = false;
+                clonZonesHeadSeen = false;
                 noteGroups.Clear();
                 noteGroupsByContainer.Clear();
                 activeNoteGroups.Clear();
@@ -728,6 +745,7 @@ internal sealed class RainbowHighway
             notes.Clear();
             headSpritePhases.Clear();
             headLaneLogged = false;
+            clonZonesHeadSeen = false;
             noteGroups.Clear();
             noteGroupsByContainer.Clear();
             activeNoteGroups.Clear();
