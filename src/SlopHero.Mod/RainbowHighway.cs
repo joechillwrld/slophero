@@ -19,6 +19,7 @@ internal sealed class RainbowHighway
     {
         internal readonly GameObject Object;
         internal readonly List<SpriteState> Sprites = new(4);
+        internal SpriteState? Head;
         internal SpriteState? Body;
         internal readonly int PoolSlot;
         internal int Phase;
@@ -49,6 +50,7 @@ internal sealed class RainbowHighway
 
     private static RainbowHighway? active;
     private readonly Dictionary<IntPtr, SpriteState> notes = new();
+    private readonly Dictionary<IntPtr, int> headSpritePhases = new();
     private readonly Dictionary<IntPtr, NoteGroup> noteGroupsByContainer = new();
     private readonly List<NoteGroup> noteGroups = new();
     private readonly List<NoteGroup> activeNoteGroups = new();
@@ -64,6 +66,7 @@ internal sealed class RainbowHighway
     private HarmonyLib.Harmony? noteHarmony, flameHarmony;
     private bool noteHookInstalled, flameUpdateHookInstalled;
     private bool cameraCallbackInstalled, cameraCallbackFailed, cameraCallbackLogged;
+    private bool headLaneLogged;
     private Camera.CameraCallback? cameraCallback;
     private bool noteHookFailed, flameHookFailed, applyingOwnColor, notesDiscovered, notesActive;
     private bool notesFailed, flamesFailed;
@@ -94,7 +97,7 @@ internal sealed class RainbowHighway
             foreach (var group in noteGroups)
             {
                 if (!group.Object.activeInHierarchy) continue;
-                if (group.Body is { Renderer: { } body } bodyState)
+                if (!TryResolveHeadLane(group) && group.Body is { Renderer: { } body } bodyState)
                 {
                     var current = body.color;
                     var previous = bodyState.Displayed;
@@ -343,6 +346,7 @@ internal sealed class RainbowHighway
                     // Cached groups may have deactivated since the last scan;
                     // checking this short list also avoids tinting hidden art.
                     if (!group.Object.activeInHierarchy) continue;
+                    TryResolveHeadLane(group);
                     var tint = NoteColor(group);
                     foreach (var state in group.Sprites)
                         if (state.Renderer != null && state.Renderer.enabled && state.Renderer.sprite != null)
@@ -463,6 +467,7 @@ internal sealed class RainbowHighway
 
     private void RewriteIncomingNoteColor(SpriteState note, ref Color value)
     {
+        TryResolveHeadLane(note.Group);
         var tint = NoteColor(note.Group);
         // The game's SetState reads the already-tinted RGB back just to
         // change alpha. Do not mistake that write for a new vanilla color.
@@ -473,7 +478,8 @@ internal sealed class RainbowHighway
         else
         {
             note.Original = value;
-            if (note.IsBody && TryResolveLane(value, out int phase)) note.Group.Phase = phase;
+            if (note.IsBody && !TryResolveHeadLane(note.Group)
+                && TryResolveLane(value, out int phase)) note.Group.Phase = phase;
             tint = NoteColor(note.Group);
         }
         value.r = tint.r; value.g = tint.g; value.b = tint.b;
@@ -538,7 +544,7 @@ internal sealed class RainbowHighway
                 var group = new NoteGroup(container.gameObject, (slot % 5) * 2, slot);
                 if (container.Body != null && TryResolveLane(container.Body.color, out int lanePhase))
                     group.Phase = lanePhase;
-                added += Remember(container.Head, group);
+                added += Remember(container.Head, group, isHead: true);
                 added += Remember(container.Body, group, isBody: true);
                 added += Remember(container.Anim, group);
                 added += Remember(container.Open_HOPO, group);
@@ -558,14 +564,43 @@ internal sealed class RainbowHighway
         }
     }
 
-    private int Remember(SpriteRenderer? renderer, NoteGroup group, bool isBody = false)
+    private int Remember(SpriteRenderer? renderer, NoteGroup group, bool isBody = false, bool isHead = false)
     {
         if (renderer == null || notes.ContainsKey(renderer.Pointer)) return 0;
         var state = new SpriteState(renderer, group, isBody);
         notes.Add(renderer.Pointer, state);
         group.Sprites.Add(state);
+        if (isHead) group.Head = state;
         if (isBody) group.Body = state;
         return 1;
+    }
+
+    private bool TryResolveHeadLane(NoteGroup group)
+    {
+        var sprite = group.Head?.Renderer?.sprite;
+        if (sprite == null) return false;
+        IntPtr pointer = sprite.Pointer;
+        if (!headSpritePhases.TryGetValue(pointer, out int phase))
+        {
+            // ClonZones authors lane sprites as gh3zones_green/normal_0 etc.
+            // Its ApplyNewState hides Body, so Body.color cannot identify the
+            // lane while those animated head sprites are in use.
+            string name = sprite.name;
+            phase = name.StartsWith("gh3zones_green/", StringComparison.Ordinal) ? 0
+                : name.StartsWith("gh3zones_red/", StringComparison.Ordinal) ? 2
+                : name.StartsWith("gh3zones_yellow/", StringComparison.Ordinal) ? 4
+                : name.StartsWith("gh3zones_blue/", StringComparison.Ordinal) ? 7
+                : name.StartsWith("gh3zones_orange/", StringComparison.Ordinal) ? 9 : -1;
+            headSpritePhases[pointer] = phase;
+        }
+        if (phase < 0) return false;
+        if (!headLaneLogged)
+        {
+            headLaneLogged = true;
+            MelonLogger.Msg("Rainbow notes resolved lane colors from ClonZones head sprites.");
+        }
+        group.Phase = phase;
+        return true;
     }
 
     private Color NoteColor(NoteGroup group) => noteVariety > 0f
@@ -662,6 +697,8 @@ internal sealed class RainbowHighway
             if (forgetSceneCache)
             {
                 notes.Clear();
+                headSpritePhases.Clear();
+                headLaneLogged = false;
                 noteGroups.Clear();
                 noteGroupsByContainer.Clear();
                 activeNoteGroups.Clear();
@@ -689,6 +726,8 @@ internal sealed class RainbowHighway
         if (forgetSceneCache)
         {
             notes.Clear();
+            headSpritePhases.Clear();
+            headLaneLogged = false;
             noteGroups.Clear();
             noteGroupsByContainer.Clear();
             activeNoteGroups.Clear();

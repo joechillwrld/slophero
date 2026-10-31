@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.148", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.149", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -151,7 +151,7 @@ public sealed partial class Core : MelonMod
             legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
         }
         else LoggerInstance.Warning(status);
-        LoggerInstance.Msg("SlopHero 0.4.148 private test build; performance work and Windows validation remain in progress.");
+        LoggerInstance.Msg("SlopHero 0.4.149 private test build; performance work and Windows validation remain in progress.");
         LoggerInstance.Msg("F8: SlopHero settings. Default: hold R to restart, hold P to practice the current section.");
     }
 
@@ -1172,7 +1172,7 @@ public sealed partial class Core : MelonMod
         if (game.songLength - game.songTime < 10 && now >= nextOutroDiagnostic)
         {
             nextOutroDiagnostic = now + 1;
-            LoggerInstance.Msg($"Outro gate: mode={outroSkipMode.Value}, chart={statsReader.OutroScannedComponents}, playable={statsReader.OutroPlayableComponents}, beyondSong={statsReader.OutroBeyondSong}, valid={statsReader.OutroTimingValid}, tail={statsReader.LastPlayableTailEnd:0.00}s, song={game.songTime:0.00}s, length={game.songLength:0.00}s, remaining={game.songLength - game.songTime:0.00}s, ready={eligible}.");
+            LoggerInstance.Msg($"Outro gate: mode={outroSkipMode.Value}, chart={statsReader.OutroScannedComponents}, playable={statsReader.OutroPlayableComponents}, emptyMask={statsReader.OutroEmptyMask}, beyondSong={statsReader.OutroBeyondSong}, valid={statsReader.OutroTimingValid}, lastHead={statsReader.OutroLastHeadTime:0.00}s, blockingIndex={statsReader.OutroBlockingTailIndex}, tail={statsReader.LastPlayableTailEnd:0.00}s, song={game.songTime:0.00}s, length={game.songLength:0.00}s, remaining={game.songLength - game.songTime:0.00}s, ready={eligible}.");
         }
         if (!eligible)
         {

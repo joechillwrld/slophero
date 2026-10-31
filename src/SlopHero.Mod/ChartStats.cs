@@ -6,6 +6,7 @@ namespace SlopHero.Mod;
 
 internal sealed class ChartStats
 {
+    private readonly record struct OutroSustain(int Index, double End);
     private IntPtr enginePointer, notesPointer;
     private int cursor;
     private long resolvedHeads, rangeStart, rangeEnd;
@@ -15,12 +16,18 @@ internal sealed class ChartStats
     private int lastHits;
     private IntPtr outroEnginePointer, outroNotesPointer;
     private int outroCursor, outroComponents, outroPlayableComponents, outroBeyondSong;
+    private int outroEmptyMask, outroLastHeadIndex, outroBlockingTailIndex;
+    private double outroLastHeadTime;
+    private readonly List<OutroSustain> outroSustains = new();
     private double outroLastSongTime = double.NegativeInfinity, lastPlayableTailEnd;
     private bool outroTimingValid = true;
     internal double LastPlayableTailEnd => lastPlayableTailEnd;
     internal int OutroScannedComponents => outroComponents;
     internal int OutroPlayableComponents => outroPlayableComponents;
     internal int OutroBeyondSong => outroBeyondSong;
+    internal int OutroEmptyMask => outroEmptyMask;
+    internal int OutroBlockingTailIndex => outroBlockingTailIndex;
+    internal double OutroLastHeadTime => outroLastHeadTime;
     internal bool OutroTimingValid => outroTimingValid;
 
     internal bool AllPlayableNotesDone(Engine engine, GameManager game)
@@ -33,8 +40,11 @@ internal sealed class ChartStats
         {
             outroEnginePointer = engine.Pointer;
             outroNotesPointer = notes.Pointer;
-            outroCursor = outroComponents = outroPlayableComponents = outroBeyondSong = 0;
+            outroCursor = outroComponents = outroPlayableComponents = outroBeyondSong = outroEmptyMask = 0;
             lastPlayableTailEnd = 0;
+            outroLastHeadTime = 0;
+            outroLastHeadIndex = outroBlockingTailIndex = -1;
+            outroSustains.Clear();
             outroTimingValid = true;
         }
         outroLastSongTime = game.songTime;
@@ -47,9 +57,12 @@ internal sealed class ChartStats
             // playable moment, so they must not block an otherwise safe skip.
             double noteTime = note.field_Public_Double_0;
             double sustainLength = note.field_Public_Double_1;
+            ushort mask = note.field_Public_UInt16_0;
             if (!double.IsFinite(noteTime) || !double.IsFinite(sustainLength)
                 || sustainLength < 0)
                 outroTimingValid = false;
+            else if (mask == 0)
+                outroEmptyMask++;
             else if (noteTime > game.songLength)
                 // Chart entries after the game's song-end bound can never be
                 // judged or displayed. They must not hold the outro gate shut.
@@ -57,15 +70,31 @@ internal sealed class ChartStats
             else
             {
                 outroPlayableComponents++;
-                // A sustain that reaches the song-end bound leaves no blank
-                // outro to skip; keep the gate closed until normal song end.
-                lastPlayableTailEnd = Math.Max(lastPlayableTailEnd,
-                    Math.Min(noteTime + sustainLength, game.songLength));
+                if (noteTime >= outroLastHeadTime)
+                { outroLastHeadTime = noteTime; outroLastHeadIndex = outroCursor; }
+                if (sustainLength > 0)
+                    outroSustains.Add(new OutroSustain(outroCursor,
+                        Math.Min(noteTime + sustainLength, game.songLength)));
             }
             outroComponents++;
             outroCursor++;
         }
-        return outroTimingValid && outroPlayableComponents > 0 && outroCursor == notes.Count
+        if (!outroTimingValid || outroPlayableComponents == 0 || outroCursor != notes.Count) return false;
+        // A missed note has no playable sustain, even if its chart length
+        // extends into the silence. Keep hit/unresolved tails conservative.
+        lastPlayableTailEnd = outroLastHeadTime;
+        outroBlockingTailIndex = outroLastHeadIndex;
+        foreach (var candidate in outroSustains)
+        {
+            if (candidate.End <= lastPlayableTailEnd) continue;
+            var note = notes[candidate.Index];
+            if (note == null) { outroTimingValid = false; return false; }
+            ushort state = (ushort)note.field_Public_EnumNPublicSealedvaNoHiMiDyIsWa8vWaUnique_0;
+            if (ChartNote.IsMissedWithoutHit(state)) continue;
+            lastPlayableTailEnd = candidate.End;
+            outroBlockingTailIndex = candidate.Index;
+        }
+        return outroTimingValid
             && game.songTime >= lastPlayableTailEnd + .25;
     }
 
