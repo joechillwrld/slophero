@@ -91,7 +91,7 @@ public sealed partial class Core
     private readonly InputViewerSuppression inputViewerSuppression = new();
     private readonly CompactScoreHudOverride compactScoreHudOverride = new();
     private string compactHudText = "";
-    private int compactHudScore = -1, compactHudCombo = -1;
+    private MelonPreferences_Entry<bool> compactShowScore = null!, compactShowCombo = null!, compactShowTime = null!, compactShowStars = null!;
     private readonly NetworkTickRemainderOverride networkTickRemainder = new();
     private readonly OptionalHudAnimationsOverride optionalHudAnimations = new();
     private readonly RuntimeTimings timings = new();
@@ -208,6 +208,10 @@ public sealed partial class Core
         skipBackgroundCamera = preferences.CreateEntry("PerformanceSkipBackgroundCamera", false);
         hideInputViewerDuringSong = preferences.CreateEntry("PerformanceHideInputViewer", false);
         compactScoreHud = preferences.CreateEntry("PerformanceCompactScoreHud", false);
+        compactShowScore = preferences.CreateEntry("CompactHudShowScore", true);
+        compactShowCombo = preferences.CreateEntry("CompactHudShowCombo", true);
+        compactShowTime = preferences.CreateEntry("CompactHudShowTime", false);
+        compactShowStars = preferences.CreateEntry("CompactHudShowStars", false);
         limitPlayerCameraFarClip = preferences.CreateEntry("PerformanceLimitPlayerCameraFarClip", false);
         farClipDistance = preferences.CreateEntry("PerformanceGuitarCameraFarClip", 80);
         disableHudCameraBenchmark = preferences.CreateEntry("PerformanceDisableHudCameraBenchmark", false);
@@ -356,7 +360,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.145 test", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.146 test", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -421,7 +425,7 @@ public sealed partial class Core
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        float contentHeight = settingsPage switch { 0 => 850, 1 => 1040, 2 => 1480, 3 => 680, 4 => 1580, 6 => showAdvancedPerformance ? 2670 : 990, _ => 500 };
+        float contentHeight = settingsPage switch { 0 => 850, 1 => 1220, 2 => 1480, 3 => 680, 4 => 1580, 6 => showAdvancedPerformance ? 2670 : 990, _ => 500 };
         Rect viewport = new(frameX + sidebarWidth + 12, frameY + 132, 680, menuHeight - 146);
         Rect content = new(0, 0, 656, contentHeight);
         settingsScrollPosition = GUI.BeginScrollView(viewport, settingsScrollPosition, content);
@@ -630,7 +634,7 @@ public sealed partial class Core
             LoggerInstance.Msg($"Blank outro skip mode set to {outroSkipMode.Value} (0=off, 1=prompt, 2=automatic).");
         }
         GUI.Label(new Rect(x + 4, y + 760, 610, 46),
-            "Only offline solo Quickplay with a blank outro. Both modes wait until every chart head and sustain tail is done.");
+            "Offline solo with a blank outro. Both modes wait until every chart head and sustain tail is done.");
     }
 
     private void SaveAutoRestartRule(AutoRestartRule rule)
@@ -638,6 +642,12 @@ public sealed partial class Core
         if (activeAttemptKey == null || autoRestartRules == null) return;
         try { autoRestartRules.Set(activeAttemptKey, rule); }
         catch (Exception ex) { Notice($"Could not save auto-restart rule: {ex.Message}"); }
+    }
+
+    private static string FormatCompactTime(double seconds)
+    {
+        int total = double.IsFinite(seconds) ? (int)Math.Clamp(Math.Floor(seconds), 0, int.MaxValue) : 0;
+        return $"{total / 60}:{total % 60:00}";
     }
 
     private void DrawCounterSettings(float x, float y)
@@ -679,6 +689,11 @@ public sealed partial class Core
         }
         if (GUI.Button(new Rect(x + 275, y + 902, 265, 36), "Reset position"))
         { compactScoreX.Value = compactScoreY.Value = 24; preferencesDirty = true; }
+        SectionHeader("Compact HUD lines", x, y + 950);
+        Toggle(compactShowScore, "Score", x, y + 980);
+        Toggle(compactShowCombo, "Combo", x, y + 1022);
+        Toggle(compactShowTime, "Song time / total time", x, y + 1064);
+        Toggle(compactShowStars, "Stars earned", x, y + 1106);
     }
 
     private void DrawHudSettings(float x, float y)
@@ -1427,6 +1442,8 @@ public sealed partial class Core
             Bool("PerformanceSkipBackgroundCamera", skipBackgroundCamera);
             Bool("PerformanceHideInputViewer", hideInputViewerDuringSong);
             Bool("PerformanceCompactScoreHud", compactScoreHud);
+            Bool("CompactHudShowScore", compactShowScore); Bool("CompactHudShowCombo", compactShowCombo);
+            Bool("CompactHudShowTime", compactShowTime); Bool("CompactHudShowStars", compactShowStars);
             Bool("PerformanceLimitPlayerCameraFarClip", limitPlayerCameraFarClip);
             Int("PerformanceGuitarCameraFarClip", farClipDistance);
             Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
@@ -1517,6 +1534,8 @@ public sealed partial class Core
         Bool("PerformanceSkipBackgroundCamera", skipBackgroundCamera);
         Bool("PerformanceHideInputViewer", hideInputViewerDuringSong);
         Bool("PerformanceCompactScoreHud", compactScoreHud);
+        Bool("CompactHudShowScore", compactShowScore); Bool("CompactHudShowCombo", compactShowCombo);
+        Bool("CompactHudShowTime", compactShowTime); Bool("CompactHudShowStars", compactShowStars);
         Bool("PerformanceLimitPlayerCameraFarClip", limitPlayerCameraFarClip);
         Int("PerformanceGuitarCameraFarClip", farClipDistance, 40, 120);
         Bool("PerformanceDisableHudCameraBenchmark", disableHudCameraBenchmark);
@@ -1968,26 +1987,31 @@ public sealed partial class Core
                     if (counterError != null)
                         LoggerInstance.Warning($"Canvas counter HUD failed; using the original renderer: {counterError}");
                 }
-                if (compactValuesValid && (compactHudScore != score || compactHudCombo != combo))
+                if (compactValuesValid)
                 {
-                    compactHudScore = score;
-                    compactHudCombo = combo;
-                    compactHudText = $"Score: {score:N0}\nCombo: {combo:N0}";
+                    var lines = new List<string>(4);
+                    if (compactShowScore.Value) lines.Add($"Score: {score:N0}");
+                    if (compactShowCombo.Value) lines.Add($"Combo: {combo:N0}");
+                    if (compactShowTime.Value)
+                        lines.Add($"Time: {FormatCompactTime(compactGame!.songTime)}/{FormatCompactTime(compactGame.songLength)}");
+                    if (compactShowStars.Value && CompactScoreHudOverride.TryReadStars(compactGame, out int stars))
+                        lines.Add($"Stars: {stars}");
+                    compactHudText = string.Join("\n", lines);
                 }
                 if (compactValuesValid || scoreCanvas.HasObjects)
                 {
                     Color compactTint;
                     try { compactTint = ParseColor(compactScoreColor.Value); }
                     catch (FormatException) { compactTint = Color.white; }
-                    string? scoreError = scoreCanvas.Refresh(compactValuesValid,
-                        compactValuesValid && !settingsOpen && !moveHud && resizeTarget < 0,
+                    string? scoreError = scoreCanvas.Refresh(compactValuesValid && compactHudText.Length > 0,
+                        compactValuesValid && compactHudText.Length > 0 && !settingsOpen && !moveHud && resizeTarget < 0,
                         compactHudText, compactScoreX.Value, compactScoreY.Value, fontSize.Value,
                         compactTint,
                         backgroundOpacity.Value);
                     if (scoreError != null)
                         LoggerInstance.Warning($"Compact score Canvas failed; native graphics restored: {scoreError}");
                 }
-                compactScoreHudOverride.Update(compactScoreHud.Value, compactValuesValid,
+                compactScoreHudOverride.Update(compactScoreHud.Value, compactValuesValid && compactHudText.Length > 0,
                     scoreCanvas.Visible, compactGame);
                 if (!compactScoreHudOverride.IsActive) scoreCanvas.Hide();
             }

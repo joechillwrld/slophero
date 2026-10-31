@@ -54,6 +54,24 @@ internal sealed class CompactScoreHudOverride
         catch { return false; }
     }
 
+    internal static bool TryReadStars(GameManager? game, out int stars)
+    {
+        stars = 0;
+        try
+        {
+            var progress = game?.starProgress;
+            var current = progress?.starCount?.sprite;
+            var numbers = progress?.numberSprites;
+            if (progress == null || numbers == null) return false;
+            if (current == null) return true;
+            for (int i = 0; i < numbers.Length; i++)
+                if (numbers[i] != null && numbers[i].Pointer == current.Pointer)
+                { stars = i; return true; }
+        }
+        catch { }
+        return false;
+    }
+
     internal void Update(bool requested, bool eligible, bool canvasVisible, GameManager? game)
     {
         if (!requested || !eligible || !canvasVisible || game == null)

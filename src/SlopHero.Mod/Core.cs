@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.145", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.146", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -151,7 +151,7 @@ public sealed partial class Core : MelonMod
             legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
         }
         else LoggerInstance.Warning(status);
-        LoggerInstance.Msg("SlopHero 0.4.145 private test build; performance work and Windows validation remain in progress.");
+        LoggerInstance.Msg("SlopHero 0.4.146 private test build; performance work and Windows validation remain in progress.");
         LoggerInstance.Msg("F8: SlopHero settings. Default: hold R to restart, hold P to practice the current section.");
     }
 
@@ -743,7 +743,7 @@ public sealed partial class Core : MelonMod
             bool outroCandidate = ready && !transition && !settingsOpen && !moveHud
                 && resizeTarget < 0 && focused && !game!.isPaused && !game.isSongOver
                 && game.actualPlayerCount == 1 && (int)game.globalVariables!.gameMode == 0
-                && !practiceModeActive && !game.globalVariables.isPlayingSetlist && !online;
+                && !game.globalVariables.isPlayingSetlist && !online;
             UpdateOutroSkip(game, outroCandidate, now);
             // These paths are local UI/visual work. They can be skipped during
             // any active chart, including online play, without touching note,
@@ -1156,7 +1156,7 @@ public sealed partial class Core : MelonMod
                 && game.songLength - game.songTime < 10 && now >= nextOutroDiagnostic)
             {
                 nextOutroDiagnostic = now + 1;
-                LoggerInstance.Msg($"Outro gate waiting: solo={offlineSolo}, remaining={game.songLength - game.songTime:0.00}s.");
+                LoggerInstance.Msg($"Outro gate waiting: solo={offlineSolo}, ready={game.songLoaded && game.playersInit}, paused={game.isPaused}, over={game.isSongOver}, players={game.actualPlayerCount}, mode={(int)game.globalVariables!.gameMode}, practiceFlag={game.globalVariables.isPracticeEnabled}, setlist={game.globalVariables.isPlayingSetlist}, online={onlineState}, transition={transition}, focused={Application.isFocused}, remaining={game.songLength - game.songTime:0.00}s.");
             }
             outroPromptVisible = false;
             outroEligibleSince = 0;
@@ -1402,7 +1402,13 @@ public sealed partial class Core : MelonMod
         try { style.normal.textColor = ParseColor(compactScoreColor.Value); }
         catch { style.normal.textColor = Color.white; }
         int width = Math.Max(240, style.fontSize * 12 + 24);
-        int height = (int)(style.fontSize * 1.25f) * 2 + 20;
+        var previewLines = new List<string>(4);
+        if (compactShowScore.Value) previewLines.Add("Score: 123,456");
+        if (compactShowCombo.Value) previewLines.Add("Combo: 123");
+        if (compactShowTime.Value) previewLines.Add("Time: 2:57/5:32");
+        if (compactShowStars.Value) previewLines.Add("Stars: 4");
+        string preview = previewLines.Count == 0 ? "No compact HUD lines selected" : string.Join("\n", previewLines);
+        int height = (int)(style.fontSize * 1.25f) * Math.Max(1, previewLines.Count) + 20;
         var position = HudLayout.ClampPosition(compactScoreX.Value, compactScoreY.Value,
             width, height, Screen.width, Screen.height);
         var rect = new Rect(position.X, position.Y, width, height);
@@ -1410,7 +1416,7 @@ public sealed partial class Core : MelonMod
         try
         {
             GUI.backgroundColor = new Color(0, 0, 0, HudLayout.Unit(backgroundOpacity.Value, .65f));
-            GUI.Box(rect, "Score: 123,456\nCombo: 123", style);
+            GUI.Box(rect, preview, style);
         }
         finally { GUI.backgroundColor = previous; }
         var evt = Event.current;

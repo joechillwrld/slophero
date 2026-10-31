@@ -1,5 +1,13 @@
 # Sloptifine current handoff
 
+## 0.4.146 private test and 2026-10-31 uploads
+
+The new `2026-10-31 03-24-00.mp4` (11.2 s) shows notes changing color rapidly while scrolling. The new `Latest.log` confirms 0.4.145 loaded, tracked 2,000 pooled note sprites, and reached the player-camera pre-render callback, so that callback alone did not fix the reported flicker. The exact generated `GuitarNoteContainer` has seven public virtual byref-note/property-block methods instead of a named `SetState`; 0.4.146 tries a postfix on each, logs when one runs, and retains the camera fallback. After a writer is observed, the fallback scans the 500-container pool for active slots at 30 Hz instead of every rendered frame. This is an unmeasured CPU-work reduction and needs Windows visual and frame checks.
+
+The log's outro diagnostics report `solo=False` near the end and include a `Counted practice section` line, while the user reports testing a full song. That line does not establish the user's game mode. The gate no longer relies on `isPracticeEnabled` and now logs each remaining eligibility flag; its chart-tail and offline solo checks remain. The uploaded thumbnail screenshot has an opaque black background; 0.4.145 saved RGB24 even though its render target had alpha. 0.4.146 saves RGBA32 with a transparent camera clear. These behaviors need an in-game check before validation.
+
+The new files are outside Git at `/workspace/attachments/9f484d7c-b5af-4cb0-855a-fa4f0fcde782/2026-10-31 03-24-00.mp4` and `/workspace/attachments/f98a9e2e-624c-4a5f-9733-18a02ccc996e/Latest.log`.
+
 This is the current starting point for performance work. The detailed
 chronology is in [performance-audit.md](performance-audit.md); the raw frame
 baseline and exact-build native map are in

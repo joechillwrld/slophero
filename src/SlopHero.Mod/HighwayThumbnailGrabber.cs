@@ -30,12 +30,14 @@ internal static class HighwayThumbnailGrabber
         var oldTarget = camera.targetTexture;
         var oldActive = RenderTexture.active;
         var oldClear = camera.clearFlags;
+        var oldBackground = camera.backgroundColor;
         Texture2D? image = null;
         try
         {
             target.Create();
             camera.targetTexture = target;
             camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0, 0, 0, 0);
             camera.Render();
             RenderTexture.active = target;
             // The player camera fills the screen even though the playable
@@ -44,7 +46,7 @@ internal static class HighwayThumbnailGrabber
             int cropWidth = Math.Max(1, (int)(width * .5f));
             int cropHeight = Math.Max(1, (int)(height * .8f));
             int cropX = (width - cropWidth) / 2;
-            image = new Texture2D(cropWidth, cropHeight, TextureFormat.RGB24, false);
+            image = new Texture2D(cropWidth, cropHeight, TextureFormat.RGBA32, false);
             image.ReadPixels(new Rect(cropX, 0, cropWidth, cropHeight), 0, 0);
             image.Apply();
             var png = image.EncodeToPNG();
@@ -59,6 +61,7 @@ internal static class HighwayThumbnailGrabber
         {
             camera.targetTexture = oldTarget;
             camera.clearFlags = oldClear;
+            camera.backgroundColor = oldBackground;
             RenderTexture.active = oldActive;
             if (image != null) UnityEngine.Object.Destroy(image);
             UnityEngine.Object.Destroy(target);

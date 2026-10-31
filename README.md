@@ -1,18 +1,15 @@
-# SlopHero 0.4.145 private test
+# SlopHero 0.4.146 private test
 
 **Sloptifine** is the name for SlopHero's performance work: reversible
 experiments judged by measurements. Gameplay timing, online play, and the
 1000 Hz instrument polling path remain intact.
 
 A MelonLoader mod targeting the supplied **Clone Hero v1.1.0.6142 Windows x64**
-build, compiled against its loader and generated assemblies. Version 0.4.145 is
+build, compiled against its loader and generated assemblies. Version 0.4.146 is
 a private test build for the next update. It uses fonts loaded by the game,
 separate compact score/combo HUD, per-attempt palette ranges, guarded blank-outro
 skip, highway thumbnail capture, ghost-only sound filter, per-song auto-restart,
-and independent saved song/global attempt counts. This revision adds a live
-counter-font preview, applies rainbow note tint at the player camera's
-pre-render callback, separates practice-section Misses from the native total
-hit count, and checks blank outros independently of restart shortcut state.
+and independent saved song/global attempt counts. This revision saves highway thumbnails with transparent margins, adds optional compact HUD lines for score, combo, song time, and stars, and tries exact-game note-writer hooks to stop rainbow flicker during play. The outro gate no longer relies on the game's practice flag; chart-tail safety and offline solo checks remain.
 The visual, audio, transition,
 and performance changes need Windows validation before a final update. See the
 [test checklist](docs/next-update-windows-validation.md). Version 0.4.141
@@ -378,7 +375,7 @@ See the [performance audit](docs/performance-audit.md) for evidence and limits.
 
 ## Install
 
-[Download SlopHero v0.4.145 private test](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.145-alpha.zip?raw=1)
+[Download SlopHero v0.4.146 private test](https://github.com/joechillwrld/slophero/blob/slophero-v1.1-alpha/downloads/SlopHero-0.4.146-alpha.zip?raw=1)
 
 1. Close Clone Hero. When upgrading, replace the existing `Mods/SlopHero.dll`;
    keep only one copy of the mod.
