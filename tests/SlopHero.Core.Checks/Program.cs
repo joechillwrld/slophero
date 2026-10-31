@@ -85,6 +85,14 @@ pauseAttempts.Observe("chart A", 5, true, false, -1, songTime: 32);
 pauseAttempts.Observe("chart A", 5, true, false, -1, songTime: 0);
 Check(pauseAttempts.SongCount("chart A") == 2,
     "A substantial in-scene rewind counts a restarted song");
+pauseAttempts.Observe("chart A", 5, true, false, -1, songTime: .35);
+pauseAttempts.Observe("chart A", 5, true, false, -1, songTime: .01);
+Check(pauseAttempts.SongCount("chart A") == 3,
+    "Restarting near the beginning counts even when the rewind is under one second");
+pauseAttempts.ResetContext();
+pauseAttempts.Observe("chart A", 5, true, false, -1, songTime: .01);
+Check(pauseAttempts.SongCount("chart A") == 4,
+    "A new scene counts even when GameManager reuses a pointer and song time");
 pauseAttempts.Observe("chart A", 6, true, true, 2, songTime: 25);
 pauseAttempts.Observe("chart A", 6, false, true, 2, songTime: 25);
 pauseAttempts.Observe("chart A", 6, true, true, 2, songTime: 25.1);

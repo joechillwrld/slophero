@@ -356,7 +356,7 @@ public sealed partial class Core
             GUI.Label(new Rect(frameX + 20, frameY + 8, 250, 28), "SlopHero", menuHeaderStyle);
             menuSubtitleStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
             menuSubtitleStyle.normal.textColor = new Color(.54f, .57f, .65f, 1);
-            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.142 test", menuSubtitleStyle);
+            GUI.Label(new Rect(frameX + 20, frameY + 33, 360, 18), "MOD SETTINGS  ·  v0.4.143 test", menuSubtitleStyle);
             GUI.Label(new Rect(frameX + menuWidth - 184, frameY + 20, 118, 18), "Drag header to move", menuSubtitleStyle);
             menuClickStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 20 };
             menuClickStyle.normal.textColor = Color.white;
@@ -421,7 +421,7 @@ public sealed partial class Core
             GUI.color = previousColor;
             GUI.backgroundColor = previousBackground;
         }
-        float contentHeight = settingsPage switch { 0 => 850, 1 => 910, 2 => 1480, 3 => 680, 4 => 1580, 6 => showAdvancedPerformance ? 2670 : 990, _ => 500 };
+        float contentHeight = settingsPage switch { 0 => 850, 1 => 1040, 2 => 1480, 3 => 680, 4 => 1580, 6 => showAdvancedPerformance ? 2670 : 990, _ => 500 };
         Rect viewport = new(frameX + sidebarWidth + 12, frameY + 132, 680, menuHeight - 146);
         Rect content = new(0, 0, 656, contentHeight);
         settingsScrollPosition = GUI.BeginScrollView(viewport, settingsScrollPosition, content);
@@ -651,15 +651,11 @@ public sealed partial class Core
         Toggle(saveAttempts, "Auto-save full-song attempts by song", x, y + 282);
         Toggle(saveGlobalAttempts, "Auto-save total across all songs", x, y + 324);
         Toggle(showTotalAttempts, "Show saved total across all songs", x, y + 366);
-        if (GUI.Button(new Rect(x, y + 408, 430, 36), "Counter font: " + counterFontName.Value))
-            Edit("Installed font family", counterFontName.Value, name => {
-                if (string.IsNullOrWhiteSpace(name)) throw new FormatException("Enter a font family name.");
-                counterFontName.Value = name.Trim(); CounterFont.Configure(counterFontName.Value);
-            });
-        if (GUI.Button(new Rect(x + 440, y + 408, 172, 36), "Next installed font"))
+        if (GUI.Button(new Rect(x, y + 408, 430, 36), "Counter font: " + counterFontName.Value)
+            || GUI.Button(new Rect(x + 440, y + 408, 172, 36), "Next game font"))
         {
             string? next = CounterFont.NextInstalledFamily(counterFontName.Value);
-            if (next == null) Notice("Installed font list is unavailable in this game build.");
+            if (next == null) Notice("No alternate game font is loaded here.");
             else
             {
                 counterFontName.Value = next;
@@ -674,6 +670,14 @@ public sealed partial class Core
             v => compactScoreX.Value = (int)v);
         Number("Compact score Y", compactScoreY.Value, x, y + 816, 0, Screen.height,
             v => compactScoreY.Value = (int)v);
+        Hex(compactScoreColor, "Compact score color", x, y + 858);
+        if (GUI.Button(new Rect(x, y + 902, 265, 36), "Move compact score"))
+        {
+            moveCompactScore = true; moveSong = false; moveHud = true; nativeMoveTarget = 0;
+            settingsOpen = false; capture = null; UpdateCursor();
+        }
+        if (GUI.Button(new Rect(x + 275, y + 902, 265, 36), "Reset position"))
+        { compactScoreX.Value = compactScoreY.Value = 24; preferencesDirty = true; }
     }
 
     private void DrawHudSettings(float x, float y)
@@ -966,6 +970,7 @@ public sealed partial class Core
         nativeMoveTarget = target;
         nativeHudDragging = false;
         moveHud = true;
+        moveCompactScore = false;
         moveSong = false;
         settingsOpen = false;
         capture = null;
@@ -1448,7 +1453,7 @@ public sealed partial class Core
         Float("RainbowHueOffsetDegrees", rainbowHueOffset); Float("RainbowHueSpread", rainbowHueSpread);
         Float("RainbowNoteVariety", rainbowNoteVariety);
         Float("RainbowSaturation", rainbowSaturation); Float("RainbowContrast", rainbowContrast); Float("RainbowBrightness", rainbowBrightness);
-        Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
+        Text("CompactScoreHudColor", compactScoreColor); Text("SongTextColor", songColor); Text("FcColor", fcColor); Text("PerfectFcColor", pfcColor); Text("StarColor", starColor);
         Text("ProgressColor", progressColor); Text("ScoreTextColor", scoreColor); Text("SongProgressColor", songProgressColor); Text("FpsTextColor", fpsTextColor);
         Text("MenuAccentColor", menuAccentHex);
         Text("MenuSurfaceTintColor", menuSurfaceHex); Float("MenuTintStrength", menuTintStrength);
@@ -1478,6 +1483,7 @@ public sealed partial class Core
         Int("HudX", hudX, 0, Math.Max(0, Screen.width)); Int("HudY", hudY, 0, Math.Max(0, Screen.height)); Int("FontSize", fontSize, 14, 48); Bool("ShowHud", showHud);
         Int("CompactScoreHudX", compactScoreX, 0, Math.Max(0, Screen.width));
         Int("CompactScoreHudY", compactScoreY, 0, Math.Max(0, Screen.height));
+        Hex("CompactScoreHudColor", compactScoreColor);
         Float("BackgroundOpacity", backgroundOpacity, 0, 1); Float("TextRed", textRed, 0, 1); Float("TextGreen", textGreen, 0, 1); Float("TextBlue", textBlue, 0, 1);
         Bool("ShowMisses", showMisses); Bool("ShowHitPercentage", showHit); Bool("ShowGhosts", showGhosts); Bool("ShowBestStreak", showBest); Bool("ShowAttempts", showAttempts); Bool("SaveAttempts", saveAttempts); Bool("SaveGlobalAttempts", saveGlobalAttempts); Bool("ShowTotalAttempts", showTotalAttempts);
         if (values.TryGetValue("CounterFontName", out var family) && !string.IsNullOrWhiteSpace(family))
@@ -1550,7 +1556,7 @@ public sealed partial class Core
             if (values.ContainsKey("StarProgressHudScale")) Float("StarProgressHudScale", scoreHudScale, .5f, 2.5f);
             else Float("SongProgressHudScale", scoreHudScale, .5f, 2.5f);
         }
-        Hex("SongTextColor", songColor); Hex("FcColor", fcColor); Hex("PerfectFcColor", pfcColor); Hex("StarColor", starColor);
+        Hex("CompactScoreHudColor", compactScoreColor); Hex("SongTextColor", songColor); Hex("FcColor", fcColor); Hex("PerfectFcColor", pfcColor); Hex("StarColor", starColor);
         Hex("ProgressColor", progressColor); Hex("ScoreTextColor", scoreColor); Hex("SongProgressColor", songProgressColor); Hex("FpsTextColor", fpsTextColor);
         Hex("MenuAccentColor", menuAccentHex);
         Hex("MenuSurfaceTintColor", menuSurfaceHex);
@@ -1583,7 +1589,7 @@ public sealed partial class Core
         }
         if (GUI.Button(new Rect(x, y + 126, 265, 36), "Move this HUD"))
         {
-            moveSong = song; moveHud = true; nativeMoveTarget = 0; nativeHudDragging = false; settingsOpen = false; capture = null; UpdateCursor();
+            moveSong = song; moveCompactScore = false; moveHud = true; nativeMoveTarget = 0; nativeHudDragging = false; settingsOpen = false; capture = null; UpdateCursor();
             restartHold.RequireRelease(); practiceHold.RequireRelease();
         }
         if (GUI.Button(new Rect(x + 275, y + 126, 265, 36), "Reset position"))
@@ -1910,6 +1916,9 @@ public sealed partial class Core
         if (customizeFpsColor.Value && nativeHudActive && !nativeHudError
             && OnDemandRendering.willCurrentFrameRender)
             nativeHud.RefreshFpsColor();
+        if (compactScoreHudOverride.IsActive && scoreCanvas.Visible
+            && OnDemandRendering.willCurrentFrameRender)
+            compactScoreHudOverride.Reassert();
         if (now < nextOverridePass) return;
         nextOverridePass = now + .05;
         // This shares the existing 20 Hz override cadence. A separate timer
@@ -1936,15 +1945,16 @@ public sealed partial class Core
         int score = 0, combo = 0;
         bool compactValuesValid = compactEligible
             && CompactScoreHudOverride.TryRead(compactGame, out score, out combo);
-        if (useCanvasCounterHud.Value || counterCanvas.HasObjects
+        bool selectedCounterFont = CounterFont.TextMeshProFont != null;
+        if (useCanvasCounterHud.Value || selectedCounterFont || counterCanvas.HasObjects
             || compactScoreHudOverride.IsActive || compactValuesValid || scoreCanvas.HasObjects)
         {
             long canvasTiming = timings.Begin();
             try
             {
-                if (useCanvasCounterHud.Value || counterCanvas.HasObjects)
+                if (useCanvasCounterHud.Value || selectedCounterFont || counterCanvas.HasObjects)
                 {
-                    string? counterError = counterCanvas.Refresh(useCanvasCounterHud.Value,
+                    string? counterError = counterCanvas.Refresh(useCanvasCounterHud.Value || selectedCounterFont,
                         showHud.Value && !string.IsNullOrEmpty(statsText) && !settingsOpen && !moveHud && resizeTarget < 0,
                         statsText, hudX.Value, hudY.Value, fontSize.Value,
                         new Color(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1),
@@ -1960,10 +1970,13 @@ public sealed partial class Core
                 }
                 if (compactValuesValid || scoreCanvas.HasObjects)
                 {
+                    Color compactTint;
+                    try { compactTint = ParseColor(compactScoreColor.Value); }
+                    catch (FormatException) { compactTint = Color.white; }
                     string? scoreError = scoreCanvas.Refresh(compactValuesValid,
                         compactValuesValid && !settingsOpen && !moveHud && resizeTarget < 0,
                         compactHudText, compactScoreX.Value, compactScoreY.Value, fontSize.Value,
-                        new Color(HudLayout.Unit(textRed.Value), HudLayout.Unit(textGreen.Value), HudLayout.Unit(textBlue.Value), 1),
+                        compactTint,
                         backgroundOpacity.Value);
                     if (scoreError != null)
                         LoggerInstance.Warning($"Compact score Canvas failed; native graphics restored: {scoreError}");

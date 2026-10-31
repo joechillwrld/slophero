@@ -17,6 +17,7 @@ internal sealed class CounterCanvasHud
     private RectTransform? panelRect;
     private Image? background;
     private TextMeshProUGUI? label;
+    private TMP_FontAsset? defaultFont;
     private string? shownText;
     private Color shownTextColor, shownBackgroundColor;
     private int shownFont = -1, shownX = -1, shownY = -1, shownWidth = -1, shownHeight = -1;
@@ -50,8 +51,12 @@ internal sealed class CounterCanvasHud
             if (root == null) Create();
             if (root == null || panelRect == null || background == null || label == null)
                 throw new InvalidOperationException("Canvas HUD components were not created.");
-            if (!songMode && CounterFont.TextMeshProFont is { } selectedFont && label.font != selectedFont)
-                label.font = selectedFont;
+            if (!songMode)
+            {
+                defaultFont ??= label.font;
+                var selectedFont = CounterFont.TextMeshProFont ?? defaultFont;
+                if (selectedFont != null && label.font != selectedFont) label.font = selectedFont;
+            }
 
             int size = Math.Clamp(fontSize, 14, 48);
             int screenWidth = Screen.width, screenHeight = Screen.height;
@@ -150,6 +155,7 @@ internal sealed class CounterCanvasHud
         panelRect = null;
         background = null;
         label = null;
+        defaultFont = null;
         shownText = null;
         shownFont = shownX = shownY = shownWidth = shownHeight = -1;
         cachedRefreshText = null;
@@ -189,11 +195,10 @@ internal sealed class CounterCanvasHud
         textRect.offsetMin = new Vector2(12, 8);
         textRect.offsetMax = new Vector2(-12, -8);
         label = textObject.AddComponent<TextMeshProUGUI>();
+        defaultFont = label.font;
         label.raycastTarget = false;
         label.alignment = TextAlignmentOptions.TopLeft;
         label.enableWordWrapping = songMode;
-        if (!songMode && CounterFont.TextMeshProFont is { } counterFont)
-            label.font = counterFont;
         panel.SetActive(true);
     }
 }

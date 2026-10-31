@@ -18,6 +18,7 @@ internal sealed class RainbowHighway
     {
         internal readonly GameObject Object;
         internal readonly List<SpriteState> Sprites = new(4);
+        internal SpriteState? Body;
         internal readonly int PoolSlot;
         internal int Phase;
         internal NoteGroup(GameObject gameObject, int phase, int poolSlot)
@@ -47,6 +48,7 @@ internal sealed class RainbowHighway
 
     private static RainbowHighway? active;
     private readonly Dictionary<IntPtr, SpriteState> notes = new();
+    private readonly Dictionary<IntPtr, NoteGroup> noteGroupsByContainer = new();
     private readonly List<NoteGroup> noteGroups = new();
     private readonly List<NoteGroup> activeNoteGroups = new();
     private readonly Dictionary<IntPtr, FlameState> flamesByAnimator = new();
@@ -56,7 +58,7 @@ internal sealed class RainbowHighway
     private readonly Color[] notePalette = new Color[12];
     private readonly Color[] variedNotePalette = new Color[60];
     private readonly Color[] flamePalette = new Color[5];
-    private MethodInfo? noteColorSetter, flameAnimatorUpdate;
+    private MethodInfo? noteColorSetter, noteStateMethod, flameAnimatorUpdate;
     private HarmonyLib.Harmony? noteHarmony, flameHarmony;
     private bool noteHookInstalled, flameUpdateHookInstalled;
     private bool noteHookFailed, flameHookFailed, applyingOwnColor, notesDiscovered, notesActive;
@@ -332,11 +334,22 @@ internal sealed class RainbowHighway
         {
             harmony.Patch(noteColorSetter, prefix: new HarmonyMethod(typeof(RainbowHighway)
                 .GetMethod(nameof(BeforeNoteColor), BindingFlags.Static | BindingFlags.NonPublic)!));
+            // The game's IL2CPP SetState can write colors without entering
+            // the managed SpriteRenderer setter. Tint right after that write,
+            // before the scrolling note is presented in the same frame.
+            noteStateMethod = typeof(GuitarNoteContainer).GetMethod("SetState",
+                BindingFlags.Public | BindingFlags.Instance)
+                ?? throw new MissingMethodException("GuitarNoteContainer.SetState");
+            harmony.Patch(noteStateMethod, postfix: new HarmonyMethod(typeof(RainbowHighway)
+                .GetMethod(nameof(AfterNoteSetState), BindingFlags.Static | BindingFlags.NonPublic)!));
             noteHookInstalled = true;
+            MelonLogger.Msg("Rainbow note SetState tint hook active for scrolling notes.");
         }
         catch
         {
             try { harmony.Unpatch(noteColorSetter, HarmonyPatchType.All, harmony.Id); } catch { }
+            if (noteStateMethod != null)
+                try { harmony.Unpatch(noteStateMethod, HarmonyPatchType.All, harmony.Id); } catch { }
             DeactivateIfUnused();
             throw;
         }
@@ -366,7 +379,7 @@ internal sealed class RainbowHighway
     private static void BeforeNoteColor(SpriteRenderer __instance, ref Color value)
     {
         var owner = active;
-        if (owner == null || !owner.notesActive || owner.applyingOwnColor) return;
+        if (owner == null || !owner.notesActive || owner.notesFailed || owner.applyingOwnColor) return;
         var pointer = __instance.Pointer;
         if (!owner.notes.TryGetValue(pointer, out var note)) return;
         var tint = owner.NoteColor(note.Group);
@@ -384,6 +397,33 @@ internal sealed class RainbowHighway
         }
         value.r = tint.r; value.g = tint.g; value.b = tint.b;
         note.Displayed = value;
+    }
+
+    private static void AfterNoteSetState(GuitarNoteContainer __instance)
+    {
+        var owner = active;
+        if (owner == null || !owner.notesActive || owner.notesFailed || owner.applyingOwnColor
+            || !owner.noteGroupsByContainer.TryGetValue(__instance.Pointer, out var group)) return;
+        try
+        {
+            owner.applyingOwnColor = true;
+            if (group.Body?.Renderer is { } body
+                && TryResolveLane(body.color, out int lanePhase)) group.Phase = lanePhase;
+            foreach (var state in group.Sprites)
+            {
+                if (state.Renderer == null || !state.Renderer.enabled || state.Renderer.sprite == null) continue;
+                var current = state.Renderer.color;
+                if (current.r != state.Displayed.r || current.g != state.Displayed.g || current.b != state.Displayed.b)
+                    state.Original = current;
+                SetNoteRgb(state, owner.NoteColor(group));
+            }
+        }
+        catch (Exception ex)
+        {
+            owner.notesFailed = true;
+            MelonLogger.Warning($"Rainbow note SetState tint stopped: {ex.Message}");
+        }
+        finally { owner.applyingOwnColor = false; }
     }
 
     private static void AfterFlameAnimatorUpdate(FlameAnimator __instance)
@@ -422,6 +462,7 @@ internal sealed class RainbowHighway
                 added += Remember(container.Anim, group);
                 added += Remember(container.Open_HOPO, group);
                 noteGroups.Add(group);
+                noteGroupsByContainer[container.Pointer] = group;
             }
         }
 
@@ -442,6 +483,7 @@ internal sealed class RainbowHighway
         var state = new SpriteState(renderer, group, isBody);
         notes.Add(renderer.Pointer, state);
         group.Sprites.Add(state);
+        if (isBody) group.Body = state;
         return 1;
     }
 
@@ -532,6 +574,7 @@ internal sealed class RainbowHighway
             {
                 notes.Clear();
                 noteGroups.Clear();
+                noteGroupsByContainer.Clear();
                 activeNoteGroups.Clear();
                 nextActiveGroupScan = 0;
                 notesDiscovered = false;
@@ -558,6 +601,7 @@ internal sealed class RainbowHighway
         {
             notes.Clear();
             noteGroups.Clear();
+            noteGroupsByContainer.Clear();
             activeNoteGroups.Clear();
             nextActiveGroupScan = 0;
             notesDiscovered = false;
@@ -600,8 +644,14 @@ internal sealed class RainbowHighway
             try { noteHarmony.Unpatch(noteColorSetter, HarmonyPatchType.All, noteHarmony.Id); }
             catch (Exception ex) { MelonLogger.Warning($"Rainbow color hook cleanup failed; its inactive prefix passes through: {ex.Message}"); }
         }
+        if (noteStateMethod != null && noteHarmony != null)
+        {
+            try { noteHarmony.Unpatch(noteStateMethod, HarmonyPatchType.All, noteHarmony.Id); }
+            catch (Exception ex) { MelonLogger.Warning($"Rainbow note state hook cleanup failed: {ex.Message}"); }
+        }
         noteHookInstalled = false;
         noteColorSetter = null;
+        noteStateMethod = null;
         noteHarmony = null;
         noteHookFailed = false;
         DeactivateIfUnused();

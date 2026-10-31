@@ -4,93 +4,72 @@ using UnityEngine;
 
 namespace SlopHero.Mod;
 
-/// <summary>One cached, process-lifetime font for SlopHero's small counter HUD.</summary>
+/// <summary>Fonts already loaded by the game can be reused without stripped OS-font APIs.</summary>
 internal static class CounterFont
 {
-    private static bool attempted;
-    private static Font? unityFont;
-    private static TMP_FontAsset? textMeshProFont;
-    private static string requestedFamily = "Segoe UI";
-    private static readonly Dictionary<string, (Font Font, TMP_FontAsset? Tmp)> cache =
+    private static readonly Dictionary<string, TMP_FontAsset> available =
         new(StringComparer.OrdinalIgnoreCase);
-    private static string[]? installedFamilies;
-
-    internal static string? NextInstalledFamily(string current)
-    {
-        if (installedFamilies == null)
-        {
-            try
-            {
-                installedFamilies = Font.GetOSInstalledFontNames()
-                    .Where(name => !string.IsNullOrWhiteSpace(name))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
-            }
-            catch (Exception ex)
-            {
-                installedFamilies = Array.Empty<string>();
-                MelonLogger.Warning($"Installed font enumeration unavailable: {ex.Message}");
-            }
-        }
-        if (installedFamilies.Length == 0) return null;
-        int index = Array.FindIndex(installedFamilies,
-            name => string.Equals(name, current, StringComparison.OrdinalIgnoreCase));
-        return installedFamilies[(index + 1) % installedFamilies.Length];
-    }
+    private static string requestedFamily = "Default";
+    private static bool warned;
+    private static float nextScanTime;
 
     internal static void Configure(string? family)
     {
-        string next = string.IsNullOrWhiteSpace(family) ? "Segoe UI" : family.Trim();
-        if (string.Equals(next, requestedFamily, StringComparison.OrdinalIgnoreCase)) return;
-        requestedFamily = next;
-        attempted = false;
+        requestedFamily = string.IsNullOrWhiteSpace(family) ? "Default" : family.Trim();
+        nextScanTime = 0;
+        warned = false;
     }
 
-    internal static Font? UnityFont
+    internal static string? NextInstalledFamily(string current)
     {
-        get { Prepare(); return unityFont; }
+        RefreshAvailable(force: true);
+        var names = available.Keys.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+        if (names.Count == 0) return null;
+        names.Insert(0, "Default");
+        int index = names.FindIndex(name => string.Equals(name, current, StringComparison.OrdinalIgnoreCase));
+        return names[(index + 1) % names.Count];
     }
+
+    internal static Font? UnityFont => TextMeshProFont?.sourceFontFile;
 
     internal static TMP_FontAsset? TextMeshProFont
     {
-        get { Prepare(); return textMeshProFont; }
+        get
+        {
+            if (string.Equals(requestedFamily, "Default", StringComparison.OrdinalIgnoreCase)) return null;
+            if (available.TryGetValue(requestedFamily, out var font)) return font;
+            RefreshAvailable();
+            if (available.TryGetValue(requestedFamily, out font)) return font;
+            if (!warned)
+            {
+                warned = true;
+                MelonLogger.Warning($"Counter font '{requestedFamily}' is not loaded in this scene; using the game's default font.");
+            }
+            return null;
+        }
     }
 
-    private static void Prepare()
+    private static void RefreshAvailable(bool force = false)
     {
-        if (attempted) return;
-        attempted = true;
-        if (cache.TryGetValue(requestedFamily, out var cached))
-        {
-            unityFont = cached.Font;
-            textMeshProFont = cached.Tmp;
-            return;
-        }
+        float now = Time.realtimeSinceStartup;
+        if (!force && now < nextScanTime) return;
+        nextScanTime = now + 2f;
         try
         {
-            unityFont = Font.CreateDynamicFontFromOSFont(requestedFamily, 48);
-            if (unityFont == null) unityFont = Font.CreateDynamicFontFromOSFont("Arial", 48);
-            if (unityFont == null) return;
-
-            unityFont.name = "SlopHero Counter Font";
-            unityFont.hideFlags = HideFlags.HideAndDontSave;
-            try
+            foreach (var text in UnityEngine.Object.FindObjectsOfType<TextMeshProUGUI>())
             {
-                textMeshProFont = TMP_FontAsset.CreateFontAsset(unityFont);
-                if (textMeshProFont != null)
-                {
-                    textMeshProFont.name = "SlopHero Counter Font SDF";
-                    textMeshProFont.hideFlags = HideFlags.HideAndDontSave;
-                }
+                if (text == null || text.font == null || string.IsNullOrWhiteSpace(text.font.name)) continue;
+                available[text.font.name] = text.font;
             }
-            catch { /* The IMGUI counters can still use the OS font directly. */ }
-            cache[requestedFamily] = (unityFont, textMeshProFont);
+            foreach (var text in UnityEngine.Object.FindObjectsOfType<TextMeshPro>())
+            {
+                if (text == null || text.font == null || string.IsNullOrWhiteSpace(text.font.name)) continue;
+                available[text.font.name] = text.font;
+            }
         }
         catch (Exception ex)
         {
-            unityFont = null;
-            textMeshProFont = null;
-            MelonLogger.Warning($"Counter font unavailable; keeping Clone Hero's default font: {ex.Message}");
+            if (!warned) { warned = true; MelonLogger.Warning($"Game font discovery unavailable: {ex.Message}"); }
         }
     }
 }

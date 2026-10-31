@@ -18,6 +18,24 @@ internal sealed class CompactScoreHudOverride
 
     internal bool IsActive => sprites.Count != 0;
 
+    // SpriteFont.SetSprites may re-enable a digit after our 20 Hz layout pass.
+    // Reassert immediately before each rendered frame while the Canvas is up.
+    internal void Reassert()
+    {
+        try
+        {
+            foreach (var state in sprites)
+                if (state.Renderer != null && state.Renderer.enabled)
+                    state.Renderer.enabled = false;
+        }
+        catch (Exception ex)
+        {
+            Restore();
+            failed = true;
+            MelonLogger.Warning($"Compact score HUD stopped; native score graphics restored: {ex.Message}");
+        }
+    }
+
     internal static bool TryRead(GameManager? game, out int score, out int combo)
     {
         score = combo = 0;
@@ -47,9 +65,7 @@ internal sealed class CompactScoreHudOverride
         try
         {
             if (sprites.Count == 0 && !Capture(game)) return;
-            foreach (var state in sprites)
-                if (state.Renderer != null && state.Renderer.enabled)
-                    state.Renderer.enabled = false;
+            Reassert();
         }
         catch (Exception ex)
         {

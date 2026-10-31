@@ -7,7 +7,7 @@ using SlopHero.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.142", "joechillwrld")]
+[assembly: MelonInfo(typeof(SlopHero.Mod.Core), "SlopHero", "0.4.143", "joechillwrld")]
 [assembly: MelonGame("srylain Inc.", "Clone Hero")]
 
 namespace SlopHero.Mod;
@@ -54,10 +54,11 @@ public sealed partial class Core : MelonMod
     private MelonPreferences_Entry<float> backgroundOpacity = null!, textRed = null!, textGreen = null!, textBlue = null!;
     private MelonPreferences_Entry<int> hudX = null!, hudY = null!, fontSize = null!;
     private MelonPreferences_Entry<int> compactScoreX = null!, compactScoreY = null!;
+    private MelonPreferences_Entry<string> compactScoreColor = null!;
     private MelonPreferences_Entry<bool> showHud = null!, showAttempts = null!, saveAttempts = null!, saveGlobalAttempts = null!, showTotalAttempts = null!;
     private MelonPreferences_Entry<string> counterFontName = null!;
     private bool compatible, gameplay, gameplayInitialized, practiceModeActive, settingsOpen, transition, practiceFailed;
-    private bool moveHud, hudDragging, preferencesDirty, cursorOverridden, savedCursorVisible;
+    private bool moveHud, moveCompactScore, hudDragging, preferencesDirty, cursorOverridden, savedCursorVisible;
     private int nativeMoveTarget;
     private bool nativeHudDragging, nativeHudError, nativeHudErrorLogged, nativeHudActive;
     private Vector2 nativeHudLastMouse;
@@ -104,13 +105,16 @@ public sealed partial class Core : MelonMod
         hudY = preferences.CreateEntry("HudY", 110);
         compactScoreX = preferences.CreateEntry("CompactScoreHudX", 24);
         compactScoreY = preferences.CreateEntry("CompactScoreHudY", 24);
+        compactScoreColor = preferences.CreateEntry("CompactScoreHudColor", "FFFFFF");
         fontSize = preferences.CreateEntry("FontSize", 24);
         showHud = preferences.CreateEntry("ShowHud", true);
         showAttempts = preferences.CreateEntry("ShowAttempts", false);
         saveAttempts = preferences.CreateEntry("SaveAttempts", false);
         saveGlobalAttempts = preferences.CreateEntry("SaveGlobalAttempts", saveAttempts.Value);
         showTotalAttempts = preferences.CreateEntry("ShowTotalAttempts", false);
-        counterFontName = preferences.CreateEntry("CounterFontName", "Segoe UI");
+        counterFontName = preferences.CreateEntry("CounterFontName", "Default");
+        if (string.Equals(counterFontName.Value, "Segoe UI", StringComparison.OrdinalIgnoreCase))
+            counterFontName.Value = "Default";
         outroSkipMode = preferences.CreateEntry("OutroSkipMode", 0);
         CounterFont.Configure(counterFontName.Value);
         backgroundOpacity = preferences.CreateEntry("BackgroundOpacity", .65f);
@@ -146,7 +150,7 @@ public sealed partial class Core : MelonMod
             legacyMouseEvents.Prepare(skipLegacyMouseEvents.Value);
         }
         else LoggerInstance.Warning(status);
-        LoggerInstance.Msg("SlopHero 0.4.142 private test build; performance work and Windows validation remain in progress.");
+        LoggerInstance.Msg("SlopHero 0.4.143 private test build; performance work and Windows validation remain in progress.");
         LoggerInstance.Msg("F8: SlopHero settings. Default: hold R to restart, hold P to practice the current section.");
     }
 
@@ -197,6 +201,7 @@ public sealed partial class Core : MelonMod
 
     public override void OnSceneWasLoaded(int buildIndex, string sceneName)
     {
+        attempts.ResetContext();
         clonZonesOriginalFretRenderers.SelectForScene(useClonZonesOriginalFretRenderers.Value,
             string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase));
         unityJobWorkerLimit.Clear();
@@ -332,6 +337,7 @@ public sealed partial class Core : MelonMod
 
     public override void OnSceneWasUnloaded(int buildIndex, string sceneName)
     {
+        attempts.ResetContext();
         if (string.Equals(sceneName, "Gameplay", StringComparison.OrdinalIgnoreCase))
             clonZonesOriginalFretRenderers.Restore();
         staticTmpScale.Clear();
@@ -643,6 +649,10 @@ public sealed partial class Core : MelonMod
             if (attempts.AttemptSequence != lastColorAttemptSequence)
             {
                 lastColorAttemptSequence = attempts.AttemptSequence;
+                if (attemptKey != null)
+                    LoggerInstance.Msg(attempts.ActiveSection >= 0
+                        ? $"Counted practice section {attempts.ActiveSection + 1} try {attempts.SectionCount(attemptKey, attempts.ActiveSection)}."
+                        : $"Counted song attempt {attempts.SongCount(attemptKey)} (saved {attempts.SavedSongCount(attemptKey)}, total {attempts.SavedTotalCount}).");
                 attemptHueRotation = SamplePaletteRange(randomHueMin.Value, randomHueMax.Value, 0f, 360f);
                 attemptSaturationMultiplier = SamplePaletteRange(randomSaturationMin.Value, randomSaturationMax.Value, .5f, 1.5f);
                 attemptBrightnessMultiplier = SamplePaletteRange(randomBrightnessMin.Value, randomBrightnessMax.Value, .5f, 1.5f);
@@ -927,14 +937,14 @@ public sealed partial class Core : MelonMod
                         if (showAttempts.Value && attemptKey != null)
                         {
                             if (practiceModeActive)
-                                lines.Add($"Section attempts: {attempts.SectionCount(attemptKey, attempts.ActiveSection)}");
+                                lines.Add($"Section tries: {attempts.SectionCount(attemptKey, attempts.ActiveSection)}");
                             else
                             {
-                                lines.Add($"Song attempts: {attempts.SongCount(attemptKey)} this session"
-                                    + (saveAttempts.Value || attempts.SavedSongCount(attemptKey) > 0
-                                        ? $" / {attempts.SavedSongCount(attemptKey)} saved" : ""));
+                                lines.Add($"Attempts: {attempts.SongCount(attemptKey)}");
+                                if (saveAttempts.Value || attempts.SavedSongCount(attemptKey) > 0)
+                                    lines.Add($"Saved: {attempts.SavedSongCount(attemptKey)}");
                                 if (showTotalAttempts.Value)
-                                    lines.Add($"All songs: {attempts.SavedTotalCount} saved attempts");
+                                    lines.Add($"Total: {attempts.SavedTotalCount}");
                             }
                         }
                         statsText = string.Join("\n", lines);
@@ -1234,7 +1244,8 @@ public sealed partial class Core : MelonMod
         if (songCanvas.Visible && (!showSong.Value || settingsOpen || moveHud || resizeEditing
             || !gameplay || string.IsNullOrEmpty(songText))) songCanvas.Hide();
         bool noticeVisible = !compatible || (noticeUntil > 0 && clock.Elapsed.TotalSeconds < noticeUntil);
-        bool counterHudVisible = !counterCanvas.Visible && showHud.Value && gameplay && !string.IsNullOrEmpty(statsText);
+        bool counterHudVisible = !(moveHud && moveCompactScore) && !counterCanvas.Visible && showHud.Value
+            && gameplay && !string.IsNullOrEmpty(statsText);
         bool songHudVisible = !songCanvas.Visible && showSong.Value && gameplay && !string.IsNullOrEmpty(songText);
         if (!settingsOpen && !moveHud && !resizeEditing && !noticeVisible && !counterHudVisible && !songHudVisible
             && !outroPromptVisible) return;
@@ -1246,7 +1257,7 @@ public sealed partial class Core : MelonMod
             // The settings page must not force a counter preview after the
             // master switch is turned off. Only explicit move/resize modes
             // show a placeholder for a hidden HUD.
-            if (counterHudVisible || nativeMoveTarget != 0 || (moveHud && !moveSong) || resizeTarget == 0)
+            if (counterHudVisible || nativeMoveTarget != 0 || (moveHud && !moveSong && !moveCompactScore) || resizeTarget == 0)
             {
                 if (nativeMoveTarget != 0) DrawNativeHudMove();
                 else
@@ -1271,6 +1282,7 @@ public sealed partial class Core : MelonMod
                     }
                 }
             }
+            if (moveHud && moveCompactScore) DrawCompactScorePreview();
             if (!(moveHud && (moveSong || nativeMoveTarget != 0)) && ((!songCanvas.Visible && showSong.Value && gameplay && !string.IsNullOrEmpty(songText)) || resizeTarget == 1)) DrawSongHudSafely();
             if (resizeEditing) DrawResizeHandles();
             if (noticeVisible)
@@ -1361,6 +1373,41 @@ public sealed partial class Core : MelonMod
             hudDragging = false;
             SavePreferences();
         }
+    }
+
+    private void DrawCompactScorePreview()
+    {
+        var style = CreateHudStyle();
+        style.fontSize = Math.Clamp(fontSize.Value, 14, 48);
+        if (CounterFont.UnityFont is { } font) style.font = font;
+        try { style.normal.textColor = ParseColor(compactScoreColor.Value); }
+        catch { style.normal.textColor = Color.white; }
+        int width = Math.Max(240, style.fontSize * 12 + 24);
+        int height = (int)(style.fontSize * 1.25f) * 2 + 20;
+        var position = HudLayout.ClampPosition(compactScoreX.Value, compactScoreY.Value,
+            width, height, Screen.width, Screen.height);
+        var rect = new Rect(position.X, position.Y, width, height);
+        Color previous = GUI.backgroundColor;
+        try
+        {
+            GUI.backgroundColor = new Color(0, 0, 0, HudLayout.Unit(backgroundOpacity.Value, .65f));
+            GUI.Box(rect, "Score: 123,456\nCombo: 123", style);
+        }
+        finally { GUI.backgroundColor = previous; }
+        var evt = Event.current;
+        if (evt.type == EventType.MouseDown && evt.button == 0 && rect.Contains(evt.mousePosition))
+        { hudDragging = true; dragOffset = evt.mousePosition - new Vector2(rect.x, rect.y); evt.Use(); }
+        if (hudDragging && evt.type == EventType.MouseDrag)
+        {
+            var next = HudLayout.ClampPosition(Mathf.RoundToInt(evt.mousePosition.x - dragOffset.x),
+                Mathf.RoundToInt(evt.mousePosition.y - dragOffset.y), width, height, Screen.width, Screen.height);
+            compactScoreX.Value = next.X;
+            compactScoreY.Value = next.Y;
+            preferencesDirty = true;
+            evt.Use();
+        }
+        if (hudDragging && evt.rawType == EventType.MouseUp)
+        { hudDragging = false; SavePreferences(); }
     }
 
     private static GUIStyle CreateHudStyle(bool wordWrap = false)

@@ -82,9 +82,11 @@ public sealed class SongAttemptCounter
         if (!playing) return;
         bool newContext = !wasPlaying || scene != lastScene || songKey != lastSongKey
             || practice != lastPractice;
+        // Restarts near the start of a song can rewind less than a second.
+        // Any meaningful backward jump in the monotonic song clock is a new
+        // attempt; small clock noise remains below this threshold.
         bool rewound = !newContext && double.IsFinite(songTime) && double.IsFinite(lastSongTime)
-            && double.IsFinite(maxSongTime) && songTime < lastSongTime - .5
-            && maxSongTime - songTime > 1;
+            && songTime < lastSongTime - .075;
         if (!newContext && !rewound)
         {
             if (double.IsFinite(songTime))
@@ -129,6 +131,14 @@ public sealed class SongAttemptCounter
                 catch (Exception ex) { PersistenceError = ex.Message; }
             }
         }
+    }
+
+    public void ResetContext()
+    {
+        wasPlaying = false;
+        lastScene = 0;
+        lastSongKey = null;
+        lastSongTime = maxSongTime = double.NaN;
     }
 
     public int SongCount(string songKey) => songs.GetValueOrDefault(songKey);
